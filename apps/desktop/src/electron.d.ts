@@ -47,7 +47,6 @@ type WorkspaceApi = {
 };
 
 type AuthApi = {
-  complete: (code: string) => Promise<AuthSnapshotType>;
   onChanged: (callback: (snapshot: AuthSnapshotType) => void) => () => void;
   onError: (callback: (message: string) => void) => () => void;
   read: () => Promise<AuthSnapshotType>;
@@ -69,10 +68,10 @@ declare global {
   type Preferences = PreferencesType;
 
   interface Window {
-    auth?: AuthApi;
-    catalog?: CatalogApi;
-    preferenceSync?: PreferenceSyncApi;
-    preferences?: PreferencesApi;
-    workspace?: WorkspaceApi;
+    auth: AuthApi;
+    catalog: CatalogApi;
+    preferenceSync: PreferenceSyncApi;
+    preferences: PreferencesApi;
+    workspace: WorkspaceApi;
   }
 }

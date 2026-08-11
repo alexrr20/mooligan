@@ -40,8 +40,7 @@ main {
 }
 
 .eyebrow,
-.footnote,
-.manual-title {
+.footnote {
   font-family: "SFMono-Regular", "Cascadia Mono", monospace;
   text-transform: uppercase;
   letter-spacing: 0.14em;
@@ -115,38 +114,6 @@ button:disabled {
   margin: 0 0 12px;
   color: #a6a89d;
   font-size: 12px;
-}
-
-.manual {
-  margin-top: 24px;
-  padding: 18px;
-  border: 1px solid #34362f;
-  color: #a6a89d;
-  font-size: 12px;
-  line-height: 1.55;
-}
-
-.manual p {
-  margin: 0 0 10px;
-}
-
-.manual-title {
-  color: #f4f1e8;
-  font-size: 8px;
-}
-
-.code {
-  min-height: 48px;
-  margin-top: 14px;
-  border-color: #696c63;
-  color: #f4f1e8;
-  background: #171914;
-}
-
-.code code {
-  overflow: hidden;
-  font-size: 10px;
-  text-overflow: ellipsis;
 }
 
 .error {

@@ -161,22 +161,6 @@ export class DesktopAuth {
     });
   }
 
-  completeManualCode(code: unknown): Promise<AuthSnapshot> {
-    return this.#serialize(async () => {
-      const { pendingAuth } = await this.#requirePendingState();
-      if (typeof code !== "string") {
-        throw new AuthInputError("The authorization code is invalid.");
-      }
-      const value = code.trim();
-
-      if (RAW_AUTHORIZATION_CODE.test(value)) {
-        return await this.#exchange({ identifier: value, state: pendingAuth.state });
-      }
-
-      return await this.#exchange(parseEncodedAuthorizationCode(value));
-    });
-  }
-
   refresh(): Promise<AuthSnapshot> {
     return this.#serialize(async () => {
       await this.#requireState();
@@ -419,8 +403,7 @@ export class DesktopAuth {
     }
 
     let response: Response;
-    const timeoutController = new AbortController();
-    const timeout = setTimeout(() => timeoutController.abort(), this.#requestTimeoutMs);
+    const timeoutSignal = AbortSignal.timeout(this.#requestTimeoutMs);
 
     try {
       response = await this.#fetch(url, {
@@ -428,16 +411,12 @@ export class DesktopAuth {
         credentials: "omit",
         headers,
         redirect: "error",
-        signal: init.signal
-          ? AbortSignal.any([init.signal, timeoutController.signal])
-          : timeoutController.signal,
+        signal: init.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal,
       });
     } catch (error) {
       throw new AuthRequestError("The authentication service could not be reached.", {
         cause: error,
       });
-    } finally {
-      clearTimeout(timeout);
     }
 
     if (response.redirected || (response.url && new URL(response.url).origin !== this.#origin)) {
@@ -460,7 +439,7 @@ export class DesktopAuth {
     const next: Record<string, StoredAuthCookie> = { ...current };
     const now = this.#now();
 
-    for (const header of getSetCookieHeaders(response.headers)) {
+    for (const header of response.headers.getSetCookie()) {
       for (const value of splitSetCookieHeader(header)) {
         for (const [name, attributes] of parseSetCookieHeader(value)) {
           if (!this.#acceptsCookie(name, attributes, response.url)) {
@@ -675,11 +654,10 @@ function parseEncodedAuthorizationCode(value: string): RedirectToken {
 
   let data: unknown;
   try {
-    const unpadded = encoded.replace(/=+$/, "");
-    const decoded = Buffer.from(unpadded, "base64url");
+    const decoded = Buffer.from(encoded, "base64url");
     const canonical = decoded.toString("base64url");
     const padded = canonical.padEnd(Math.ceil(canonical.length / 4) * 4, "=");
-    if (encoded !== canonical && encoded !== padded) {
+    if (encoded !== padded) {
       throw new Error("Non-canonical authorization code.");
     }
     data = JSON.parse(decoded.toString("utf8"));
@@ -739,13 +717,6 @@ function cookieExpiry(
   }
 
   return null;
-}
-
-function getSetCookieHeaders(headers: Headers) {
-  const getSetCookie = (headers as Headers & { getSetCookie?: () => string[] }).getSetCookie;
-  return getSetCookie
-    ? getSetCookie.call(headers)
-    : splitSetCookieHeader(headers.get("set-cookie") ?? "");
 }
 
 function sanitizeUser(value: unknown): AuthUser {

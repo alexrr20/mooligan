@@ -74,10 +74,21 @@ void test("desktop sign-in persists PKCE first and keeps session material out of
 
     if (url.pathname === "/api/auth/get-session") {
       if (hangSessionRequest) {
+        const signal = init?.signal;
+        assert.ok(signal);
         return new Promise<Response>((_resolve, reject) => {
-          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), {
-            once: true,
-          });
+          const watchdog = setTimeout(
+            () => reject(new Error("The request timeout did not abort the mocked fetch.")),
+            1_000,
+          );
+          signal.addEventListener(
+            "abort",
+            () => {
+              clearTimeout(watchdog);
+              reject(signal.reason);
+            },
+            { once: true },
+          );
         });
       }
       return jsonResponse({ session: { token: "server-only" }, user });
@@ -121,6 +132,12 @@ void test("desktop sign-in persists PKCE first and keeps session material out of
     await assert.rejects(
       auth.handleCallback(
         `${AUTH_PROTOCOL}://auth/callback?token=${encodeToken(identifier, state)}`,
+      ),
+      AuthInputError,
+    );
+    await assert.rejects(
+      auth.handleCallback(
+        `${AUTH_PROTOCOL}://auth/callback#token=${encodeToken(identifier, state).replace(/=+$/, "")}`,
       ),
       AuthInputError,
     );
@@ -208,11 +225,9 @@ void test("desktop sign-in persists PKCE first and keeps session material out of
       status: "signed-out",
       user: null,
     });
-    await assert.rejects(relaunched.completeManualCode({ code: "C".repeat(32) }), AuthInputError);
     const pendingState = (await safeStorage.readState(path)).pendingAuth?.state ?? "";
     assert.equal(
-      (await relaunched.completeManualCode(` ${encodeToken("C".repeat(32), pendingState)} `))
-        .status,
+      (await relaunched.handleCallback(callbackUrl("C".repeat(32), pendingState))).status,
       "signed-in",
     );
     assert.equal(tokenCalls, 2);
@@ -241,6 +256,7 @@ void test("desktop sign-in persists PKCE first and keeps session material out of
     now += 301_000;
     await relaunched.signOut();
     await relaunched.beginSignIn();
+    const expiredState = (await safeStorage.readState(path)).pendingAuth?.state ?? "";
     now += 301_000;
     const expired = new DesktopAuth({
       fetch,
@@ -250,7 +266,10 @@ void test("desktop sign-in persists PKCE first and keeps session material out of
       safeStorage,
     });
     assert.equal((await expired.initialize()).pendingAuth, false);
-    await assert.rejects(expired.completeManualCode("D".repeat(32)), AuthInputError);
+    await assert.rejects(
+      expired.handleCallback(callbackUrl("D".repeat(32), expiredState)),
+      AuthInputError,
+    );
   } finally {
     await rm(directory, { force: true, recursive: true });
   }

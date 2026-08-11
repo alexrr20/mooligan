@@ -9,37 +9,22 @@ export function usePreferenceSync() {
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: preferenceSyncQueryKey,
-    queryFn: () => {
-      if (!bridge) {
-        throw new Error("Preference sync is available in the desktop app.");
-      }
-      return bridge.read();
-    },
-    enabled: Boolean(bridge),
+    queryFn: () => bridge.read(),
     retry: false,
     staleTime: Infinity,
   });
   const retry = useMutation({
-    mutationFn: () => {
-      if (!bridge) {
-        throw new Error("Preference sync is available in the desktop app.");
-      }
-      return bridge.retry();
-    },
+    mutationFn: () => bridge.retry(),
     onSuccess: (snapshot) => queryClient.setQueryData(preferenceSyncQueryKey, snapshot),
   });
 
   useEffect(() => {
-    if (!bridge) {
-      return;
-    }
     return bridge.onChanged((snapshot) => {
       queryClient.setQueryData(preferenceSyncQueryKey, snapshot);
     });
   }, [bridge, queryClient]);
 
   return {
-    available: Boolean(bridge),
     busy: retry.isPending,
     retry: retry.mutate,
     snapshot: query.data ?? localOnly,

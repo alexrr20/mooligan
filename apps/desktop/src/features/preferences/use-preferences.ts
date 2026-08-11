@@ -9,42 +9,24 @@ export function usePreferences() {
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: preferencesQueryKey,
-    queryFn: () => {
-      if (!bridge) {
-        throw new Error("Preferences are available in the desktop app.");
-      }
-
-      return bridge.read();
-    },
-    enabled: Boolean(bridge),
+    queryFn: () => bridge.read(),
     retry: false,
     staleTime: Infinity,
   });
   const mutation = useMutation({
-    mutationFn: (update: Partial<Preferences>) => {
-      if (!bridge) {
-        throw new Error("Preferences are available in the desktop app.");
-      }
-
-      return bridge.update(update);
-    },
+    mutationFn: (update: Partial<Preferences>) => bridge.update(update),
     onSuccess: (preferences) => {
       queryClient.setQueryData(preferencesQueryKey, preferences);
     },
   });
 
   useEffect(() => {
-    if (!bridge) {
-      return;
-    }
-
     return bridge.onChanged((preferences) => {
       queryClient.setQueryData(preferencesQueryKey, preferences);
     });
   }, [bridge, queryClient]);
 
   return {
-    available: Boolean(bridge),
     error: query.error ?? mutation.error,
     loading: query.isLoading,
     preferences: query.data ?? defaultPreferences,

@@ -14,13 +14,7 @@ import {
   shell,
 } from "electron";
 
-import {
-  AuthInputError,
-  type AuthSnapshot,
-  DEFAULT_AUTH_ORIGIN,
-  DesktopAuth,
-  resolveAuthOrigin,
-} from "./auth";
+import { type AuthSnapshot, DesktopAuth, resolveAuthOrigin } from "./auth";
 import { registerAuthColdStart, registerAuthScheme } from "./auth-startup";
 import { registerCatalogIpc } from "./catalog";
 import { assertTrustedSender, developmentRendererUrl } from "./ipc-security";
@@ -78,22 +72,7 @@ if (!authStartup.isPrimary) {
     .whenReady()
     .then(async () => {
       const workspace = new WorkspaceManager(app.getPath("userData"));
-      const configuredAuthOrigin = process.env.MOOLIGAN_AUTH_ORIGIN;
-      let authConfigured = !app.isPackaged || Boolean(configuredAuthOrigin);
-      let authConfigurationError: string | null = authConfigured
-        ? null
-        : "Account sign-in is not configured for this build.";
-      let authOrigin = resolveAuthOrigin(DEFAULT_AUTH_ORIGIN);
-
-      if (configuredAuthOrigin) {
-        try {
-          authOrigin = resolveAuthOrigin(configuredAuthOrigin);
-        } catch {
-          authConfigured = false;
-          authConfigurationError =
-            "The configured authentication origin is invalid. Account features are disabled.";
-        }
-      }
+      const authOrigin = resolveAuthOrigin();
 
       const auth = new DesktopAuth({
         filePath: join(
@@ -103,18 +82,13 @@ if (!authStartup.isPrimary) {
         openExternal: (url) => shell.openExternal(url),
         origin: authOrigin,
         safeStorage,
-        ...(authConfigured
-          ? {}
-          : {
-              fetch: async () => new Response(null, { status: 503 }),
-            }),
       });
       const preferenceSync = new PreferenceSyncCoordinator(auth, workspace);
 
-      let lastAuthError = authConfigurationError;
+      let lastAuthError: string | null = null;
 
       async function applyAuthSnapshot(snapshot: AuthSnapshot) {
-        lastAuthError = authConfigurationError;
+        lastAuthError = null;
         publish("auth:changed", snapshot);
         const previousPreferences = workspace.readPreferences();
         const previousWorkspaceId = workspace.workspaceId;
@@ -178,20 +152,7 @@ if (!authStartup.isPrimary) {
       });
       ipcMain.handle("auth:sign-in", (event) => {
         assertTrustedSender(event);
-        if (!authConfigured) {
-          throw new Error("Account sign-in is not configured for this build.");
-        }
         return runAuth(() => auth.beginSignIn());
-      });
-      ipcMain.handle("auth:complete", (event, code: unknown) => {
-        assertTrustedSender(event);
-        if (!authConfigured) {
-          throw new Error("Account sign-in is not configured for this build.");
-        }
-        if (typeof code !== "string" || code.length > 512) {
-          throw new AuthInputError("The authorization code is invalid.");
-        }
-        return runAuth(() => auth.completeManualCode(code));
       });
       ipcMain.handle("auth:refresh", (event) => {
         assertTrustedSender(event);
@@ -307,9 +268,6 @@ if (!authStartup.isPrimary) {
 
       void authStartup.start(
         async (url) => {
-          if (!authConfigured) {
-            throw new Error("Account sign-in is not configured for this build.");
-          }
           await runAuth(() => auth.handleCallback(url));
           focusWindow();
         },
