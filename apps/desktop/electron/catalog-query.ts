@@ -13,11 +13,13 @@ export type CatalogCardSummary = {
 };
 
 export type CatalogListRequest = {
-  hideArtSeries?: boolean;
+  includeArtSeries?: boolean;
+  includeDigital?: boolean;
   limit?: number;
   offset?: number;
   query?: string;
   uniqueCards?: boolean;
+  universe?: "beyond" | "within";
 };
 
 export type CatalogListPage = {
@@ -56,14 +58,21 @@ const cardColumns = `cards.id,
                      cards.rarity`;
 const summaryColumns =
   "id, name, imageUrl, gridImageUrl, setCode, setName, collectorNumber, typeLine, rarity";
-const artSeriesFilter =
-  "NOT ? OR COALESCE(json_extract(cards.json, '$.layout'), '') <> 'art_series'";
+const artSeriesFilter = "? OR COALESCE(json_extract(cards.json, '$.layout'), '') <> 'art_series'";
+const digitalFilter = "? OR COALESCE(json_extract(cards.json, '$.digital'), 0) = 0";
+const universesBeyond = `EXISTS (
+  SELECT 1
+  FROM json_each(cards.json, '$.promo_types')
+  WHERE value = 'universesbeyond'
+)`;
+const universeFilter = `? = '' OR (${universesBeyond}) = (? = 'beyond')`;
+const cardFilter = `(${artSeriesFilter}) AND (${digitalFilter}) AND (${universeFilter})`;
 
 export function createCatalogQuery(database: DatabaseSync) {
   const browse = database.prepare(
     `SELECT ${cardColumns}
      FROM cards
-     WHERE ${artSeriesFilter}
+     WHERE ${cardFilter}
      ORDER BY cards.name COLLATE NOCASE,
               cards.set_code COLLATE NOCASE,
               cards.collector_number COLLATE NOCASE
@@ -73,7 +82,7 @@ export function createCatalogQuery(database: DatabaseSync) {
     `SELECT ${cardColumns}
      FROM card_search
      JOIN cards ON cards.rowid = card_search.rowid
-     WHERE card_search MATCH ? AND (${artSeriesFilter})
+     WHERE card_search MATCH ? AND (${cardFilter})
      ORDER BY rank
      LIMIT ? OFFSET ?`,
   );
@@ -87,7 +96,7 @@ export function createCatalogQuery(database: DatabaseSync) {
                          cards.id
               ) AS printingRank
        FROM cards
-       WHERE ${artSeriesFilter}
+       WHERE ${cardFilter}
      )
      SELECT ${summaryColumns}
      FROM ranked
@@ -104,7 +113,7 @@ export function createCatalogQuery(database: DatabaseSync) {
               card_search.rank AS searchRank
        FROM card_search
        JOIN cards ON cards.rowid = card_search.rowid
-       WHERE card_search MATCH ? AND (${artSeriesFilter})
+       WHERE card_search MATCH ? AND (${cardFilter})
      ), ranked AS (
        SELECT *,
               ROW_NUMBER() OVER (
@@ -147,8 +156,11 @@ export function createCatalogQuery(database: DatabaseSync) {
       Number.isSafeInteger(request.offset) && request.offset! >= 0 ? request.offset! : 0;
     const query = request.query?.trim().slice(0, 100) ?? "";
     const ftsQuery = toFtsQuery(query);
-    const hideArtSeries = request.hideArtSeries === true;
+    const includeArtSeries = request.includeArtSeries !== false;
+    const includeDigital = request.includeDigital !== false;
     const uniqueCards = request.uniqueCards === true;
+    const universe = request.universe ?? "";
+    const filterArguments = [Number(includeArtSeries), Number(includeDigital), universe, universe];
 
     if (query && !ftsQuery) {
       return { cards: [], hasMore: false, total: 0 };
@@ -163,22 +175,23 @@ export function createCatalogQuery(database: DatabaseSync) {
         : browse;
     const rows = (
       ftsQuery
-        ? statement.all(ftsQuery, Number(hideArtSeries), limit + 1, offset)
-        : statement.all(Number(hideArtSeries), limit + 1, offset)
+        ? statement.all(ftsQuery, ...filterArguments, limit + 1, offset)
+        : statement.all(...filterArguments, limit + 1, offset)
     ) as CatalogCardSummary[];
     const hasMore = rows.length > limit;
     const cards = rows.slice(0, limit).map((row) => ({ ...row }));
-    const total = ftsQuery
-      ? hasMore
-        ? null
-        : offset + cards.length
-      : (
-          (uniqueCards
-            ? uniqueCardTotal.get(Number(hideArtSeries))
-            : hideArtSeries
-              ? nonArtSeriesTotal.get()
-              : catalogTotal.get()) as { total: number }
-        ).total;
+    const total =
+      ftsQuery || !includeDigital || universe
+        ? hasMore
+          ? null
+          : offset + cards.length
+        : (
+            (uniqueCards
+              ? uniqueCardTotal.get(Number(includeArtSeries))
+              : !includeArtSeries
+                ? nonArtSeriesTotal.get()
+                : catalogTotal.get()) as { total: number }
+          ).total;
 
     return { cards, hasMore, total };
   };
@@ -191,10 +204,24 @@ export function validateCatalogListRequest(value: unknown): CatalogListRequest {
   if (
     !isRecord(value) ||
     Object.keys(value).some(
-      (key) => !["hideArtSeries", "limit", "offset", "query", "uniqueCards"].includes(key),
+      (key) =>
+        ![
+          "includeArtSeries",
+          "includeDigital",
+          "limit",
+          "offset",
+          "query",
+          "uniqueCards",
+          "universe",
+        ].includes(key),
     ) ||
-    (Object.hasOwn(value, "hideArtSeries") && typeof value.hideArtSeries !== "boolean") ||
+    (Object.hasOwn(value, "includeArtSeries") && typeof value.includeArtSeries !== "boolean") ||
+    (Object.hasOwn(value, "includeDigital") && typeof value.includeDigital !== "boolean") ||
     (Object.hasOwn(value, "uniqueCards") && typeof value.uniqueCards !== "boolean") ||
+    (Object.hasOwn(value, "universe") &&
+      value.universe !== undefined &&
+      value.universe !== "beyond" &&
+      value.universe !== "within") ||
     (Object.hasOwn(value, "query") &&
       (typeof value.query !== "string" || value.query.length > 500)) ||
     (Object.hasOwn(value, "limit") &&

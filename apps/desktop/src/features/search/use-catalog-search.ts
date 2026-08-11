@@ -1,20 +1,34 @@
 import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 
-export function useCatalogSearch(query: string, uniqueCards: boolean, hideArtSeries: boolean) {
+import type { UniverseFilter } from "./search-state";
+
+export function useCatalogSearch(
+  query: string,
+  uniqueCards: boolean,
+  includeArtSeries: boolean,
+  includeDigital: boolean,
+  universe: UniverseFilter | undefined,
+) {
   const catalog = window.catalog;
   const result = useInfiniteQuery({
-    queryKey: ["catalog", "cards", { hideArtSeries, query, uniqueCards }],
+    queryKey: [
+      "catalog",
+      "cards",
+      { includeArtSeries, includeDigital, query, uniqueCards, universe },
+    ],
     queryFn: ({ pageParam }) => {
       if (!catalog) {
         throw new Error("Catalog browsing is available in the desktop app.");
       }
 
       return catalog.list({
-        hideArtSeries,
+        includeArtSeries,
+        includeDigital,
         limit: 100,
         offset: pageParam,
         query,
         uniqueCards,
+        universe,
       });
     },
     enabled: Boolean(catalog),

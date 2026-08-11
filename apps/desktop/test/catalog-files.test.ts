@@ -20,29 +20,52 @@ import { validateCatalogSearch } from "../src/features/search/search-state.ts";
 void test("catalog search state keeps only valid non-default values", () => {
   assert.deepEqual(
     validateCatalogSearch({
+      artSeries: false,
+      digital: false,
       grid: true,
-      hideArtSeries: false,
       query: `  Mooligan ${"x".repeat(120)}  `,
       uniqueCards: true,
+      universe: "beyond",
     }),
     {
+      artSeries: false,
+      digital: false,
       grid: true,
       query: `Mooligan ${"x".repeat(91)}`,
       uniqueCards: true,
+      universe: "beyond",
     },
   );
-  assert.deepEqual(validateCatalogSearch({ grid: "true", query: "   ", uniqueCards: 1 }), {});
+  assert.deepEqual(
+    validateCatalogSearch({ digital: true, grid: "true", query: "   ", universe: "all" }),
+    {},
+  );
 });
 
 void test("catalog IPC input accepts only the narrow list request", () => {
   assert.deepEqual(validateCatalogListRequest(undefined), {});
-  assert.deepEqual(validateCatalogListRequest({ limit: 100, offset: 0, query: "mox" }), {
-    limit: 100,
-    offset: 0,
-    query: "mox",
-  });
+  assert.deepEqual(validateCatalogListRequest({ universe: undefined }), { universe: undefined });
+  assert.deepEqual(
+    validateCatalogListRequest({
+      includeArtSeries: false,
+      includeDigital: false,
+      limit: 100,
+      offset: 0,
+      query: "mox",
+      universe: "within",
+    }),
+    {
+      includeArtSeries: false,
+      includeDigital: false,
+      limit: 100,
+      offset: 0,
+      query: "mox",
+      universe: "within",
+    },
+  );
   assert.throws(() => validateCatalogListRequest({ query: { value: "mox" } }));
   assert.throws(() => validateCatalogListRequest({ limit: 251 }));
+  assert.throws(() => validateCatalogListRequest({ universe: "all" }));
   assert.throws(() => validateCatalogListRequest({ extra: true }));
 });
 
@@ -68,6 +91,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
   const cards = [
     {
       collector_number: "1",
+      digital: false,
       id: "printing-1",
       image_uris: {
         normal: "https://cards.scryfall.io/normal/front/1.jpg",
@@ -76,6 +100,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
       name: "Mooligan Test Card",
       object: "card",
       oracle_id: "oracle-1",
+      promo_types: ["universesbeyond"],
       rarity: "rare",
       set: "moo",
       set_name: "Mooligan Test Set",
@@ -83,6 +108,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
     },
     {
       collector_number: "8",
+      digital: true,
       id: "printing-3",
       image_uris: { small: "https://cards.scryfall.io/small/front/3.jpg" },
       name: "Mooligan Test Card",
@@ -95,6 +121,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
     },
     {
       collector_number: "A1",
+      digital: false,
       id: "art-series-1",
       image_uris: { small: "https://cards.scryfall.io/small/front/art.jpg" },
       layout: "art_series",
@@ -108,6 +135,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
     },
     {
       collector_number: "2",
+      digital: false,
       id: "printing-2",
       name: "Second Test Card",
       object: "card",
@@ -179,7 +207,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
         hasMore: true,
         total: 4,
       });
-      const withoutArtSeries = queryCatalog({ hideArtSeries: true });
+      const withoutArtSeries = queryCatalog({ includeArtSeries: false });
 
       assert.equal(withoutArtSeries.total, 3);
       assert.deepEqual(
@@ -190,11 +218,32 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
         queryCatalog({ query: "series" }).cards.map((card) => card.id),
         ["art-series-1"],
       );
-      assert.deepEqual(queryCatalog({ hideArtSeries: true, query: "series" }), {
+      assert.deepEqual(queryCatalog({ includeArtSeries: false, query: "series" }), {
         cards: [],
         hasMore: false,
         total: 0,
       });
+      assert.deepEqual(
+        queryCatalog({ includeDigital: false }).cards.map((card) => card.id),
+        ["printing-1", "art-series-1", "printing-2"],
+      );
+      assert.deepEqual(
+        queryCatalog({ universe: "beyond" }).cards.map((card) => card.id),
+        ["printing-1"],
+      );
+      assert.deepEqual(
+        queryCatalog({ universe: "within" }).cards.map((card) => card.id),
+        ["printing-3", "art-series-1", "printing-2"],
+      );
+      assert.equal(queryCatalog({ limit: 1, universe: "within" }).total, null);
+      assert.deepEqual(
+        queryCatalog({
+          includeArtSeries: false,
+          includeDigital: false,
+          universe: "within",
+        }).cards.map((card) => card.id),
+        ["printing-2"],
+      );
       assert.deepEqual(queryCatalog({ uniqueCards: true }), {
         cards: [
           {
