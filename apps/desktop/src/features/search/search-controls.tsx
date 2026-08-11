@@ -3,6 +3,8 @@ import { Switch } from "@base-ui/react/switch";
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useState } from "react";
 
+import type { UniverseFilter } from "./search-state";
+
 type SearchFormProps = {
   activeQuery: string;
   onSearch: (query: string) => void;
@@ -70,6 +72,42 @@ export function SearchToggle({ checked, label, onChange }: SearchToggleProps) {
       </span>
       {label}
     </Switch.Root>
+  );
+}
+
+type SearchUniverseFilterProps = {
+  onChange: (value: UniverseFilter | undefined) => void;
+  value: UniverseFilter | undefined;
+};
+
+const universeOptions = [
+  { label: "All", value: undefined },
+  { label: "Within", value: "within" },
+  { label: "Beyond", value: "beyond" },
+] as const;
+
+export function SearchUniverseFilter({ onChange, value }: SearchUniverseFilterProps) {
+  return (
+    <div {...stylex.props(styles.viewControl)}>
+      <span {...stylex.props(styles.viewLabel)}>Universe</span>
+      <div {...stylex.props(styles.viewToggle)} aria-label="Universe" role="group">
+        {universeOptions.map((option) => (
+          <button
+            {...stylex.props(
+              styles.viewOption,
+              styles.universeOption,
+              value === option.value && styles.viewOptionActive,
+            )}
+            aria-pressed={value === option.value}
+            key={option.label}
+            type="button"
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -245,6 +283,14 @@ const styles = stylex.create({
     ":hover": {
       color: "#1b1d19",
     },
+  },
+  universeOption: {
+    width: "auto",
+    minWidth: "42px",
+    paddingInline: "7px",
+    fontSize: "7px",
+    letterSpacing: "0.05em",
+    textTransform: "uppercase",
   },
   viewIcon: {
     width: "13px",

@@ -3,7 +3,12 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
 
 import { Page } from "../components/page";
-import { SearchForm, SearchToggle, SearchViewToggle } from "../features/search/search-controls";
+import {
+  SearchForm,
+  SearchToggle,
+  SearchUniverseFilter,
+  SearchViewToggle,
+} from "../features/search/search-controls";
 import { SearchResults } from "../features/search/search-results";
 import { type CatalogSearchState, validateCatalogSearch } from "../features/search/search-state";
 import { useCatalogSearch } from "../features/search/use-catalog-search";
@@ -17,13 +22,16 @@ function SearchPage() {
   const searchState = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const activeQuery = searchState.query ?? "";
+  const includeArtSeries = searchState.artSeries !== false;
+  const includeDigital = searchState.digital !== false;
   const gridView = searchState.grid === true;
-  const hideArtSeries = searchState.hideArtSeries === true;
   const uniqueCards = searchState.uniqueCards === true;
   const { cards, error, hasMore, loading, loadMore, total } = useCatalogSearch(
     activeQuery,
     uniqueCards,
-    hideArtSeries,
+    includeArtSeries,
+    includeDigital,
+    searchState.universe,
   );
   const updateSearch = useCallback(
     (update: CatalogSearchState) => {
@@ -60,9 +68,18 @@ function SearchPage() {
               onChange={(checked) => updateSearch({ uniqueCards: checked || undefined })}
             />
             <SearchToggle
-              checked={hideArtSeries}
-              label="Hide art series"
-              onChange={(checked) => updateSearch({ hideArtSeries: checked || undefined })}
+              checked={includeArtSeries}
+              label="Art series"
+              onChange={(checked) => updateSearch({ artSeries: checked ? undefined : false })}
+            />
+            <SearchToggle
+              checked={includeDigital}
+              label="Digital cards"
+              onChange={(checked) => updateSearch({ digital: checked ? undefined : false })}
+            />
+            <SearchUniverseFilter
+              value={searchState.universe}
+              onChange={(universe) => updateSearch({ universe })}
             />
             <SearchViewToggle
               grid={gridView}
