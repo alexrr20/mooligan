@@ -73,6 +73,7 @@ class FakeApp extends EventEmitter {
 }
 
 function callback(identifier: string, state: string) {
-  const token = Buffer.from(JSON.stringify({ identifier, state })).toString("base64url");
+  const unpadded = Buffer.from(JSON.stringify({ identifier, state })).toString("base64url");
+  const token = unpadded.padEnd(Math.ceil(unpadded.length / 4) * 4, "=");
   return `${AUTH_PROTOCOL}://auth/callback#token=${token}`;
 }

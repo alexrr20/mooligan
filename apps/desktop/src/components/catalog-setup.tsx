@@ -19,11 +19,6 @@ export function CatalogSetup() {
   useEffect(() => {
     const catalog = window.catalog;
 
-    if (!catalog) {
-      setState({ kind: "ready" });
-      return;
-    }
-
     let active = true;
     const stopProgress = catalog.onProgress((progress) => {
       if (active) {
@@ -76,10 +71,6 @@ export function CatalogSetup() {
 
   async function download() {
     const catalog = window.catalog;
-
-    if (!catalog) {
-      return;
-    }
 
     setState({
       kind: "downloading",

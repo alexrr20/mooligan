@@ -48,7 +48,6 @@ contextBridge.exposeInMainWorld("workspace", {
 });
 
 contextBridge.exposeInMainWorld("auth", {
-  complete: (code: string): Promise<AuthSnapshot> => ipcRenderer.invoke("auth:complete", code),
   onChanged: (callback: (snapshot: AuthSnapshot) => void) => {
     const listener = (_event: IpcRendererEvent, snapshot: AuthSnapshot) => callback(snapshot);
 

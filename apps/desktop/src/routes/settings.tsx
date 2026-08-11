@@ -1,6 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
 
 import { Page } from "../components/page";
 import { useAuth } from "../features/auth/use-auth";
@@ -16,7 +15,7 @@ function SettingsPage() {
   const auth = useAuth();
   const preferenceSync = usePreferenceSync();
   const backup = useWorkspaceBackup();
-  const { available, error, loading, preferences, saving, update } = usePreferences();
+  const { error, loading, preferences, saving, update } = usePreferences();
 
   return (
     <Page
@@ -44,7 +43,7 @@ function SettingsPage() {
         <fieldset
           {...stylex.props(styles.options)}
           aria-describedby="motion-status"
-          disabled={!available || saving}
+          disabled={saving}
         >
           <legend {...stylex.props(styles.visuallyHidden)}>Motion behavior</legend>
           {motionOptions.map((option, index) => {
@@ -79,7 +78,7 @@ function SettingsPage() {
         <div {...stylex.props(styles.statusRow)}>
           <span {...stylex.props(styles.localDot)} aria-hidden="true" />
           <p {...stylex.props(styles.status)} id="motion-status" aria-live="polite">
-            {statusMessage({ available, error, loading, saving })}
+            {statusMessage({ error, loading, saving })}
           </p>
           <span {...stylex.props(styles.statusDivider)} aria-hidden="true" />
           <p {...stylex.props(styles.status)}>{cloudMessage(preferenceSync.snapshot.status)}</p>
@@ -98,17 +97,8 @@ function AccountSetting({
   auth: ReturnType<typeof useAuth>;
   preferenceSync: ReturnType<typeof usePreferenceSync>;
 }) {
-  const [code, setCode] = useState("");
   const { snapshot } = auth;
   const signedIn = snapshot.user !== null || snapshot.status === "sync-paused";
-
-  function submitCode(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (code.trim()) {
-      auth.complete(code);
-      setCode("");
-    }
-  }
 
   return (
     <section {...stylex.props(styles.account)} aria-labelledby="account-heading">
@@ -139,7 +129,7 @@ function AccountSetting({
           </span>
           <div {...stylex.props(styles.accountIdentity)}>
             <strong {...stylex.props(styles.accountName)}>
-              {accountTitle({ available: auth.available, loading: auth.loading, snapshot })}
+              {accountTitle({ loading: auth.loading, snapshot })}
             </strong>
             <span {...stylex.props(styles.accountEmail)}>
               {snapshot.user?.email ?? accountDescription(snapshot.status)}
@@ -177,9 +167,7 @@ function AccountSetting({
           ) : (
             <button
               {...stylex.props(styles.primaryButton)}
-              disabled={
-                !auth.available || auth.busy || snapshot.status === "protected-storage-unavailable"
-              }
+              disabled={auth.busy || snapshot.status === "protected-storage-unavailable"}
               onClick={() => auth.signIn()}
               type="button"
             >
@@ -189,36 +177,6 @@ function AccountSetting({
           )}
         </div>
       </div>
-
-      {snapshot.pendingAuth && !signedIn && (
-        <form {...stylex.props(styles.manualForm)} onSubmit={submitCode}>
-          <div>
-            <p {...stylex.props(styles.manualTitle)}>Didn’t return to Mooligan?</p>
-            <p {...stylex.props(styles.manualCopy)}>
-              Paste the one-time authorization code shown in your browser.
-            </p>
-          </div>
-          <div {...stylex.props(styles.codeRow)}>
-            <input
-              {...stylex.props(styles.codeInput)}
-              aria-label="Authorization code"
-              autoComplete="off"
-              maxLength={512}
-              onChange={(event) => setCode(event.currentTarget.value)}
-              placeholder="Authorization code"
-              spellCheck={false}
-              value={code}
-            />
-            <button
-              {...stylex.props(styles.codeButton)}
-              disabled={auth.busy || !code.trim()}
-              type="submit"
-            >
-              Complete
-            </button>
-          </div>
-        </form>
-      )}
 
       {auth.error && (
         <p {...stylex.props(styles.accountError)} role="alert">
@@ -267,7 +225,7 @@ function BackupSetting({ backup }: { backup: ReturnType<typeof useWorkspaceBacku
         <div {...stylex.props(styles.accountActions)}>
           <button
             {...stylex.props(styles.secondaryButton)}
-            disabled={!backup.available || backup.busy}
+            disabled={backup.busy}
             onClick={() => backup.importBackup()}
             type="button"
           >
@@ -275,7 +233,7 @@ function BackupSetting({ backup }: { backup: ReturnType<typeof useWorkspaceBacku
           </button>
           <button
             {...stylex.props(styles.primaryButton)}
-            disabled={!backup.available || backup.busy}
+            disabled={backup.busy}
             onClick={() => backup.exportBackup()}
             type="button"
           >
@@ -306,18 +264,7 @@ function initials(name: string) {
   return parts.map((part) => part[0]?.toUpperCase()).join("") || "M";
 }
 
-function accountTitle({
-  available,
-  loading,
-  snapshot,
-}: {
-  available: boolean;
-  loading: boolean;
-  snapshot: AuthSnapshot;
-}) {
-  if (!available) {
-    return "Desktop account controls";
-  }
+function accountTitle({ loading, snapshot }: { loading: boolean; snapshot: AuthSnapshot }) {
   if (loading) {
     return "Reading protected session…";
   }
@@ -389,9 +336,6 @@ function cloudMessage(status: PreferenceSyncStatus) {
 }
 
 function backupStatus(backup: ReturnType<typeof useWorkspaceBackup>) {
-  if (!backup.available) {
-    return "Available in the desktop app";
-  }
   if (backup.busy) {
     return "Preparing workspace…";
   }
@@ -427,20 +371,14 @@ const motionOptions: readonly {
 ];
 
 function statusMessage({
-  available,
   error,
   loading,
   saving,
 }: {
-  available: boolean;
   error: Error | null;
   loading: boolean;
   saving: boolean;
 }) {
-  if (!available) {
-    return "Available in the desktop app";
-  }
-
   if (error) {
     return "Could not save this preference";
   }
@@ -656,64 +594,6 @@ const styles = stylex.create({
     ":hover": {
       borderColor: "#85887e",
     },
-    ":disabled": {
-      cursor: "default",
-      opacity: 0.45,
-    },
-  },
-  manualForm: {
-    padding: "18px 22px",
-    display: "grid",
-    gridTemplateColumns: {
-      default: "minmax(220px, 0.75fr) minmax(300px, 1fr)",
-      "@media (max-width: 700px)": "1fr",
-    },
-    alignItems: "center",
-    gap: "18px",
-    borderTop: "1px solid #34362f",
-  },
-  manualTitle: {
-    margin: "0 0 5px",
-    color: "#f4f1e8",
-    fontSize: "11px",
-  },
-  manualCopy: {
-    margin: 0,
-    color: "#85887e",
-    fontSize: "9px",
-    lineHeight: 1.5,
-  },
-  codeRow: {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) auto",
-  },
-  codeInput: {
-    minWidth: 0,
-    height: "40px",
-    paddingInline: "12px",
-    color: "#f4f1e8",
-    backgroundColor: "#11120f",
-    border: "1px solid #484b42",
-    borderRight: 0,
-    borderRadius: "2px 0 0 2px",
-    fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-    fontSize: "10px",
-    outline: "none",
-    ":focus": {
-      borderColor: "#caff42",
-    },
-  },
-  codeButton: {
-    paddingInline: "13px",
-    color: "#0a0a0a",
-    backgroundColor: "#caff42",
-    border: "1px solid #caff42",
-    borderRadius: "0 2px 2px 0",
-    cursor: "pointer",
-    fontFamily: "inherit",
-    fontSize: "8px",
-    letterSpacing: "0.08em",
-    textTransform: "uppercase",
     ":disabled": {
       cursor: "default",
       opacity: 0.45,

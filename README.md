@@ -26,7 +26,7 @@ switches use separate local workspaces to avoid mixing user data.
 
 ## Development
 
-Install dependencies, apply all local D1 migrations, then start the API and
+Install dependencies, apply the local D1 schema, then start the API and
 Electron together:
 
 ```bash
@@ -35,9 +35,10 @@ vp run api#db:migrate:local
 vp run dev
 ```
 
-The migrations create the catalog release, Better Auth, and workspace-sync
-tables in Wrangler's local D1 database. Re-run the migration command after
-pulling new migrations.
+The baseline migration creates the catalog release, Better Auth, and
+workspace-sync tables in Wrangler's local D1 database. It targets a fresh
+database; while the schema is still pre-release, recreate local D1 rather than
+carrying forward obsolete migration history.
 
 ### Optional account setup
 
@@ -91,9 +92,7 @@ credentials, or fragment. It must use HTTPS except for the loopback hosts
 3. Complete Google sign-in. The browser returns through the exact custom
    protocol `com.mooligan.app`; the callback shape is
    `com.mooligan.app://auth/callback#token=<authorization-token>`.
-4. If the operating system does not reopen Mooligan, copy the authorization
-   code shown by the hosted page and paste it into Settings.
-5. Quit and relaunch the app to verify session restoration. Then sign out and
+4. Quit and relaunch the app to verify session restoration. Then sign out and
    confirm the local workspace and its preferences remain present.
 
 Also disconnect the Worker while editing a preference: the local save should
@@ -127,8 +126,8 @@ vp run -r build
 These automated checks do not prove operating-system protocol registration or
 the system-browser round trip. `vp run desktop#package` creates an unpacked
 platform build with the `com.mooligan.app` scheme metadata for smoke testing;
-test both the deep-link and manual-code paths in a signed installer on every
-supported platform before release.
+test the deep-link path in a signed installer on every supported platform
+before release.
 
 ## Production build
 
@@ -169,9 +168,9 @@ vp exec wrangler secret put GOOGLE_CLIENT_ID
 vp exec wrangler secret put GOOGLE_CLIENT_SECRET
 ```
 
-Apply every remote migration before deploying. The first catalog request
-populates an empty release record from Scryfall and returns `503` only if that
-bootstrap check fails.
+Apply the baseline schema to a fresh remote database before deploying. The
+first catalog request populates an empty release record from Scryfall and
+returns `503` only if that bootstrap check fails.
 
 The desktop packaging configuration registers the exact `com.mooligan.app` URL
 scheme and defaults release builds to the production Worker. Override the

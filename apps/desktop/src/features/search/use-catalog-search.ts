@@ -16,12 +16,8 @@ export function useCatalogSearch(
       "cards",
       { includeArtSeries, includeDigital, query, uniqueCards, universe },
     ],
-    queryFn: ({ pageParam }) => {
-      if (!catalog) {
-        throw new Error("Catalog browsing is available in the desktop app.");
-      }
-
-      return catalog.list({
+    queryFn: ({ pageParam }) =>
+      catalog.list({
         includeArtSeries,
         includeDigital,
         limit: 100,
@@ -29,9 +25,7 @@ export function useCatalogSearch(
         query,
         uniqueCards,
         universe,
-      });
-    },
-    enabled: Boolean(catalog),
+      }),
     getNextPageParam: (lastPage, pages) =>
       lastPage.hasMore ? pages.reduce((count, page) => count + page.cards.length, 0) : undefined,
     initialPageParam: 0,
@@ -51,11 +45,7 @@ export function useCatalogSearch(
 
   return {
     cards,
-    error: !catalog
-      ? "Catalog browsing is available in the desktop app."
-      : result.isError
-        ? "The local card index could not be read."
-        : "",
+    error: result.isError ? "The local card index could not be read." : "",
     hasMore: !result.isPlaceholderData && Boolean(result.hasNextPage),
     loading: result.isFetching,
     loadMore,
