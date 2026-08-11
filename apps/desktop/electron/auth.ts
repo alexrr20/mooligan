@@ -419,20 +419,25 @@ export class DesktopAuth {
     }
 
     let response: Response;
+    const timeoutController = new AbortController();
+    const timeout = setTimeout(() => timeoutController.abort(), this.#requestTimeoutMs);
 
     try {
-      const timeoutSignal = AbortSignal.timeout(this.#requestTimeoutMs);
       response = await this.#fetch(url, {
         ...init,
         credentials: "omit",
         headers,
         redirect: "error",
-        signal: init.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal,
+        signal: init.signal
+          ? AbortSignal.any([init.signal, timeoutController.signal])
+          : timeoutController.signal,
       });
     } catch (error) {
       throw new AuthRequestError("The authentication service could not be reached.", {
         cause: error,
       });
+    } finally {
+      clearTimeout(timeout);
     }
 
     if (response.redirected || (response.url && new URL(response.url).origin !== this.#origin)) {
