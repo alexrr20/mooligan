@@ -136,7 +136,7 @@ Acceptance criteria:
    the existing `env.DB` D1 binding.
 3. Mount `GET` and `POST` requests under `/api/auth/*` before other matching
    middleware.
-4. Generate the required Better Auth SQL and commit it as the next D1 migration.
+4. Include the required Better Auth SQL in the fresh D1 baseline.
 5. Configure the public base URL, a high-entropy Better Auth secret, trusted
    origins, and provider secrets through Worker configuration and secrets.
 6. Begin with one social provider. Email/password should wait until password
@@ -154,9 +154,7 @@ user.
    proxy client.
 2. Preserve the PKCE and state parameters when starting provider sign-in.
 3. Redirect successful authentication to Mooligan's registered custom protocol.
-4. Provide the documented manual authorization-code fallback for environments
-   where protocol callbacks fail.
-5. Keep this surface limited to authentication until a real web product is
+4. Keep this surface limited to authentication until a real web product is
    required.
 
 Before this phase, select:
@@ -173,8 +171,7 @@ Before this phase, select:
    main-process setup before Electron becomes ready.
 3. Register the safe preload bridge required by the integration.
 4. Register the custom protocol in development and in the packaged application.
-5. Open sign-in in the system browser and handle both deep-link and manual-code
-   completion.
+5. Open sign-in in the system browser and handle the exact deep-link callback.
 6. Store session material only in the main process. Use a custom Better Auth
    storage adapter backed by Electron's asynchronous `safeStorage` API.
 7. Expose only sanitized user and session status to the renderer. Never expose
@@ -189,7 +186,6 @@ Acceptance criteria:
   data.
 - Deep links work when the app is closed, open, and launched as a second
   instance.
-- The manual-code fallback succeeds when deep links are unavailable.
 
 ### Phase 5: Bind an account to a workspace
 
