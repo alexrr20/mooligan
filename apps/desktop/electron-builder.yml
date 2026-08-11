@@ -14,6 +14,8 @@ protocols:
       - com.mooligan.app
 mac:
   category: public.app-category.lifestyle
+win:
+  target: nsis
 linux:
   category: Utility
   desktop:
