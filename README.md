@@ -75,12 +75,13 @@ database, validates it, and atomically replaces the installed catalog. A failed
 check or import leaves the existing offline catalog untouched.
 
 Desktop builds read the catalog service from `MOOLIGAN_API_URL` and the auth
-service from `MOOLIGAN_AUTH_ORIGIN`; local development defaults both to
-`http://127.0.0.1:3000`. Values present while building are embedded in the
-packaged main process, so installed apps do not depend on shell configuration.
-The auth value must be an origin with no path, query, credentials, or fragment.
-It must use HTTPS except for the loopback hosts `127.0.0.1`, `localhost`, and
-`[::1]` during development.
+service from `MOOLIGAN_AUTH_ORIGIN`. Local development defaults both to
+`http://127.0.0.1:3000`; release builds default both to the production Worker.
+Explicit values present while building override those defaults and are embedded
+in the packaged main process, so installed apps do not depend on shell
+configuration. The auth value must be an origin with no path, query,
+credentials, or fragment. It must use HTTPS except for the loopback hosts
+`127.0.0.1`, `localhost`, and `[::1]` during development.
 
 ### Verify sign-in locally
 
@@ -144,14 +145,13 @@ vp run api#db:migrate
 vp run api#deploy
 ```
 
-Before deploying, configure the production auth values as Worker secrets. No
-localhost auth origin is compiled into the deployed Worker:
+The production Worker origin and its trusted origins are committed in
+`apps/api/wrangler.jsonc`. No localhost auth origin is compiled into the
+deployed Worker:
 
-- `BETTER_AUTH_URL` must be the public HTTPS origin that serves the Worker and
-  hosted sign-in assets, with no local or HTTP production fallback.
-- `BETTER_AUTH_TRUSTED_ORIGINS` must contain only that exact HTTPS origin and
-  `com.mooligan.app:/`, encoded as JSON such as
-  `["https://auth.example.com","com.mooligan.app:/"]`.
+- `BETTER_AUTH_URL` is `https://mooligan-api.bessa.workers.dev`.
+- `BETTER_AUTH_TRUSTED_ORIGINS` contains only that exact HTTPS origin and
+  `com.mooligan.app:/`.
 - Store `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID`, and `GOOGLE_CLIENT_SECRET` as
   Cloudflare Worker secrets. Never put production values in the repository.
 - Register `${BETTER_AUTH_URL}/api/auth/callback/google` as the production
@@ -159,12 +159,11 @@ localhost auth origin is compiled into the deployed Worker:
 - Configure `MOOLIGAN_API_URL` and `MOOLIGAN_AUTH_ORIGIN` in the released
   desktop app to use the same HTTPS Worker origin.
 
-Set the production secrets interactively from the API workspace:
+Set the credential-bearing production secrets interactively from the API
+workspace:
 
 ```bash
 cd apps/api
-vp exec wrangler secret put BETTER_AUTH_URL
-vp exec wrangler secret put BETTER_AUTH_TRUSTED_ORIGINS
 vp exec wrangler secret put BETTER_AUTH_SECRET
 vp exec wrangler secret put GOOGLE_CLIENT_ID
 vp exec wrangler secret put GOOGLE_CLIENT_SECRET
@@ -175,15 +174,15 @@ populates an empty release record from Scryfall and returns `503` only if that
 bootstrap check fails.
 
 The desktop packaging configuration registers the exact `com.mooligan.app` URL
-scheme. Build the installer with the production service origins embedded:
+scheme and defaults release builds to the production Worker. Override the
+service origins only when targeting another deployment:
 
 ```bash
-MOOLIGAN_API_URL=https://auth.example.com \
-  MOOLIGAN_AUTH_ORIGIN=https://auth.example.com \
+MOOLIGAN_API_URL=https://mooligan-api.bessa.workers.dev \
+  MOOLIGAN_AUTH_ORIGIN=https://mooligan-api.bessa.workers.dev \
   vp run desktop#dist
 ```
 
-Replace the example origin with the deployed Worker origin.
 Platform signing—and notarization where applicable—still requires external
 release credentials. A production OAuth end-to-end test therefore also
 requires real Google credentials, a deployed HTTPS origin, and the relevant

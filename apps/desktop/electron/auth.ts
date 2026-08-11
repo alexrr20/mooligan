@@ -31,7 +31,7 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
 const SAFE_COOKIE_VALUE = /^[\x21\x23-\x2B\x2D-\x3A\x3C-\x5B\x5D-\x7E]*$/;
 const PKCE_VALUE = /^[A-Za-z0-9_-]{43}$/;
 const RAW_AUTHORIZATION_CODE = /^[A-Za-z0-9]{32}$/;
-const ENCODED_AUTHORIZATION_CODE = /^[A-Za-z0-9_-]+$/;
+const ENCODED_AUTHORIZATION_CODE = /^[A-Za-z0-9_-]+={0,2}$/;
 
 export type AuthStatus =
   | "signed-out"
@@ -419,20 +419,25 @@ export class DesktopAuth {
     }
 
     let response: Response;
+    const timeoutController = new AbortController();
+    const timeout = setTimeout(() => timeoutController.abort(), this.#requestTimeoutMs);
 
     try {
-      const timeoutSignal = AbortSignal.timeout(this.#requestTimeoutMs);
       response = await this.#fetch(url, {
         ...init,
         credentials: "omit",
         headers,
         redirect: "error",
-        signal: init.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal,
+        signal: init.signal
+          ? AbortSignal.any([init.signal, timeoutController.signal])
+          : timeoutController.signal,
       });
     } catch (error) {
       throw new AuthRequestError("The authentication service could not be reached.", {
         cause: error,
       });
+    } finally {
+      clearTimeout(timeout);
     }
 
     if (response.redirected || (response.url && new URL(response.url).origin !== this.#origin)) {
@@ -644,7 +649,6 @@ function parseDeepLink(value: unknown) {
     url.port ||
     url.search ||
     !url.hash.startsWith("#token=") ||
-    url.hash.indexOf("=", 7) !== -1 ||
     url.hash.includes("&")
   ) {
     throw new AuthInputError("The sign-in callback is invalid.");
@@ -654,7 +658,7 @@ function parseDeepLink(value: unknown) {
 }
 
 function parseEncodedAuthorizationCode(value: string): RedirectToken {
-  if (!value || value.length > 512 || !/^(?:[A-Za-z0-9_-]|%[\dA-Fa-f]{2})+$/.test(value)) {
+  if (!value || value.length > 512) {
     throw new AuthInputError("The authorization code is invalid.");
   }
 
@@ -671,8 +675,11 @@ function parseEncodedAuthorizationCode(value: string): RedirectToken {
 
   let data: unknown;
   try {
-    const decoded = Buffer.from(encoded, "base64url");
-    if (decoded.toString("base64url") !== encoded) {
+    const unpadded = encoded.replace(/=+$/, "");
+    const decoded = Buffer.from(unpadded, "base64url");
+    const canonical = decoded.toString("base64url");
+    const padded = canonical.padEnd(Math.ceil(canonical.length / 4) * 4, "=");
+    if (encoded !== canonical && encoded !== padded) {
       throw new Error("Non-canonical authorization code.");
     }
     data = JSON.parse(decoded.toString("utf8"));

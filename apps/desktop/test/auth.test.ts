@@ -209,7 +209,12 @@ void test("desktop sign-in persists PKCE first and keeps session material out of
       user: null,
     });
     await assert.rejects(relaunched.completeManualCode({ code: "C".repeat(32) }), AuthInputError);
-    assert.equal((await relaunched.completeManualCode(` ${"C".repeat(32)} `)).status, "signed-in");
+    const pendingState = (await safeStorage.readState(path)).pendingAuth?.state ?? "";
+    assert.equal(
+      (await relaunched.completeManualCode(` ${encodeToken("C".repeat(32), pendingState)} `))
+        .status,
+      "signed-in",
+    );
     assert.equal(tokenCalls, 2);
 
     let online = false;
@@ -343,11 +348,12 @@ class FakeSafeStorage implements AsyncSafeStorage {
 }
 
 function callbackUrl(identifier: string, state: string) {
-  return `${AUTH_PROTOCOL}://auth/callback#token=${encodeToken(identifier, state)}`;
+  return `${AUTH_PROTOCOL}://auth/callback#token=${encodeURIComponent(encodeToken(identifier, state))}`;
 }
 
 function encodeToken(identifier: string, state: string) {
-  return Buffer.from(JSON.stringify({ identifier, state })).toString("base64url");
+  const unpadded = Buffer.from(JSON.stringify({ identifier, state })).toString("base64url");
+  return unpadded.padEnd(Math.ceil(unpadded.length / 4) * 4, "=");
 }
 
 function jsonResponse(data: unknown, cookies: string[] = []) {

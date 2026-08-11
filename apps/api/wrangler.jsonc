@@ -4,14 +4,12 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-07-28",
   "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "BETTER_AUTH_URL": "https://mooligan-api.bessa.workers.dev",
+    "BETTER_AUTH_TRUSTED_ORIGINS": "[\"https://mooligan-api.bessa.workers.dev\",\"com.mooligan.app:/\"]",
+  },
   "secrets": {
-    "required": [
-      "BETTER_AUTH_URL",
-      "BETTER_AUTH_TRUSTED_ORIGINS",
-      "BETTER_AUTH_SECRET",
-      "GOOGLE_CLIENT_ID",
-      "GOOGLE_CLIENT_SECRET",
-    ],
+    "required": ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
   },
   "assets": {
     "directory": "./auth-dist",
