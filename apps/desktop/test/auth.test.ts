@@ -74,10 +74,21 @@ void test("desktop sign-in persists PKCE first and keeps session material out of
 
     if (url.pathname === "/api/auth/get-session") {
       if (hangSessionRequest) {
+        const signal = init?.signal;
+        assert.ok(signal);
         return new Promise<Response>((_resolve, reject) => {
-          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), {
-            once: true,
-          });
+          const watchdog = setTimeout(
+            () => reject(new Error("The request timeout did not abort the mocked fetch.")),
+            1_000,
+          );
+          signal.addEventListener(
+            "abort",
+            () => {
+              clearTimeout(watchdog);
+              reject(signal.reason);
+            },
+            { once: true },
+          );
         });
       }
       return jsonResponse({ session: { token: "server-only" }, user });
