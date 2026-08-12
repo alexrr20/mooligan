@@ -1,4 +1,5 @@
 :root {
+  --color-accent: #11c565;
   color: #f4f1e8;
   background: #0a0a0a;
   font-family: "Avenir Next", "Helvetica Neue", sans-serif;
@@ -82,10 +83,10 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  border: 1px solid #caff42;
+  border: 1px solid var(--color-accent);
   border-radius: 2px;
   color: #1b1d19;
-  background: #caff42;
+  background: var(--color-accent);
   font: inherit;
   cursor: pointer;
   transition:

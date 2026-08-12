@@ -1,6 +1,8 @@
 import { Button } from "@base-ui/react/button";
 import * as stylex from "@stylexjs/stylex";
 
+import { colors } from "../../styles/tokens.stylex.js";
+
 type SearchResultsProps = {
   cards: CatalogCardSummary[];
   error: string;
@@ -196,7 +198,7 @@ const styles = stylex.create({
     border: "1px solid #1b1d19",
     borderRadius: "2px",
     color: "#1b1d19",
-    backgroundColor: "#caff42",
+    backgroundColor: colors.accent,
   },
   cardImageFrame: {
     width: {
@@ -278,10 +280,12 @@ const styles = stylex.create({
     minHeight: "24px",
     display: "grid",
     placeItems: "center",
-    border: "1px solid #caff42",
+    borderWidth: "1px",
+    borderStyle: "solid",
+    borderColor: colors.accent,
     borderRadius: "2px",
     color: "#1b1d19",
-    backgroundColor: "#caff42",
+    backgroundColor: colors.accent,
     fontSize: "8px",
     letterSpacing: "0.08em",
     textTransform: "uppercase",
@@ -312,7 +316,7 @@ const styles = stylex.create({
     border: "1px solid #1b1d19",
     borderRadius: "3px",
     color: "#1b1d19",
-    backgroundColor: "#caff42",
+    backgroundColor: colors.accent,
     fontSize: "9px",
     boxShadow: "6px 6px 0 #242620",
   },
@@ -346,10 +350,12 @@ const styles = stylex.create({
     transition: "background-color 160ms ease",
     ":hover:not(:disabled)": {
       color: "#1b1d19",
-      backgroundColor: "#caff42",
+      backgroundColor: colors.accent,
     },
     ":focus-visible": {
-      outline: "2px solid #caff42",
+      outlineWidth: "2px",
+      outlineStyle: "solid",
+      outlineColor: colors.accent,
       outlineOffset: "3px",
     },
     ":disabled": {

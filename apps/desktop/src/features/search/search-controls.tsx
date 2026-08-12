@@ -3,6 +3,7 @@ import { Switch } from "@base-ui/react/switch";
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useState } from "react";
 
+import { colors } from "../../styles/tokens.stylex.js";
 import type { UniverseFilter } from "./search-state";
 
 type SearchFormProps = {
@@ -187,7 +188,7 @@ const styles = stylex.create({
       color: "#73766b",
     },
     ":focus": {
-      borderColor: "#caff42",
+      borderColor: colors.accent,
     },
   },
   filterToggle: {
@@ -207,7 +208,9 @@ const styles = stylex.create({
       color: "#f4f1e8",
     },
     ":focus-visible": {
-      outline: "2px solid #caff42",
+      outlineWidth: "2px",
+      outlineStyle: "solid",
+      outlineColor: colors.accent,
       outlineOffset: "4px",
     },
   },
@@ -223,8 +226,8 @@ const styles = stylex.create({
     transition: "background-color 160ms ease, border-color 160ms ease",
   },
   toggleTrackActive: {
-    borderColor: "#caff42",
-    backgroundColor: "#caff42",
+    borderColor: colors.accent,
+    backgroundColor: colors.accent,
   },
   toggleKnob: {
     width: "10px",
@@ -273,13 +276,15 @@ const styles = stylex.create({
       color: "#f4f1e8",
     },
     ":focus-visible": {
-      outline: "2px solid #caff42",
+      outlineWidth: "2px",
+      outlineStyle: "solid",
+      outlineColor: colors.accent,
       outlineOffset: "3px",
     },
   },
   viewOptionActive: {
     color: "#1b1d19",
-    backgroundColor: "#caff42",
+    backgroundColor: colors.accent,
     ":hover": {
       color: "#1b1d19",
     },

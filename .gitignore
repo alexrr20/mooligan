@@ -20,6 +20,7 @@ release
 
 # Local licensed assets
 /apps/desktop/src/assets/Frama/
+/apps/desktop/src/assets/Config/
 
 # dotenv environment variable files
 .env

@@ -1,6 +1,8 @@
 import * as stylex from "@stylexjs/stylex";
 import type { ReactNode } from "react";
 
+import { colors } from "../styles/tokens.stylex.js";
+
 type PageProps = {
   children: ReactNode;
   description: string;
@@ -152,10 +154,12 @@ const styles = stylex.create({
     flex: "0 0 auto",
     display: "grid",
     placeItems: "center",
-    border: "1px solid #caff42",
+    borderWidth: "1px",
+    borderStyle: "solid",
+    borderColor: colors.accent,
     borderRadius: "4px",
     color: "#1b1d19",
-    backgroundColor: "#caff42",
+    backgroundColor: colors.accent,
     fontSize: "10px",
     boxShadow: "8px 8px 0 #242620",
   },

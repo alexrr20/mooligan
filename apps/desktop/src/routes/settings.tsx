@@ -1,11 +1,13 @@
 import * as stylex from "@stylexjs/stylex";
 import { createFileRoute } from "@tanstack/react-router";
 
+import { Button } from "../components/button";
 import { Page } from "../components/page";
 import { useAuth } from "../features/auth/use-auth";
 import { usePreferenceSync } from "../features/preferences/use-preference-sync";
 import { usePreferences } from "../features/preferences/use-preferences";
 import { useWorkspaceBackup } from "../features/preferences/use-workspace-backup";
+import { colors } from "../styles/tokens.stylex.js";
 
 export const Route = createFileRoute("/settings")({
   component: SettingsPage,
@@ -146,34 +148,26 @@ function AccountSetting({
               {(snapshot.status === "sync-paused" ||
                 preferenceSync.snapshot.status === "paused" ||
                 preferenceSync.snapshot.status === "pending") && (
-                <button
-                  {...stylex.props(styles.secondaryButton)}
+                <Button
                   disabled={auth.busy || preferenceSync.busy}
                   onClick={() => auth.refresh()}
-                  type="button"
+                  variant="secondary"
                 >
                   Retry sync
-                </button>
+                </Button>
               )}
-              <button
-                {...stylex.props(styles.secondaryButton)}
-                disabled={auth.busy}
-                onClick={() => auth.signOut()}
-                type="button"
-              >
+              <Button disabled={auth.busy} onClick={() => auth.signOut()} variant="secondary">
                 Sign out
-              </button>
+              </Button>
             </>
           ) : (
-            <button
-              {...stylex.props(styles.primaryButton)}
+            <Button
               disabled={auth.busy || snapshot.status === "protected-storage-unavailable"}
               onClick={() => auth.signIn()}
-              type="button"
             >
               Continue with Google
               <span aria-hidden="true">↗</span>
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -223,23 +217,12 @@ function BackupSetting({ backup }: { backup: ReturnType<typeof useWorkspaceBacku
           </span>
         </div>
         <div {...stylex.props(styles.accountActions)}>
-          <button
-            {...stylex.props(styles.secondaryButton)}
-            disabled={backup.busy}
-            onClick={() => backup.importBackup()}
-            type="button"
-          >
+          <Button disabled={backup.busy} onClick={() => backup.importBackup()} variant="secondary">
             Import
-          </button>
-          <button
-            {...stylex.props(styles.primaryButton)}
-            disabled={backup.busy}
-            onClick={() => backup.exportBackup()}
-            type="button"
-          >
+          </Button>
+          <Button disabled={backup.busy} onClick={() => backup.exportBackup()}>
             Export backup
-            <span aria-hidden="true">↓</span>
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -480,8 +463,8 @@ const styles = stylex.create({
   },
   accountGlyphSignedIn: {
     color: "#0a0a0a",
-    backgroundColor: "#caff42",
-    borderColor: "#caff42",
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   accountGlyphPaused: {
     color: "#171914",
@@ -554,51 +537,6 @@ const styles = stylex.create({
     fontSize: "13px",
     fontWeight: 400,
   },
-  primaryButton: {
-    minHeight: "40px",
-    paddingInline: "15px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "20px",
-    color: "#0a0a0a",
-    backgroundColor: "#caff42",
-    border: "1px solid #caff42",
-    borderRadius: "2px",
-    cursor: "pointer",
-    fontFamily: "inherit",
-    fontSize: "9px",
-    letterSpacing: "0.08em",
-    textTransform: "uppercase",
-    transition: "background-color 140ms ease, opacity 140ms ease",
-    ":hover": {
-      backgroundColor: "#dcff80",
-    },
-    ":disabled": {
-      cursor: "default",
-      opacity: 0.45,
-    },
-  },
-  secondaryButton: {
-    minHeight: "40px",
-    paddingInline: "14px",
-    color: "#f4f1e8",
-    backgroundColor: "transparent",
-    border: "1px solid #484b42",
-    borderRadius: "2px",
-    cursor: "pointer",
-    fontFamily: "inherit",
-    fontSize: "8px",
-    letterSpacing: "0.1em",
-    textTransform: "uppercase",
-    ":hover": {
-      borderColor: "#85887e",
-    },
-    ":disabled": {
-      cursor: "default",
-      opacity: 0.45,
-    },
-  },
   accountError: {
     margin: 0,
     padding: "11px 22px",
@@ -640,7 +578,9 @@ const styles = stylex.create({
       backgroundColor: "rgba(255, 255, 255, 0.045)",
     },
     ":focus-within": {
-      outline: "2px solid #caff42",
+      outlineWidth: "2px",
+      outlineStyle: "solid",
+      outlineColor: colors.accent,
       outlineOffset: "-2px",
     },
   },
@@ -679,7 +619,7 @@ const styles = stylex.create({
     lineHeight: 1.55,
   },
   optionMark: {
-    color: "#caff42",
+    color: colors.accent,
     fontSize: "12px",
   },
   statusRow: {
@@ -694,7 +634,7 @@ const styles = stylex.create({
     width: "5px",
     height: "5px",
     borderRadius: "50%",
-    backgroundColor: "#caff42",
+    backgroundColor: colors.accent,
   },
   pausedDot: {
     backgroundColor: "#c6a869",

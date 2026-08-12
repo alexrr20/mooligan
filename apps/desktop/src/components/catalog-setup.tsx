@@ -3,6 +3,9 @@ import * as stylex from "@stylexjs/stylex";
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 
+import { colors } from "../styles/tokens.stylex.js";
+import { Button } from "./button";
+
 type SetupState =
   | { kind: "checking" }
   | { kind: "missing" }
@@ -186,12 +189,7 @@ export function CatalogSetup() {
                   ) : null}
 
                   <div {...stylex.props(styles.actions)}>
-                    <button
-                      {...stylex.props(styles.primaryButton)}
-                      type="button"
-                      disabled={downloading}
-                      onClick={() => void download()}
-                    >
+                    <Button disabled={downloading} onClick={() => void download()} size="large">
                       {downloading
                         ? "Downloading…"
                         : state.kind === "error"
@@ -202,10 +200,15 @@ export function CatalogSetup() {
                             ? "Update library"
                             : "Download library"}
                       <span aria-hidden="true">↓</span>
-                    </button>
-                    <Dialog.Close {...stylex.props(styles.secondaryButton)} disabled={downloading}>
+                    </Button>
+                    <Button
+                      disabled={downloading}
+                      render={<Dialog.Close />}
+                      size="large"
+                      variant="ghost"
+                    >
                       Not now
-                    </Dialog.Close>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -294,7 +297,7 @@ const styles = stylex.create({
     justifyContent: "space-between",
     border: "1px solid #1b1d19",
     borderRadius: "5px",
-    backgroundColor: "#caff42",
+    backgroundColor: colors.accent,
     color: "#1b1d19",
     boxShadow: "11px 11px 0 #242620, 12px 12px 0 #55584f",
     transform: "rotate(-2.5deg)",
@@ -364,7 +367,7 @@ const styles = stylex.create({
   progressFill: {
     width: "100%",
     height: "100%",
-    backgroundColor: "#caff42",
+    backgroundColor: colors.accent,
     transform: "scaleX(0)",
     transformOrigin: "left center",
   },
@@ -373,56 +376,6 @@ const styles = stylex.create({
     display: "flex",
     alignItems: "center",
     gap: "11px",
-  },
-  primaryButton: {
-    minWidth: "190px",
-    minHeight: "44px",
-    paddingInline: "16px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "24px",
-    border: "1px solid #caff42",
-    borderRadius: "2px",
-    color: "#1b1d19",
-    backgroundColor: "#caff42",
-    fontSize: "11px",
-    cursor: "pointer",
-    transition: "transform 160ms ease, background-color 160ms ease",
-    ":hover": {
-      transform: "translateY(-2px)",
-      backgroundColor: "#dcff82",
-    },
-    ":focus-visible": {
-      outline: "2px solid #caff42",
-      outlineOffset: "3px",
-    },
-    ":disabled": {
-      transform: "none",
-      color: "#aeb0a6",
-      backgroundColor: "#3c3e38",
-      cursor: "wait",
-    },
-  },
-  secondaryButton: {
-    minHeight: "44px",
-    paddingInline: "16px",
-    border: 0,
-    color: "#a6a89d",
-    backgroundColor: "transparent",
-    fontSize: "10px",
-    cursor: "pointer",
-    ":hover": {
-      color: "#f4f1e8",
-    },
-    ":focus-visible": {
-      outline: "2px solid #caff42",
-      outlineOffset: "2px",
-    },
-    ":disabled": {
-      color: "#a4a59e",
-      cursor: "wait",
-    },
   },
   footnote: {
     margin: 0,
