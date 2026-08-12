@@ -16,7 +16,7 @@ type StarterPageProps = Omit<PageProps, "children"> & {
 
 export function Page({ children, description, eyebrow, number, title }: PageProps) {
   return (
-    <div {...stylex.props(styles.page)}>
+    <PageFrame>
       <header {...stylex.props(styles.header)}>
         <div {...stylex.props(styles.eyebrowRow)}>
           <p {...stylex.props(styles.eyebrow)}>{eyebrow}</p>
@@ -26,8 +26,12 @@ export function Page({ children, description, eyebrow, number, title }: PageProp
         <p {...stylex.props(styles.description)}>{description}</p>
       </header>
       <div {...stylex.props(styles.content)}>{children}</div>
-    </div>
+    </PageFrame>
   );
+}
+
+export function PageFrame({ children }: Pick<PageProps, "children">) {
+  return <div {...stylex.props(styles.page)}>{children}</div>;
 }
 
 export function StarterPage({
