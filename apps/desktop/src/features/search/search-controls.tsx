@@ -36,11 +36,9 @@ export function SearchForm({ activeQuery, onSearch }: SearchFormProps) {
         onSearch(query.trim());
       }}
     >
-      <label {...stylex.props(styles.searchLabel)} htmlFor="card-search">
-        Filter the index
-      </label>
       <Input
         {...stylex.props(styles.searchInput)}
+        aria-label="Search cards"
         id="card-search"
         name="query"
         placeholder="Card, set, number, or type"
@@ -154,23 +152,9 @@ export function SearchViewToggle({ grid, onChange }: SearchViewToggleProps) {
 const styles = stylex.create({
   searchBar: {
     minHeight: "78px",
-    display: "grid",
-    gridTemplateColumns: {
-      default: "150px minmax(0, 1fr)",
-      "@media (max-width: 820px)": "1fr",
-    },
+    display: "flex",
     alignItems: "center",
-    columnGap: "18px",
     borderBottom: "1px solid #34362f",
-  },
-  searchLabel: {
-    color: "#a6a89d",
-    fontSize: "8px",
-    letterSpacing: "0.14em",
-    textTransform: "uppercase",
-    "@media (max-width: 820px)": {
-      display: "none",
-    },
   },
   searchInput: {
     width: "100%",
