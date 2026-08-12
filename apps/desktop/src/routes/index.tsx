@@ -2,6 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { createFileRoute, Link } from "@tanstack/react-router";
 
 import { Page } from "../components/page";
+import { colors } from "../styles/tokens.stylex.js";
 
 export const Route = createFileRoute("/")({
   component: Home,
@@ -66,16 +67,18 @@ const styles = stylex.create({
       backgroundColor: "rgba(255, 255, 255, 0.06)",
     },
     ":focus-visible": {
-      outline: "2px solid #caff42",
+      outlineWidth: "2px",
+      outlineStyle: "solid",
+      outlineColor: colors.accent,
       outlineOffset: "3px",
     },
   },
   quickLinkAccent: {
-    borderColor: "#caff42",
+    borderColor: colors.accent,
     color: "#f4f1e8",
     backgroundColor: "#141512",
     ":hover": {
-      borderColor: "#caff42",
+      borderColor: colors.accent,
       backgroundColor: "#292b26",
     },
   },

@@ -1,5 +1,9 @@
 import * as stylex from "@stylexjs/stylex";
 
+export const colors = stylex.defineVars({
+  accent: "#11C565",
+});
+
 export const fontSizes = stylex.defineVars({
   xs: "0.75rem",
   sm: "0.875rem",

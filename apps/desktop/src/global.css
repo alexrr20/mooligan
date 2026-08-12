@@ -2,6 +2,10 @@
   box-sizing: border-box;
 }
 
+:root {
+  --color-accent: #11c565;
+}
+
 html,
 body,
 #root {
@@ -51,5 +55,5 @@ button {
 
 ::selection {
   color: #1b1d19;
-  background: #caff42;
+  background: var(--color-accent);
 }

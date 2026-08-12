@@ -1,5 +1,9 @@
 import type { VarGroup } from "@stylexjs/stylex";
 
+export declare const colors: VarGroup<{
+  accent: string;
+}>;
+
 export declare const fontSizes: VarGroup<{
   xs: string;
   sm: string;

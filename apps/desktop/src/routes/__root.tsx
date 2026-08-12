@@ -4,6 +4,7 @@ import { motion, MotionConfig } from "motion/react";
 
 import { CatalogSetup } from "../components/catalog-setup";
 import { usePreferences } from "../features/preferences/use-preferences";
+import { colors } from "../styles/tokens.stylex.js";
 
 export const Route = createRootRoute({
   component: AppShell,
@@ -51,7 +52,7 @@ function AppShell() {
                   activeProps={{
                     style: {
                       color: "#1b1d19",
-                      backgroundColor: "#caff42",
+                      backgroundColor: colors.accent,
                     },
                   }}
                   to={item.to}
@@ -178,7 +179,9 @@ const styles = stylex.create({
       backgroundColor: "#262823",
     },
     ":focus-visible": {
-      outline: "2px solid #caff42",
+      outlineWidth: "2px",
+      outlineStyle: "solid",
+      outlineColor: colors.accent,
       outlineOffset: "2px",
     },
   },
@@ -198,7 +201,7 @@ const styles = stylex.create({
     height: "6px",
     marginTop: "5px",
     borderRadius: "50%",
-    backgroundColor: "#caff42",
+    backgroundColor: colors.accent,
     boxShadow: "0 0 0 3px rgba(202, 255, 66, 0.09)",
   },
   localTitle: {

@@ -1,6 +1,6 @@
 import { Button as BaseButton } from "@base-ui/react/button";
 import * as stylex from "@stylexjs/stylex";
-import { fontSizes } from "../styles/tokens.stylex.js";
+import { colors, fontSizes } from "../styles/tokens.stylex.js";
 
 export type ButtonProps = Omit<BaseButton.Props, "className" | "style"> & {
   fullWidth?: boolean;
@@ -58,7 +58,7 @@ const styles = stylex.create({
   },
   primary: {
     color: "#064E3B",
-    backgroundColor: "#11C565",
+    backgroundColor: colors.accent,
     borderWidth: "1px",
     borderStyle: "solid",
     borderColor: "#10BC60",

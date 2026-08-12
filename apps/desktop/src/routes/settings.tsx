@@ -7,6 +7,7 @@ import { useAuth } from "../features/auth/use-auth";
 import { usePreferenceSync } from "../features/preferences/use-preference-sync";
 import { usePreferences } from "../features/preferences/use-preferences";
 import { useWorkspaceBackup } from "../features/preferences/use-workspace-backup";
+import { colors } from "../styles/tokens.stylex.js";
 
 export const Route = createFileRoute("/settings")({
   component: SettingsPage,
@@ -462,8 +463,8 @@ const styles = stylex.create({
   },
   accountGlyphSignedIn: {
     color: "#0a0a0a",
-    backgroundColor: "#caff42",
-    borderColor: "#caff42",
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   accountGlyphPaused: {
     color: "#171914",
@@ -577,7 +578,9 @@ const styles = stylex.create({
       backgroundColor: "rgba(255, 255, 255, 0.045)",
     },
     ":focus-within": {
-      outline: "2px solid #caff42",
+      outlineWidth: "2px",
+      outlineStyle: "solid",
+      outlineColor: colors.accent,
       outlineOffset: "-2px",
     },
   },
@@ -616,7 +619,7 @@ const styles = stylex.create({
     lineHeight: 1.55,
   },
   optionMark: {
-    color: "#caff42",
+    color: colors.accent,
     fontSize: "12px",
   },
   statusRow: {
@@ -631,7 +634,7 @@ const styles = stylex.create({
     width: "5px",
     height: "5px",
     borderRadius: "50%",
-    backgroundColor: "#caff42",
+    backgroundColor: colors.accent,
   },
   pausedDot: {
     backgroundColor: "#c6a869",

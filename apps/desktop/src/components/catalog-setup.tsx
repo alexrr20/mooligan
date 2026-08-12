@@ -3,6 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 
+import { colors } from "../styles/tokens.stylex.js";
 import { Button } from "./button";
 
 type SetupState =
@@ -296,7 +297,7 @@ const styles = stylex.create({
     justifyContent: "space-between",
     border: "1px solid #1b1d19",
     borderRadius: "5px",
-    backgroundColor: "#caff42",
+    backgroundColor: colors.accent,
     color: "#1b1d19",
     boxShadow: "11px 11px 0 #242620, 12px 12px 0 #55584f",
     transform: "rotate(-2.5deg)",
@@ -366,7 +367,7 @@ const styles = stylex.create({
   progressFill: {
     width: "100%",
     height: "100%",
-    backgroundColor: "#caff42",
+    backgroundColor: colors.accent,
     transform: "scaleX(0)",
     transformOrigin: "left center",
   },
