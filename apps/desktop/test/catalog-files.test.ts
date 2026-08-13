@@ -105,8 +105,10 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
       digital: false,
       id: "printing-1",
       image_uris: {
+        grid: "https://cards.scryfall.io/grid/front/1.webp",
         normal: "https://cards.scryfall.io/normal/front/1.jpg",
         small: "https://cards.scryfall.io/small/front/1.jpg",
+        thumb: "https://cards.scryfall.io/thumb/front/1.webp",
       },
       name: "Mooligan Test Card",
       object: "card",
@@ -156,8 +158,10 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
       card_faces: [
         {
           image_uris: {
+            grid: "https://cards.scryfall.io/grid/front/2.webp",
             normal: "https://cards.scryfall.io/normal/front/2.jpg",
             small: "https://cards.scryfall.io/small/front/2.jpg",
+            thumb: "https://cards.scryfall.io/thumb/front/2.webp",
           },
           type_line: "Creature — Test",
         },
@@ -205,9 +209,9 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
         cards: [
           {
             collectorNumber: "1",
-            gridImageUrl: "https://cards.scryfall.io/normal/front/1.jpg",
+            gridImageUrl: "https://cards.scryfall.io/grid/front/1.webp",
             id: "printing-1",
-            imageUrl: "https://cards.scryfall.io/small/front/1.jpg",
+            imageUrl: "https://cards.scryfall.io/thumb/front/1.webp",
             name: "Mooligan Test Card",
             rarity: "rare",
             setCode: "moo",
@@ -224,6 +228,13 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
       assert.deepEqual(
         withoutArtSeries.cards.map((card) => card.id),
         ["printing-1", "printing-3", "printing-2"],
+      );
+      assert.deepEqual(
+        queryCatalog({ query: "alternate" }).cards.map(({ gridImageUrl, imageUrl }) => ({
+          gridImageUrl,
+          imageUrl,
+        })),
+        [{ gridImageUrl: null, imageUrl: null }],
       );
       assert.deepEqual(
         queryCatalog({ query: "series" }).cards.map((card) => card.id),
@@ -259,9 +270,9 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
         cards: [
           {
             collectorNumber: "1",
-            gridImageUrl: "https://cards.scryfall.io/normal/front/1.jpg",
+            gridImageUrl: "https://cards.scryfall.io/grid/front/1.webp",
             id: "printing-1",
-            imageUrl: "https://cards.scryfall.io/small/front/1.jpg",
+            imageUrl: "https://cards.scryfall.io/thumb/front/1.webp",
             name: "Mooligan Test Card",
             rarity: "rare",
             setCode: "moo",
@@ -270,9 +281,9 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
           },
           {
             collectorNumber: "2",
-            gridImageUrl: "https://cards.scryfall.io/normal/front/2.jpg",
+            gridImageUrl: "https://cards.scryfall.io/grid/front/2.webp",
             id: "printing-2",
-            imageUrl: "https://cards.scryfall.io/small/front/2.jpg",
+            imageUrl: "https://cards.scryfall.io/thumb/front/2.webp",
             name: "Second Test Card",
             rarity: "common",
             setCode: "moo",
@@ -291,9 +302,9 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
         cards: [
           {
             collectorNumber: "2",
-            gridImageUrl: "https://cards.scryfall.io/normal/front/2.jpg",
+            gridImageUrl: "https://cards.scryfall.io/grid/front/2.webp",
             id: "printing-2",
-            imageUrl: "https://cards.scryfall.io/small/front/2.jpg",
+            imageUrl: "https://cards.scryfall.io/thumb/front/2.webp",
             name: "Second Test Card",
             rarity: "common",
             setCode: "moo",
@@ -349,9 +360,9 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
             cards: [
               {
                 collectorNumber: "2",
-                gridImageUrl: "https://cards.scryfall.io/normal/front/2.jpg",
+                gridImageUrl: "https://cards.scryfall.io/grid/front/2.webp",
                 id: "printing-2",
-                imageUrl: "https://cards.scryfall.io/small/front/2.jpg",
+                imageUrl: "https://cards.scryfall.io/thumb/front/2.webp",
                 name: "Second Test Card",
                 rarity: "common",
                 setCode: "moo",

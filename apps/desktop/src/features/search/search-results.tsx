@@ -1,16 +1,24 @@
 import { Button } from "@base-ui/react/button";
 import * as stylex from "@stylexjs/stylex";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { colors } from "../../styles/tokens.stylex.js";
+import { SearchImageLoading } from "./search-image-loading";
 
 type SearchResultsProps = {
   cards: CatalogCardSummary[];
   error: string;
   grid: boolean;
   hasMore: boolean;
+  imagesReady: boolean;
   loading: boolean;
   onLoadMore: () => void;
   total: number | null;
+};
+
+type ActiveImages = {
+  generation: number;
+  ids: ReadonlySet<string>;
 };
 
 export function SearchResults({
@@ -18,10 +26,93 @@ export function SearchResults({
   error,
   grid,
   hasMore,
+  imagesReady,
   loading,
   onLoadMore,
   total,
 }: SearchResultsProps) {
+  const listRef = useRef<HTMLOListElement>(null);
+  const observerRef = useRef<IntersectionObserver>(null);
+  const generationRef = useRef(0);
+  const [activeImages, setActiveImages] = useState<ActiveImages>({
+    generation: 0,
+    ids: new Set(),
+  });
+  const coordinator = useMemo(
+    () =>
+      new SearchImageLoading((id, generation) => {
+        setActiveImages((current) => {
+          if (current.generation !== generation) {
+            return { generation, ids: new Set([id]) };
+          }
+          if (current.ids.has(id)) {
+            return current;
+          }
+
+          const ids = new Set(current.ids);
+          ids.add(id);
+          return { generation, ids };
+        });
+      }),
+    [],
+  );
+  const imageIds = useMemo(
+    () => cards.flatMap((card) => ((grid ? card.gridImageUrl : card.imageUrl) ? [card.id] : [])),
+    [cards, grid],
+  );
+
+  useLayoutEffect(() => {
+    const generation = coordinator.reset();
+    generationRef.current = generation;
+    setActiveImages({ generation, ids: new Set() });
+
+    if (!imagesReady) {
+      return () => {
+        coordinator.reset();
+      };
+    }
+
+    let initialObservation = true;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visibleIds = entries.flatMap((entry) => {
+          const id = (entry.target as HTMLElement).dataset.imageId;
+          return entry.isIntersecting && id ? [id] : [];
+        });
+
+        if (initialObservation) {
+          initialObservation = false;
+          coordinator.initialVisible(visibleIds, generation);
+        } else {
+          coordinator.visible(visibleIds, generation);
+        }
+      },
+      { root: null, rootMargin: "0px" },
+    );
+    observerRef.current = observer;
+
+    return () => {
+      observer.disconnect();
+      if (observerRef.current === observer) {
+        observerRef.current = null;
+      }
+      coordinator.reset();
+    };
+  }, [coordinator, grid, imagesReady]);
+
+  useLayoutEffect(() => {
+    if (!imagesReady) {
+      return;
+    }
+
+    const generation = generationRef.current;
+    coordinator.append(imageIds, generation);
+    const observer = observerRef.current;
+    listRef.current
+      ?.querySelectorAll<HTMLElement>("[data-image-id]")
+      .forEach((frame) => observer?.observe(frame));
+  }, [coordinator, imageIds, imagesReady]);
+
   if (error) {
     return (
       <div {...stylex.props(styles.message)} role="alert">
@@ -60,40 +151,51 @@ export function SearchResults({
           <span>Printing</span>
         </div>
       ) : null}
-      <ol {...stylex.props(styles.cardList, grid && styles.cardGrid)} start={1}>
-        {cards.map((card, index) => (
-          <li {...stylex.props(styles.cardRow, grid && styles.cardTile)} key={card.id}>
-            <span {...stylex.props(styles.rowNumber, grid && styles.tileNumber)}>
-              {String(index + 1).padStart(3, "0")}
-            </span>
-            <div {...stylex.props(styles.cardImageFrame, grid && styles.tileImageFrame)}>
-              {card.imageUrl ? (
-                <img
-                  {...stylex.props(styles.cardImage)}
-                  alt={`${card.name}, ${card.setName ?? card.setCode} printing`}
-                  decoding="async"
-                  loading="lazy"
-                  src={grid ? (card.gridImageUrl ?? card.imageUrl) : card.imageUrl}
-                />
-              ) : (
-                <span {...stylex.props(styles.cardImageFallback)}>No art</span>
-              )}
-            </div>
-            <div {...stylex.props(styles.cardIdentity, grid && styles.tileIdentity)}>
-              <strong {...stylex.props(styles.cardName, grid && styles.tileName)}>
-                {card.name}
-              </strong>
-              <span {...stylex.props(styles.typeLine)}>{card.typeLine ?? "Card"}</span>
-            </div>
-            <div {...stylex.props(styles.printing, grid && styles.tilePrinting)}>
-              <span {...stylex.props(styles.setCode)}>{card.setCode}</span>
-              <span {...stylex.props(styles.printingCopy)}>
-                {card.setName ?? "Unknown set"} · #{card.collectorNumber}
-                {card.rarity ? ` · ${card.rarity}` : ""}
+      <ol ref={listRef} {...stylex.props(styles.cardList, grid && styles.cardGrid)} start={1}>
+        {cards.map((card, index) => {
+          const imageUrl = grid ? card.gridImageUrl : card.imageUrl;
+          const imageActive = imageUrl && activeImages.ids.has(card.id);
+
+          return (
+            <li {...stylex.props(styles.cardRow, grid && styles.cardTile)} key={card.id}>
+              <span {...stylex.props(styles.rowNumber, grid && styles.tileNumber)}>
+                {String(index + 1).padStart(3, "0")}
               </span>
-            </div>
-          </li>
-        ))}
+              <div
+                {...stylex.props(styles.cardImageFrame, grid && styles.tileImageFrame)}
+                data-image-id={imageUrl ? card.id : undefined}
+              >
+                {imageActive ? (
+                  <img
+                    {...stylex.props(styles.cardImage)}
+                    key={`${activeImages.generation}:${card.id}`}
+                    alt={`${card.name}, ${card.setName ?? card.setCode} printing`}
+                    decoding="async"
+                    loading="eager"
+                    src={imageUrl}
+                    onError={() => coordinator.settled(card.id, activeImages.generation)}
+                    onLoad={() => coordinator.settled(card.id, activeImages.generation)}
+                  />
+                ) : imageUrl ? null : (
+                  <span {...stylex.props(styles.cardImageFallback)}>No art</span>
+                )}
+              </div>
+              <div {...stylex.props(styles.cardIdentity, grid && styles.tileIdentity)}>
+                <strong {...stylex.props(styles.cardName, grid && styles.tileName)}>
+                  {card.name}
+                </strong>
+                <span {...stylex.props(styles.typeLine)}>{card.typeLine ?? "Card"}</span>
+              </div>
+              <div {...stylex.props(styles.printing, grid && styles.tilePrinting)}>
+                <span {...stylex.props(styles.setCode)}>{card.setCode}</span>
+                <span {...stylex.props(styles.printingCopy)}>
+                  {card.setName ?? "Unknown set"} · #{card.collectorNumber}
+                  {card.rarity ? ` · ${card.rarity}` : ""}
+                </span>
+              </div>
+            </li>
+          );
+        })}
       </ol>
       {hasMore ? (
         <Button

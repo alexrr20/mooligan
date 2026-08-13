@@ -26,13 +26,20 @@ function SearchPage() {
   const includeDigital = searchState.digital === true;
   const gridView = searchState.grid === true;
   const uniqueCards = searchState.uniqueCards === true;
-  const { cards, error, hasMore, loading, loadMore, total } = useCatalogSearch(
+  const { cards, error, hasMore, imagesReady, loading, loadMore, total } = useCatalogSearch(
     activeQuery,
     uniqueCards,
     includeArtSeries,
     includeDigital,
     searchState.universe,
   );
+  const resultIdentity = JSON.stringify([
+    activeQuery,
+    uniqueCards,
+    includeArtSeries,
+    includeDigital,
+    searchState.universe,
+  ]);
   const updateSearch = useCallback(
     (update: CatalogSearchState) => {
       void navigate({
@@ -88,10 +95,12 @@ function SearchPage() {
         </div>
 
         <SearchResults
+          key={`${resultIdentity}:${gridView}`}
           cards={cards}
           error={error}
           grid={gridView}
           hasMore={hasMore}
+          imagesReady={imagesReady}
           loading={loading}
           total={total}
           onLoadMore={loadMore}

@@ -47,6 +47,7 @@ export function useCatalogSearch(
     cards,
     error: result.isError ? "The local card index could not be read." : "",
     hasMore: !result.isPlaceholderData && Boolean(result.hasNextPage),
+    imagesReady: !result.isError && !result.isPlaceholderData,
     loading: result.isFetching,
     loadMore,
     total: result.isPlaceholderData ? null : (lastPage?.total ?? null),

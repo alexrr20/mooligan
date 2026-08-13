@@ -15,12 +15,12 @@ export const RaritySchema = z.enum(["common", "uncommon", "rare", "mythic", "spe
 export type Rarity = z.infer<typeof RaritySchema>;
 
 export const CardImageUrisSchema = z.object({
-  artCrop: z.url().optional(),
-  borderCrop: z.url().optional(),
-  large: z.url().optional(),
-  normal: z.url().optional(),
+  art: z.url().optional(),
+  crop: z.url().optional(),
+  display: z.url().optional(),
+  grid: z.url().optional(),
   png: z.url().optional(),
-  small: z.url().optional(),
+  thumb: z.url().optional(),
 });
 export type CardImageUris = z.infer<typeof CardImageUrisSchema>;
 
