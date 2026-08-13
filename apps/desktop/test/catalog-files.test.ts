@@ -15,21 +15,24 @@ import {
   type CatalogQueryWorkerResponse,
   validateCatalogListRequest,
 } from "../electron/catalog-query.ts";
-import { validateCatalogSearch } from "../src/features/search/search-state.ts";
+import {
+  reconcileCatalogSearchDraft,
+  validateCatalogSearch,
+} from "../src/features/search/search-state.ts";
 
 void test("catalog search state keeps only valid non-default values", () => {
   assert.deepEqual(
     validateCatalogSearch({
-      artSeries: false,
-      digital: false,
+      artSeries: true,
+      digital: true,
       grid: true,
       query: `  Mooligan ${"x".repeat(120)}  `,
       uniqueCards: true,
       universe: "beyond",
     }),
     {
-      artSeries: false,
-      digital: false,
+      artSeries: true,
+      digital: true,
       grid: true,
       query: `Mooligan ${"x".repeat(91)}`,
       uniqueCards: true,
@@ -37,8 +40,16 @@ void test("catalog search state keeps only valid non-default values", () => {
     },
   );
   assert.deepEqual(
-    validateCatalogSearch({ digital: true, grid: "true", query: "   ", universe: "all" }),
+    validateCatalogSearch({ digital: false, grid: "true", query: "   ", universe: "all" }),
     {},
+  );
+});
+
+void test("a completed search cannot overwrite a newer query draft", () => {
+  assert.equal(reconcileCatalogSearchDraft("lightning bolt", "", "lightning"), "lightning bolt");
+  assert.equal(
+    reconcileCatalogSearchDraft("lightning", "lightning", "counterspell"),
+    "counterspell",
   );
 });
 

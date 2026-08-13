@@ -22,8 +22,8 @@ function SearchPage() {
   const searchState = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const activeQuery = searchState.query ?? "";
-  const includeArtSeries = searchState.artSeries !== false;
-  const includeDigital = searchState.digital !== false;
+  const includeArtSeries = searchState.artSeries === true;
+  const includeDigital = searchState.digital === true;
   const gridView = searchState.grid === true;
   const uniqueCards = searchState.uniqueCards === true;
   const { cards, error, hasMore, loading, loadMore, total } = useCatalogSearch(
@@ -62,12 +62,12 @@ function SearchPage() {
             <SearchToggle
               checked={includeArtSeries}
               label="Art series"
-              onChange={(checked) => updateSearch({ artSeries: checked ? undefined : false })}
+              onChange={(checked) => updateSearch({ artSeries: checked || undefined })}
             />
             <SearchToggle
               checked={includeDigital}
               label="Digital cards"
-              onChange={(checked) => updateSearch({ digital: checked ? undefined : false })}
+              onChange={(checked) => updateSearch({ digital: checked || undefined })}
             />
             <SearchUniverseFilter
               value={searchState.universe}
