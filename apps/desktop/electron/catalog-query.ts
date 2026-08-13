@@ -40,16 +40,12 @@ export type CatalogQueryWorkerResponse =
 const cardColumns = `cards.id,
                      cards.name,
                      COALESCE(
-                       json_extract(cards.json, '$.image_uris.small'),
-                       json_extract(cards.json, '$.card_faces[0].image_uris.small'),
-                       json_extract(cards.json, '$.image_uris.normal'),
-                       json_extract(cards.json, '$.card_faces[0].image_uris.normal')
+                       json_extract(cards.json, '$.image_uris.thumb'),
+                       json_extract(cards.json, '$.card_faces[0].image_uris.thumb')
                      ) AS imageUrl,
                      COALESCE(
-                       json_extract(cards.json, '$.image_uris.normal'),
-                       json_extract(cards.json, '$.card_faces[0].image_uris.normal'),
-                       json_extract(cards.json, '$.image_uris.small'),
-                       json_extract(cards.json, '$.card_faces[0].image_uris.small')
+                       json_extract(cards.json, '$.image_uris.grid'),
+                       json_extract(cards.json, '$.card_faces[0].image_uris.grid')
                      ) AS gridImageUrl,
                      cards.set_code AS setCode,
                      cards.set_name AS setName,
