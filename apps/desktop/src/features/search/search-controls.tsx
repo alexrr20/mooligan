@@ -1,10 +1,10 @@
 import { Input } from "@base-ui/react/input";
 import { Switch } from "@base-ui/react/switch";
 import * as stylex from "@stylexjs/stylex";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { colors } from "../../styles/tokens.stylex.js";
-import type { UniverseFilter } from "./search-state";
+import { reconcileCatalogSearchDraft, type UniverseFilter } from "./search-state";
 
 type SearchFormProps = {
   activeQuery: string;
@@ -13,8 +13,13 @@ type SearchFormProps = {
 
 export function SearchForm({ activeQuery, onSearch }: SearchFormProps) {
   const [query, setQuery] = useState(activeQuery);
+  const previousActiveQuery = useRef(activeQuery);
 
-  useEffect(() => setQuery(activeQuery), [activeQuery]);
+  useEffect(() => {
+    const previousQuery = previousActiveQuery.current;
+    previousActiveQuery.current = activeQuery;
+    setQuery((draft) => reconcileCatalogSearchDraft(draft, previousQuery, activeQuery));
+  }, [activeQuery]);
 
   useEffect(() => {
     const nextQuery = query.trim();
