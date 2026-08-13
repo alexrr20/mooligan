@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { Button } from "../components/button";
-import { Page } from "../components/page";
+import { PageFrame } from "../components/page";
 import { useAuth } from "../features/auth/use-auth";
 import { usePreferenceSync } from "../features/preferences/use-preference-sync";
 import { usePreferences } from "../features/preferences/use-preferences";
@@ -20,12 +20,7 @@ function SettingsPage() {
   const { error, loading, preferences, saving, update } = usePreferences();
 
   return (
-    <Page
-      description="Choose how Mooligan stores, displays, and protects the library on this device."
-      eyebrow="System"
-      number="07"
-      title="Quiet controls, one place."
-    >
+    <PageFrame>
       <AccountSetting auth={auth} preferenceSync={preferenceSync} />
 
       <section {...stylex.props(styles.setting)} aria-labelledby="motion-heading">
@@ -88,7 +83,7 @@ function SettingsPage() {
       </section>
 
       <BackupSetting backup={backup} />
-    </Page>
+    </PageFrame>
   );
 }
 
@@ -107,9 +102,9 @@ function AccountSetting({
       <div {...stylex.props(styles.settingIntro)}>
         <div>
           <p {...stylex.props(styles.kicker)}>Account / Optional</p>
-          <h2 {...stylex.props(styles.settingTitle)} id="account-heading">
+          <h1 {...stylex.props(styles.settingTitle)} id="account-heading">
             Local by default.
-          </h2>
+          </h1>
         </div>
         <p {...stylex.props(styles.settingCopy)}>
           Sign in only when you want cloud synchronization. Your library stays in its local

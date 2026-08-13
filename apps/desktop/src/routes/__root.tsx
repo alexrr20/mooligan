@@ -36,8 +36,6 @@ function AppShell() {
       <div {...stylex.props(styles.app)}>
         <header {...stylex.props(styles.chrome)} data-window-drag-region>
           <span {...stylex.props(styles.wordmark)}>Mooligan</span>
-          <span {...stylex.props(styles.windowTitle)}>The card keeper</span>
-          <span {...stylex.props(styles.windowMeta)}>Local / Desktop</span>
         </header>
 
         <aside {...stylex.props(styles.sidebar)}>
@@ -62,14 +60,6 @@ function AppShell() {
                 </Link>
               ))}
             </nav>
-          </div>
-
-          <div {...stylex.props(styles.localNote)}>
-            <span {...stylex.props(styles.localDot)} aria-hidden="true" />
-            <div>
-              <p {...stylex.props(styles.localTitle)}>Local library</p>
-              <p {...stylex.props(styles.localCopy)}>Your workspace lives on this device.</p>
-            </div>
           </div>
         </aside>
 
@@ -104,11 +94,7 @@ const styles = stylex.create({
   },
   chrome: {
     gridColumn: "1 / -1",
-    display: "grid",
-    gridTemplateColumns: {
-      default: "238px 1fr 238px",
-      "@media (max-width: 820px)": "190px 1fr 190px",
-    },
+    display: "flex",
     alignItems: "center",
     minWidth: 0,
     paddingInline: "22px",
@@ -124,29 +110,9 @@ const styles = stylex.create({
     fontSize: "17px",
     letterSpacing: "-0.01em",
   },
-  windowTitle: {
-    overflow: "hidden",
-    color: "#a6a89d",
-    fontSize: "9px",
-    letterSpacing: "0.15em",
-    textAlign: "center",
-    textOverflow: "ellipsis",
-    textTransform: "uppercase",
-    whiteSpace: "nowrap",
-  },
-  windowMeta: {
-    color: "#85887e",
-    fontSize: "8px",
-    letterSpacing: "0.12em",
-    textAlign: "right",
-    textTransform: "uppercase",
-  },
   sidebar: {
     minHeight: 0,
     padding: "34px 20px 24px",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
     borderRight: "1px solid #34362f",
     color: "#d9d9cf",
     backgroundColor: "#0a0a0a",
@@ -188,32 +154,6 @@ const styles = stylex.create({
   navNumber: {
     fontSize: "8px",
     opacity: 0.62,
-  },
-  localNote: {
-    padding: "16px 12px 0",
-    display: "grid",
-    gridTemplateColumns: "8px 1fr",
-    gap: "10px",
-    borderTop: "1px solid #34362f",
-  },
-  localDot: {
-    width: "6px",
-    height: "6px",
-    marginTop: "5px",
-    borderRadius: "50%",
-    backgroundColor: colors.accent,
-    boxShadow: "0 0 0 3px rgba(202, 255, 66, 0.09)",
-  },
-  localTitle: {
-    margin: "0 0 4px",
-    color: "#d9d9cf",
-    fontSize: "11px",
-  },
-  localCopy: {
-    margin: 0,
-    color: "#85887e",
-    fontSize: "9px",
-    lineHeight: 1.5,
   },
   main: {
     minWidth: 0,
