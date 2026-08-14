@@ -14,14 +14,17 @@ import {
   shell,
 } from "electron";
 
-import { type AuthSnapshot, DesktopAuth, resolveAuthOrigin } from "./auth";
-import { registerAuthColdStart, registerAuthScheme } from "./auth-startup";
-import { registerCatalogIpc } from "./catalog";
+import { type AuthSnapshot, DesktopAuth, resolveAuthOrigin } from "./auth/service";
+import { registerAuthColdStart, registerAuthScheme } from "./auth/startup";
+import { registerCatalogIpc } from "./catalog/ipc";
 import { assertTrustedSender, developmentRendererUrl } from "./ipc-security";
-import { PreferenceSyncCoordinator, type PreferenceSyncSnapshot } from "./preference-sync";
-import { validatePreferencesUpdate } from "./preferences";
-import { parseWorkspaceBackup } from "./workspace-backup";
-import { WorkspaceManager } from "./workspace-store";
+import {
+  PreferenceSyncCoordinator,
+  type PreferenceSyncSnapshot,
+} from "./workspace/preference-sync";
+import { validatePreferencesUpdate } from "./workspace/preferences";
+import { parseWorkspaceBackup } from "./workspace/backup";
+import { WorkspaceManager } from "./workspace/store";
 
 app.enableSandbox();
 registerAuthScheme(protocol);

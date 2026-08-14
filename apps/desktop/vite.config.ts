@@ -29,7 +29,7 @@ export default defineConfig(({ command }) => ({
     electron({
       main: {
         entry: {
-          "catalog-query-worker": "electron/catalog-query-worker.ts",
+          "catalog-query-worker": "electron/catalog/query-worker.ts",
           main: "electron/main.ts",
         },
         vite: { define: desktopServiceDefinitions(command) },

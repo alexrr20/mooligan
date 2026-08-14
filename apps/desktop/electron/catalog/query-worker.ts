@@ -5,7 +5,7 @@ import {
   createCatalogQuery,
   type CatalogQueryWorkerRequest,
   type CatalogQueryWorkerResponse,
-} from "./catalog-query.ts";
+} from "./query.ts";
 
 const port = parentPort;
 

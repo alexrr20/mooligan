@@ -2,25 +2,25 @@ import type {
   AuthSnapshot as AuthSnapshotType,
   AuthStatus as AuthStatusType,
   AuthUser as AuthUserType,
-} from "../electron/auth";
+} from "../electron/auth/service";
 import type {
   CatalogProgress as CatalogProgressType,
   CatalogStatus as CatalogStatusType,
-} from "../electron/catalog";
+} from "../electron/catalog/ipc";
 import type {
   CatalogCardSummary as CatalogCardSummaryType,
   CatalogListPage as CatalogListPageType,
   CatalogListRequest,
-} from "../electron/catalog-query";
+} from "../electron/catalog/query";
 import type {
   PreferenceSyncSnapshot as PreferenceSyncSnapshotType,
   PreferenceSyncStatus as PreferenceSyncStatusType,
-} from "../electron/preference-sync";
+} from "../electron/workspace/preference-sync";
 import type {
   MotionPreference as MotionPreferenceType,
   Preferences as PreferencesType,
   PreferencesUpdate,
-} from "../electron/preferences";
+} from "../electron/workspace/preferences";
 
 type CatalogApi = {
   download: () => Promise<CatalogStatusType>;

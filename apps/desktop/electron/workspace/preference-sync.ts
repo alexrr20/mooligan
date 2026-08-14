@@ -1,5 +1,5 @@
 import type { MotionPreference, Preferences } from "./preferences.ts";
-import type { PreferenceSyncState, RemoteMotionPreference } from "./workspace-store.ts";
+import type { PreferenceSyncState, RemoteMotionPreference } from "./store.ts";
 
 export type PreferenceSyncStatus = "local-only" | "syncing" | "synced" | "pending" | "paused";
 

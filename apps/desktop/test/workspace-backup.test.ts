@@ -8,8 +8,8 @@ import type { CollectionLot } from "@mooligan/domain/collection";
 import type { Deck } from "@mooligan/domain/decks";
 import type { CardList } from "@mooligan/domain/lists";
 
-import type { WorkspaceBackup } from "../electron/workspace-backup.ts";
-import { WorkspaceManager, WorkspaceStore } from "../electron/workspace-store.ts";
+import type { WorkspaceBackup } from "../electron/workspace/backup.ts";
+import { WorkspaceManager, WorkspaceStore } from "../electron/workspace/store.ts";
 
 const collectionLot: CollectionLot = {
   acquiredAt: "2026-08-01T10:00:00.000Z",

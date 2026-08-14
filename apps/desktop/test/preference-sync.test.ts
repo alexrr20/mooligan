@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { MotionPreference, Preferences } from "../electron/preferences.ts";
+import type { MotionPreference, Preferences } from "../electron/workspace/preferences.ts";
 import {
   PreferenceSyncCoordinator,
   type PreferenceSyncAuth,
   type PreferenceSyncWorkspace,
-} from "../electron/preference-sync.ts";
-import type { PreferenceSyncState, RemoteMotionPreference } from "../electron/workspace-store.ts";
+} from "../electron/workspace/preference-sync.ts";
+import type { PreferenceSyncState, RemoteMotionPreference } from "../electron/workspace/store.ts";
 
 const REMOTE_A = "01989924-0000-7000-8000-000000000001";
 const REMOTE_B = "01989924-0000-7000-8000-000000000002";

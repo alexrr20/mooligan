@@ -20,7 +20,7 @@ import {
   validateCardList,
   validateCollectionLot,
   validateDeck,
-} from "./workspace-backup.ts";
+} from "./backup.ts";
 
 export type RemoteMotionPreference = {
   updatedAt: string;

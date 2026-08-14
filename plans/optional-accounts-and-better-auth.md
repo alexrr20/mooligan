@@ -110,8 +110,8 @@ Each phase should leave a working product and be independently testable.
 Likely implementation locations:
 
 ```text
-apps/desktop/electron/workspace-store.ts
-apps/desktop/electron/preferences.ts
+apps/desktop/electron/workspace/store.ts
+apps/desktop/electron/workspace/preferences.ts
 apps/desktop/electron/preload.ts
 apps/desktop/src/electron.d.ts
 apps/desktop/src/features/preferences/use-preferences.ts

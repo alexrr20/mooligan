@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 
 import type { App, Protocol } from "electron";
 
-import { AUTH_PROTOCOL, isAuthCallbackUrl } from "./auth.ts";
+import { AUTH_PROTOCOL, isAuthCallbackUrl } from "./service.ts";
 
 type StartupApp = Pick<App, "on" | "requestSingleInstanceLock" | "setAsDefaultProtocolClient">;
 

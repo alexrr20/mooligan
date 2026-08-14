@@ -15,7 +15,7 @@ import {
   type ProtectedAuthState,
   ProtectedStorageError,
   type StoredAuthCookie,
-} from "./auth-storage.ts";
+} from "./storage.ts";
 
 export const AUTH_PROTOCOL = "com.mooligan.app";
 export const AUTH_CALLBACK_PATH = "/auth/callback";

@@ -4,8 +4,8 @@ import { test } from "node:test";
 
 import type { App, Protocol } from "electron";
 
-import { registerAuthColdStart, registerAuthScheme } from "../electron/auth-startup.ts";
-import { AUTH_PROTOCOL } from "../electron/auth.ts";
+import { registerAuthColdStart, registerAuthScheme } from "../electron/auth/startup.ts";
+import { AUTH_PROTOCOL } from "../electron/auth/service.ts";
 
 void test("cold-start callbacks queue before readiness and duplicate OS delivery is harmless", async () => {
   const state = "S".repeat(43);
