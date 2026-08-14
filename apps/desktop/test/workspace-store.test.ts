@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { validatePreferencesUpdate } from "../electron/preferences.ts";
-import { WorkspaceManager, WorkspaceStore } from "../electron/workspace-store.ts";
+import { validatePreferencesUpdate } from "../electron/workspace/preferences.ts";
+import { WorkspaceManager, WorkspaceStore } from "../electron/workspace/store.ts";
 
 void test("a local workspace initializes, reopens, updates, and validates preferences", async () => {
   const directory = await mkdtemp(join(tmpdir(), "mooligan-workspace-"));

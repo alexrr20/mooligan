@@ -9,7 +9,7 @@ import {
   EncryptedAuthStorage,
   type ProtectedAuthState,
   ProtectedStorageError,
-} from "../electron/auth-storage.ts";
+} from "../electron/auth/storage.ts";
 
 void test("authentication state is asynchronously encrypted, atomically replaced, and reopened", async () => {
   const directory = await mkdtemp(join(tmpdir(), "mooligan-auth-storage-"));

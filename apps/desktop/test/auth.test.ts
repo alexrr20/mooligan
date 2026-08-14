@@ -4,8 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import type { AsyncSafeStorage, ProtectedAuthState } from "../electron/auth-storage.ts";
-import { AUTH_PROTOCOL, AuthInputError, DesktopAuth, resolveAuthOrigin } from "../electron/auth.ts";
+import type { AsyncSafeStorage, ProtectedAuthState } from "../electron/auth/storage.ts";
+import {
+  AUTH_PROTOCOL,
+  AuthInputError,
+  DesktopAuth,
+  resolveAuthOrigin,
+} from "../electron/auth/service.ts";
 
 const user = {
   createdAt: "private server field",

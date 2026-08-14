@@ -8,16 +8,16 @@ import { CatalogSnapshotSchema, type CatalogSnapshot } from "@mooligan/domain/ca
 import { CatalogReleaseSchema, type CatalogRelease } from "@mooligan/domain/catalog-sync";
 import { app, ipcMain, net, type IpcMainInvokeEvent } from "electron";
 
-import { recoverInterruptedReplacement } from "./catalog-files";
-import { catalogSchemaVersion, importCatalog, readGzipJsonLines } from "./catalog-import";
-import { validateCatalogListRequest } from "./catalog-query";
+import { recoverInterruptedReplacement } from "./files";
+import { catalogSchemaVersion, importCatalog, readGzipJsonLines } from "./import";
+import { validateCatalogListRequest } from "./query";
 import type {
   CatalogListPage,
   CatalogListRequest,
   CatalogQueryWorkerRequest,
   CatalogQueryWorkerResponse,
-} from "./catalog-query";
-import { assertTrustedSender } from "./ipc-security";
+} from "./query";
+import { assertTrustedSender } from "../ipc-security";
 
 export type CatalogProgress = {
   completedBytes: number;
