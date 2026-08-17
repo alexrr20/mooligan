@@ -1,5 +1,9 @@
 import { rename, stat } from "node:fs/promises";
 
+import * as z from "zod";
+
+const FileSystemErrorSchema = z.object({ code: z.string().optional() });
+
 export async function recoverInterruptedReplacement(destination: string, backup: string) {
   if (await exists(destination)) {
     return;
@@ -8,7 +12,7 @@ export async function recoverInterruptedReplacement(destination: string, backup:
   try {
     await rename(backup, destination);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+    if (!isFileNotFound(error)) {
       throw error;
     }
   }
@@ -19,10 +23,15 @@ async function exists(path: string) {
     await stat(path);
     return true;
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+    if (isFileNotFound(error)) {
       return false;
     }
 
     throw error;
   }
+}
+
+function isFileNotFound(cause: unknown) {
+  const error = FileSystemErrorSchema.safeParse(cause);
+  return error.success && error.data.code === "ENOENT";
 }

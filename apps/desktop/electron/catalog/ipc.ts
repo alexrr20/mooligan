@@ -5,18 +5,20 @@ import { DatabaseSync } from "node:sqlite";
 import { Worker } from "node:worker_threads";
 
 import { CatalogSnapshotSchema, type CatalogSnapshot } from "@mooligan/domain/catalog";
+import {
+  CatalogImageDescriptorSchema,
+  type CatalogCardDetail,
+  type CatalogImageDescriptor,
+} from "@mooligan/domain/catalog-detail";
 import { CatalogReleaseSchema, type CatalogRelease } from "@mooligan/domain/catalog-sync";
 import { app, ipcMain, net, type IpcMainInvokeEvent } from "electron";
+import * as z from "zod";
 
 import { recoverInterruptedReplacement } from "./files";
+import { validateCatalogPrintingId } from "./detail";
 import { catalogSchemaVersion, importCatalog, readGzipJsonLines } from "./import";
-import { validateCatalogListRequest } from "./query";
-import type {
-  CatalogListPage,
-  CatalogListRequest,
-  CatalogQueryWorkerRequest,
-  CatalogQueryWorkerResponse,
-} from "./query";
+import { parseCatalogQueryWorkerResponse, validateCatalogListRequest } from "./query";
+import type { CatalogListPage, CatalogQueryOperation, CatalogQueryWorkerRequest } from "./query";
 import { assertTrustedSender } from "../ipc-security";
 
 export type CatalogProgress = {
@@ -30,13 +32,20 @@ export type CatalogStatus =
   | (CatalogSnapshot & { installed: true; updateAvailable: boolean });
 
 const apiBaseUrl = process.env.MOOLIGAN_API_URL ?? "http://127.0.0.1:3000";
+const CatalogMetadataSchema = CatalogSnapshotSchema.extend({ schemaVersion: z.number().int() });
+const FileSystemErrorSchema = z.object({ code: z.string().optional() });
 let activeDownload: Promise<CatalogStatus> | undefined;
 let catalogQueriesAvailable = Promise.resolve();
 let catalogQueryId = 0;
 let catalogQueryWorker: Worker | undefined;
+type CatalogQueryResult = CatalogCardDetail | CatalogListPage | string | null;
 const catalogQueries = new Map<
   number,
-  { reject: (error: Error) => void; resolve: (page: CatalogListPage) => void }
+  {
+    operation: CatalogQueryOperation["type"];
+    reject: (error: Error) => void;
+    resolve: (result: CatalogQueryResult) => void;
+  }
 >();
 
 export function registerCatalogIpc() {
@@ -44,10 +53,27 @@ export function registerCatalogIpc() {
     assertTrustedSender(event);
     return getCatalogStatus();
   });
-  ipcMain.handle("catalog:list", async (event, request: unknown) => {
+  ipcMain.handle("catalog:list", async (event, request) => {
     assertTrustedSender(event);
     await catalogQueriesAvailable;
-    return queryCatalog(validateCatalogListRequest(request));
+    return queryCatalog({
+      request: validateCatalogListRequest(request),
+      type: "list",
+    });
+  });
+  ipcMain.handle("catalog:detail", async (event, printingId) => {
+    assertTrustedSender(event);
+    const validPrintingId = validateCatalogPrintingId(printingId);
+
+    if (!validPrintingId) {
+      return null;
+    }
+
+    await catalogQueriesAvailable;
+    return queryCatalog({
+      printingId: validPrintingId,
+      type: "detail",
+    });
   });
   ipcMain.handle("catalog:download", (event) => {
     assertTrustedSender(event);
@@ -67,7 +93,8 @@ async function getCatalogStatus(): Promise<CatalogStatus> {
   try {
     await stat(path);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+    const fileSystemError = FileSystemErrorSchema.safeParse(error);
+    if (fileSystemError.success && fileSystemError.data.code === "ENOENT") {
       return { installed: false };
     }
 
@@ -90,9 +117,9 @@ async function getCatalogStatus(): Promise<CatalogStatus> {
         )
         .get();
 
-      const snapshot = CatalogSnapshotSchema.safeParse(row);
+      const snapshot = CatalogMetadataSchema.safeParse(row);
 
-      if (!snapshot.success || !isRecord(row) || row.schemaVersion !== catalogSchemaVersion) {
+      if (!snapshot.success || snapshot.data.schemaVersion !== catalogSchemaVersion) {
         return { installed: false };
       }
 
@@ -222,7 +249,8 @@ async function replaceCatalog(partial: string, destination: string, backup: stri
   try {
     await rename(destination, backup);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+    const fileSystemError = FileSystemErrorSchema.safeParse(error);
+    if (!fileSystemError.success || fileSystemError.data.code !== "ENOENT") {
       throw error;
     }
   }
@@ -250,18 +278,42 @@ function catalogUrl(path: string) {
   return new URL(path, `${apiBaseUrl.replace(/\/+$/, "")}/`).toString();
 }
 
-function queryCatalog(request: CatalogListRequest) {
-  const id = ++catalogQueryId;
-  const worker = getCatalogQueryWorker();
+export async function queryCatalogImageSource(image: CatalogImageDescriptor) {
+  const validImage = CatalogImageDescriptorSchema.parse(image);
+  await catalogQueriesAvailable;
+  try {
+    return await queryCatalog({ image: validImage, type: "image-source" });
+  } catch {
+    await catalogQueriesAvailable;
+    return queryCatalog({ image: validImage, type: "image-source" });
+  }
+}
 
-  return new Promise<CatalogListPage>((resolve, reject) => {
-    catalogQueries.set(id, { reject, resolve });
+function queryCatalog(
+  operation: Extract<CatalogQueryOperation, { type: "detail" }>,
+): Promise<CatalogCardDetail | null>;
+function queryCatalog(
+  operation: Extract<CatalogQueryOperation, { type: "image-source" }>,
+): Promise<string | null>;
+function queryCatalog(
+  operation: Extract<CatalogQueryOperation, { type: "list" }>,
+): Promise<CatalogListPage>;
+function queryCatalog(operation: CatalogQueryOperation): Promise<CatalogQueryResult> {
+  const id = ++catalogQueryId;
+
+  return new Promise<CatalogQueryResult>((resolve, reject) => {
+    catalogQueries.set(id, {
+      operation: operation.type,
+      reject,
+      resolve,
+    });
 
     try {
-      worker.postMessage({ id, request } satisfies CatalogQueryWorkerRequest);
-    } catch (error) {
+      const worker = getCatalogQueryWorker();
+      worker.postMessage({ id, operation } satisfies CatalogQueryWorkerRequest);
+    } catch {
       catalogQueries.delete(id);
-      reject(error instanceof Error ? error : new Error(String(error)));
+      reject(catalogReadError());
     }
   });
 }
@@ -276,33 +328,43 @@ function getCatalogQueryWorker() {
     { workerData: catalogPath() },
   );
 
-  worker.on("message", (response: CatalogQueryWorkerResponse) => {
-    const pending = catalogQueries.get(response.id);
+  worker.on("message", (value) => {
+    const envelope = z.object({ id: z.number().int().positive() }).safeParse(value);
 
-    if (!pending) {
+    if (!envelope.success) {
+      failCatalogQueryWorker(worker);
       return;
     }
 
-    catalogQueries.delete(response.id);
+    const pending = catalogQueries.get(envelope.data.id);
+
+    if (!pending) {
+      failCatalogQueryWorker(worker);
+      return;
+    }
+
+    const response = parseCatalogQueryWorkerResponse(value, pending.operation);
+
+    if (!response) {
+      failCatalogQueryWorker(worker);
+      return;
+    }
+
+    catalogQueries.delete(envelope.data.id);
 
     if ("error" in response) {
-      pending.reject(new Error(response.error));
+      pending.reject(catalogReadError());
     } else {
-      pending.resolve(response.page);
+      pending.resolve(response.result);
     }
   });
-  worker.once("error", (error) => failCatalogQueryWorker(worker, error));
-  worker.once("exit", (code) => {
-    failCatalogQueryWorker(
-      worker,
-      new Error(`The catalog query worker exited unexpectedly with code ${code}.`),
-    );
-  });
+  worker.once("error", () => failCatalogQueryWorker(worker));
+  worker.once("exit", () => failCatalogQueryWorker(worker));
   catalogQueryWorker = worker;
   return worker;
 }
 
-function failCatalogQueryWorker(worker: Worker, error: Error) {
+function failCatalogQueryWorker(worker: Worker, terminate = true) {
   if (catalogQueryWorker !== worker) {
     return;
   }
@@ -310,10 +372,18 @@ function failCatalogQueryWorker(worker: Worker, error: Error) {
   catalogQueryWorker = undefined;
 
   for (const pending of catalogQueries.values()) {
-    pending.reject(error);
+    pending.reject(catalogReadError());
   }
 
   catalogQueries.clear();
+
+  if (terminate) {
+    void worker.terminate().catch(() => undefined);
+  }
+}
+
+function catalogReadError() {
+  return new Error("The local card catalog could not be read.");
 }
 
 async function stopCatalogQueryWorker() {
@@ -323,7 +393,7 @@ async function stopCatalogQueryWorker() {
     return;
   }
 
-  failCatalogQueryWorker(worker, new Error("The card catalog is being replaced."));
+  failCatalogQueryWorker(worker, false);
   await worker.terminate();
 }
 
@@ -347,8 +417,4 @@ function sendProgress(event: IpcMainInvokeEvent, progress: CatalogProgress) {
   if (!event.sender.isDestroyed()) {
     event.sender.send("catalog:progress", progress);
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }

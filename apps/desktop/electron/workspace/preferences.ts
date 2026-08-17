@@ -1,3 +1,6 @@
+import * as z from "zod";
+import type { JSONType } from "zod";
+
 export type MotionPreference = "full" | "reduced" | "system";
 
 export type Preferences = {
@@ -6,54 +9,32 @@ export type Preferences = {
 
 export type PreferencesUpdate = Partial<Preferences>;
 
-export const preferenceDefinitions: {
+type PreferenceDefinitions = {
   [Key in keyof Preferences]: {
     defaultValue: Preferences[Key];
     syncable: boolean;
   };
-} = {
-  motion: { defaultValue: "system", syncable: true },
 };
 
-const motionPreferences: readonly MotionPreference[] = ["full", "reduced", "system"];
+export const preferenceDefinitions = {
+  motion: { defaultValue: "system", syncable: true },
+} satisfies PreferenceDefinitions;
 
-export function validatePreferences(value: unknown): Preferences {
-  const preferences = validatePreferencesUpdate(value);
+export const MotionPreferenceSchema = z.enum(["full", "reduced", "system"]);
+export const PreferencesSchema = z.strictObject({ motion: MotionPreferenceSchema });
+const PreferencesUpdateSchema = PreferencesSchema.partial();
 
-  if (preferences.motion === undefined) {
-    throw new TypeError("Missing preference: motion.");
-  }
-
-  return { motion: preferences.motion };
+export function validatePreferences(value: JSONType): Preferences {
+  return PreferencesSchema.parse(value);
 }
 
-export function validatePreferencesUpdate(value: unknown): PreferencesUpdate {
-  if (!isPlainRecord(value)) {
-    throw new TypeError("Preference update must be an object.");
+export function validatePreferencesUpdate(value: JSONType): PreferencesUpdate {
+  const preferences = PreferencesUpdateSchema.safeParse(value);
+  if (preferences.success) return preferences.data;
+
+  const unknownKey = preferences.error.issues.find(({ code }) => code === "unrecognized_keys");
+  if (unknownKey?.code === "unrecognized_keys") {
+    throw new TypeError(`Unknown preference: ${unknownKey.keys[0]}.`);
   }
-
-  const unknownKey = Object.keys(value).find((key) => key !== "motion");
-
-  if (unknownKey) {
-    throw new TypeError(`Unknown preference: ${unknownKey}.`);
-  }
-
-  if (!Object.hasOwn(value, "motion")) {
-    return {};
-  }
-
-  if (!motionPreferences.includes(value.motion as MotionPreference)) {
-    throw new TypeError("Invalid motion preference.");
-  }
-
-  return { motion: value.motion as MotionPreference };
-}
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  if (typeof value !== "object" || value === null) {
-    return false;
-  }
-
-  const prototype = Object.getPrototypeOf(value) as unknown;
-  return prototype === Object.prototype || prototype === null;
+  throw new TypeError("Invalid motion preference.");
 }

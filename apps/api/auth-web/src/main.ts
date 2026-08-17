@@ -9,12 +9,12 @@ const authClient = createAuthClient({
   baseURL: location.origin,
   plugins: [electronProxyClient({ protocol })],
 });
-const signInButton = element<HTMLButtonElement>("sign-in");
-const continueButton = element<HTMLButtonElement>("continue");
-const signedIn = element<HTMLDivElement>("signed-in");
-const signedOut = element<HTMLDivElement>("signed-out");
-const identity = element<HTMLParagraphElement>("identity");
-const errorMessage = element<HTMLParagraphElement>("error");
+const signInButton = button("sign-in");
+const continueButton = button("continue");
+const signedIn = element("signed-in");
+const signedOut = element("signed-out");
+const identity = element("identity");
+const errorMessage = element("error");
 const redirectTimer = authClient.ensureElectronRedirect({ timeout: 5 * 60 * 1_000 });
 window.addEventListener("pagehide", () => clearInterval(redirectTimer), { once: true });
 
@@ -89,12 +89,20 @@ function showError(message: string) {
   errorMessage.hidden = false;
 }
 
-function element<ElementType extends HTMLElement>(id: string) {
+function element(id: string) {
   const value = document.getElementById(id);
 
-  if (!value) {
+  if (!(value instanceof HTMLElement)) {
     throw new Error(`Missing sign-in element: ${id}`);
   }
 
-  return value as ElementType;
+  return value;
+}
+
+function button(id: string) {
+  const value = element(id);
+  if (!(value instanceof HTMLButtonElement)) {
+    throw new Error(`Invalid sign-in button: ${id}`);
+  }
+  return value;
 }

@@ -3,8 +3,10 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import * as z from "zod";
+import type { JSONType } from "zod";
 
-import type { AsyncSafeStorage, ProtectedAuthState } from "../electron/auth/storage.ts";
+import { type AsyncSafeStorage, ProtectedAuthStateSchema } from "../electron/auth/storage.ts";
 import {
   AUTH_PROTOCOL,
   AuthInputError,
@@ -21,6 +23,12 @@ const user = {
   name: "Molly",
   sessionToken: "must-not-reach-the-renderer",
 };
+const TokenRequestSchema = z.object({
+  code_verifier: z.string(),
+  state: z.string(),
+  token: z.string(),
+});
+type TokenRequest = z.infer<typeof TokenRequestSchema>;
 
 void test("desktop sign-in persists PKCE first and keeps session material out of public state", async () => {
   const directory = await mkdtemp(join(tmpdir(), "mooligan-auth-"));
@@ -29,7 +37,7 @@ void test("desktop sign-in persists PKCE first and keeps session material out of
   let now = 1_000_000;
   let openedUrl: URL | undefined;
   let tokenCalls = 0;
-  let tokenRequest: Record<string, unknown> | undefined;
+  let tokenRequest: TokenRequest | undefined;
   let syncCookie = "";
   let syncUnauthorized = false;
   let signOutFails = false;
@@ -43,11 +51,11 @@ void test("desktop sign-in persists PKCE first and keeps session material out of
       assert.equal(headers.get("origin"), `${AUTH_PROTOCOL}:/`);
       assert.equal(headers.get("electron-origin"), `${AUTH_PROTOCOL}:/`);
       tokenCalls += 1;
-      const body = init?.body;
-      if (typeof body !== "string") {
+      const body = z.string().safeParse(init?.body);
+      if (!body.success) {
         throw new Error("missing token request body");
       }
-      tokenRequest = JSON.parse(body) as Record<string, unknown>;
+      tokenRequest = TokenRequestSchema.parse(JSON.parse(body.data));
       return jsonResponse({ token: "raw-session-token", user }, [
         "better-auth.session_token=session-one; Path=/; HttpOnly; Max-Age=3600",
         "not-better-auth.session_token=ignored; Path=/; Max-Age=3600",
@@ -367,7 +375,7 @@ class FakeSafeStorage implements AsyncSafeStorage {
 
   async readState(path: string) {
     const decrypted = await this.decryptStringAsync(await readFile(path));
-    return JSON.parse(decrypted.result) as ProtectedAuthState;
+    return ProtectedAuthStateSchema.parse(JSON.parse(decrypted.result));
   }
 }
 
@@ -380,7 +388,7 @@ function encodeToken(identifier: string, state: string) {
   return unpadded.padEnd(Math.ceil(unpadded.length / 4) * 4, "=");
 }
 
-function jsonResponse(data: unknown, cookies: string[] = []) {
+function jsonResponse(data: JSONType, cookies: string[] = []) {
   const headers = new Headers({ "content-type": "application/json" });
   for (const cookie of cookies) {
     headers.append("set-cookie", cookie);

@@ -8,7 +8,7 @@ import type { CollectionLot } from "@mooligan/domain/collection";
 import type { Deck } from "@mooligan/domain/decks";
 import type { CardList } from "@mooligan/domain/lists";
 
-import type { WorkspaceBackup } from "../electron/workspace/backup.ts";
+import { parseWorkspaceBackup } from "../electron/workspace/backup.ts";
 import { WorkspaceManager, WorkspaceStore } from "../electron/workspace/store.ts";
 
 const collectionLot: CollectionLot = {
@@ -69,7 +69,7 @@ void test("workspace backups round-trip user data while preserving local metadat
     const backup = source.createBackup();
     source.close();
 
-    const exported = JSON.parse(backup) as WorkspaceBackup & Record<string, unknown>;
+    const exported = parseWorkspaceBackup(backup);
     assert.deepEqual(Object.keys(exported).sort(), [
       "cardLists",
       "collectionLots",
@@ -132,7 +132,7 @@ void test("invalid backups are fully rejected before any workspace data changes"
     const before = store.createBackup();
     const workspaceId = store.workspaceId;
 
-    const replacement = JSON.parse(
+    const replacement = parseWorkspaceBackup(
       JSON.stringify({
         cardLists: [{ id: cardList.id, value: cardList }],
         collectionLots: [{ id: collectionLot.id, value: collectionLot }],
@@ -141,7 +141,7 @@ void test("invalid backups are fully rejected before any workspace data changes"
         preferences: { motion: "reduced" },
         version: 1,
       }),
-    ) as WorkspaceBackup;
+    );
 
     replacement.decks[0].id = "does-not-match-payload";
     assert.throws(() => store.importBackup(JSON.stringify(replacement)), /deck IDs are invalid/);

@@ -1,5 +1,12 @@
+import * as z from "zod";
+import type { JSONType } from "zod";
+
 import type { MotionPreference, Preferences } from "./preferences.ts";
-import type { PreferenceSyncState, RemoteMotionPreference } from "./store.ts";
+import {
+  RemoteMotionPreferenceSchema,
+  type PreferenceSyncState,
+  type RemoteMotionPreference,
+} from "./store.ts";
 
 export type PreferenceSyncStatus = "local-only" | "syncing" | "synced" | "pending" | "paused";
 
@@ -19,7 +26,7 @@ export interface PreferenceSyncWorkspace {
   markPreferenceSynced(pushedValue: MotionPreference, preference: RemoteMotionPreference): boolean;
   readPreferences(): Preferences;
   readPreferenceSyncState(): PreferenceSyncState;
-  selectForUser(userId: string): unknown;
+  selectForUser(userId: string): void;
 }
 
 export class PreferenceSyncCoordinator {
@@ -123,7 +130,9 @@ export class PreferenceSyncCoordinator {
       const local = this.#workspace.readPreferences();
       const response = await this.#bind(this.#workspace.workspaceId, local.motion);
 
-      this.#workspace.bindActiveWorkspace(this.#userId!, response.workspaceId);
+      const userId = this.#userId;
+      if (!userId) throw new SyncUnavailableError();
+      this.#workspace.bindActiveWorkspace(userId, response.workspaceId);
       remote = response.preferences.motion;
     }
 
@@ -193,7 +202,7 @@ export class PreferenceSyncCoordinator {
     }
   }
 
-  async #request(path: `/sync/${string}`, init?: RequestInit): Promise<unknown> {
+  async #request(path: `/sync/${string}`, init?: RequestInit): Promise<JSONType> {
     let response: Response;
 
     try {
@@ -207,7 +216,7 @@ export class PreferenceSyncCoordinator {
     }
 
     try {
-      return await response.json();
+      return z.json().parse(await response.json());
     } catch {
       throw new SyncUnavailableError();
     }
@@ -225,83 +234,17 @@ export class PreferenceSyncCoordinator {
 
 class SyncUnavailableError extends Error {}
 
-type PreferencesResponse = {
-  preferences: { motion?: RemoteMotionPreference };
-};
+const RemotePreferencesSchema = z.strictObject({
+  motion: RemoteMotionPreferenceSchema.optional(),
+});
+const PreferencesResponseSchema = z.strictObject({ preferences: RemotePreferencesSchema });
+const BindResponseSchema = PreferencesResponseSchema.extend({ workspaceId: z.uuid() });
+type PreferencesResponse = z.infer<typeof PreferencesResponseSchema>;
 
-function parseBindResponse(value: unknown): PreferencesResponse & { workspaceId: string } {
-  if (
-    !isRecord(value) ||
-    !hasExactKeys(value, ["preferences", "workspaceId"]) ||
-    typeof value.workspaceId !== "string" ||
-    !isUuid(value.workspaceId)
-  ) {
-    throw new TypeError("Invalid workspace bind response.");
-  }
-
-  return {
-    preferences: parsePreferences(value.preferences),
-    workspaceId: value.workspaceId,
-  };
+function parseBindResponse(value: JSONType): PreferencesResponse & { workspaceId: string } {
+  return BindResponseSchema.parse(value);
 }
 
-function parsePreferencesResponse(value: unknown): PreferencesResponse {
-  if (!isRecord(value) || !hasExactKeys(value, ["preferences"])) {
-    throw new TypeError("Invalid preferences response.");
-  }
-
-  return { preferences: parsePreferences(value.preferences) };
-}
-
-function parsePreferences(value: unknown): { motion?: RemoteMotionPreference } {
-  if (!isRecord(value) || !hasExactKeys(value, Object.hasOwn(value, "motion") ? ["motion"] : [])) {
-    throw new TypeError("Invalid remote preferences.");
-  }
-
-  return Object.hasOwn(value, "motion")
-    ? { motion: parseRemoteMotionPreference(value.motion) }
-    : {};
-}
-
-function parseRemoteMotionPreference(value: unknown): RemoteMotionPreference {
-  if (
-    !isRecord(value) ||
-    !hasExactKeys(value, ["updatedAt", "value", "version"]) ||
-    !isMotionPreference(value.value) ||
-    typeof value.version !== "number" ||
-    !Number.isSafeInteger(value.version) ||
-    value.version < 1 ||
-    typeof value.updatedAt !== "string" ||
-    !isIsoTimestamp(value.updatedAt)
-  ) {
-    throw new TypeError("Invalid remote preference.");
-  }
-
-  return {
-    updatedAt: value.updatedAt,
-    value: value.value,
-    version: value.version,
-  };
-}
-
-function isMotionPreference(value: unknown): value is MotionPreference {
-  return value === "full" || value === "reduced" || value === "system";
-}
-
-function isIsoTimestamp(value: string) {
-  const timestamp = Date.parse(value);
-  return Number.isFinite(timestamp) && new Date(timestamp).toISOString() === value;
-}
-
-function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function hasExactKeys(value: Record<string, unknown>, keys: readonly string[]) {
-  const actual = Object.keys(value);
-  return actual.length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+function parsePreferencesResponse(value: JSONType): PreferencesResponse {
+  return PreferencesResponseSchema.parse(value);
 }

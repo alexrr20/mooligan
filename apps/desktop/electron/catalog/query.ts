@@ -1,59 +1,109 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export type CatalogCardSummary = {
-  collectorNumber: string;
-  gridImageUrl: string | null;
-  id: string;
-  imageUrl: string | null;
-  name: string;
-  rarity: string;
-  setCode: string;
-  setName: string;
-  typeLine: string;
-};
+import {
+  CatalogCardDetailSchema,
+  CatalogImageDescriptorSchema,
+} from "@mooligan/domain/catalog-detail";
+import * as z from "zod";
+import type { JSONType } from "zod";
 
-export type CatalogListRequest = {
-  includeArtSeries?: boolean;
-  includeDigital?: boolean;
-  limit?: number;
-  offset?: number;
-  query?: string;
-  uniqueCards?: boolean;
-  universe?: "beyond" | "within";
-};
+const catalogPrintingIdSchema = z.string().min(1).max(128);
 
-export type CatalogListPage = {
-  cards: CatalogCardSummary[];
-  hasMore: boolean;
-  total: number | null;
-};
+export const CatalogCardSummarySchema = z.object({
+  collectorNumber: z.string(),
+  id: catalogPrintingIdSchema,
+  image: CatalogImageDescriptorSchema.nullable(),
+  name: z.string(),
+  rarity: z.string(),
+  setCode: z.string(),
+  setName: z.string(),
+  typeLine: z.string(),
+});
+export type CatalogCardSummary = z.infer<typeof CatalogCardSummarySchema>;
 
-export type CatalogQueryWorkerRequest = {
-  id: number;
-  request: CatalogListRequest;
-};
+export const CatalogListRequestSchema = z.strictObject({
+  includeArtSeries: z.boolean().optional(),
+  includeDigital: z.boolean().optional(),
+  limit: z.number().int().min(1).max(250).optional(),
+  offset: z.number().int().nonnegative().optional(),
+  query: z.string().max(500).optional(),
+  uniqueCards: z.boolean().optional(),
+  universe: z.enum(["beyond", "within"]).optional(),
+});
+export type CatalogListRequest = z.infer<typeof CatalogListRequestSchema>;
 
-export type CatalogQueryWorkerResponse =
-  | { id: number; page: CatalogListPage }
-  | { error: string; id: number };
+export const CatalogListPageSchema = z.object({
+  cards: z.array(CatalogCardSummarySchema),
+  hasMore: z.boolean(),
+  total: z.number().int().nonnegative().nullable(),
+});
+export type CatalogListPage = z.infer<typeof CatalogListPageSchema>;
+
+const CatalogQueryOperationSchema = z.discriminatedUnion("type", [
+  z.object({ printingId: catalogPrintingIdSchema, type: z.literal("detail") }),
+  z.object({
+    image: CatalogImageDescriptorSchema.extend({ printingId: catalogPrintingIdSchema }),
+    type: z.literal("image-source"),
+  }),
+  z.object({ request: CatalogListRequestSchema, type: z.literal("list") }),
+]);
+export type CatalogQueryOperation = z.infer<typeof CatalogQueryOperationSchema>;
+
+const CatalogQueryWorkerRequestSchema = z.object({
+  id: z.number().int().positive(),
+  operation: CatalogQueryOperationSchema,
+});
+export type CatalogQueryWorkerRequest = z.infer<typeof CatalogQueryWorkerRequestSchema>;
+
+const CatalogQueryWorkerResponseSchema = z.union([
+  z.object({
+    id: z.number().int().positive(),
+    operation: z.literal("detail"),
+    result: CatalogCardDetailSchema.nullable(),
+  }),
+  z.object({
+    id: z.number().int().positive(),
+    operation: z.literal("image-source"),
+    result: z.string().min(1).nullable(),
+  }),
+  z.object({
+    id: z.number().int().positive(),
+    operation: z.literal("list"),
+    result: CatalogListPageSchema,
+  }),
+  z.object({
+    error: z.string().min(1),
+    id: z.number().int().positive(),
+    operation: z.enum(["detail", "image-source", "list"]),
+  }),
+]);
+export type CatalogQueryWorkerResponse = z.infer<typeof CatalogQueryWorkerResponseSchema>;
+
+export function parseCatalogQueryWorkerRequest(value: JSONType) {
+  const request = CatalogQueryWorkerRequestSchema.safeParse(value);
+  return request.success ? request.data : null;
+}
+
+export function parseCatalogQueryWorkerResponse(
+  value: JSONType,
+  expectedOperation: CatalogQueryOperation["type"],
+) {
+  const response = CatalogQueryWorkerResponseSchema.safeParse(value);
+  return response.success && response.data.operation === expectedOperation ? response.data : null;
+}
 
 const cardColumns = `cards.id,
                      cards.name,
-                     COALESCE(
-                       json_extract(cards.json, '$.image_uris.thumb'),
-                       json_extract(cards.json, '$.card_faces[0].image_uris.thumb')
-                     ) AS imageUrl,
-                     COALESCE(
-                       json_extract(cards.json, '$.image_uris.grid'),
-                       json_extract(cards.json, '$.card_faces[0].image_uris.grid')
-                     ) AS gridImageUrl,
+                     CASE WHEN COALESCE(
+                       json_extract(cards.json, '$.image_uris.small'),
+                       json_extract(cards.json, '$.card_faces[0].image_uris.small')
+                     ) IS NULL THEN 0 ELSE 1 END AS hasImage,
                      cards.set_code AS setCode,
                      cards.set_name AS setName,
                      cards.collector_number AS collectorNumber,
                      cards.type_line AS typeLine,
                      cards.rarity`;
-const summaryColumns =
-  "id, name, imageUrl, gridImageUrl, setCode, setName, collectorNumber, typeLine, rarity";
+const summaryColumns = "id, name, hasImage, setCode, setName, collectorNumber, typeLine, rarity";
 const artSeriesFilter = "? OR COALESCE(json_extract(cards.json, '$.layout'), '') <> 'art_series'";
 const digitalFilter = "? OR COALESCE(json_extract(cards.json, '$.digital'), 0) = 0";
 const universesBeyond = `EXISTS (
@@ -169,75 +219,64 @@ export function createCatalogQuery(database: DatabaseSync) {
       : ftsQuery
         ? search
         : browse;
-    const rows = (
-      ftsQuery
-        ? statement.all(ftsQuery, ...filterArguments, limit + 1, offset)
-        : statement.all(...filterArguments, limit + 1, offset)
-    ) as CatalogCardSummary[];
+    const rows = z
+      .array(CatalogCardSummaryRowSchema)
+      .parse(
+        ftsQuery
+          ? statement.all(ftsQuery, ...filterArguments, limit + 1, offset)
+          : statement.all(...filterArguments, limit + 1, offset),
+      );
     const hasMore = rows.length > limit;
-    const cards = rows.slice(0, limit).map((row) => ({ ...row }));
+    const cards = rows.slice(0, limit).map(toCatalogCardSummary);
     const total =
       ftsQuery || !includeDigital || universe
         ? hasMore
           ? null
           : offset + cards.length
-        : (
-            (uniqueCards
+        : CatalogTotalRowSchema.parse(
+            uniqueCards
               ? uniqueCardTotal.get(Number(includeArtSeries))
               : !includeArtSeries
                 ? nonArtSeriesTotal.get()
-                : catalogTotal.get()) as { total: number }
+                : catalogTotal.get(),
           ).total;
 
     return { cards, hasMore, total };
   };
 }
 
-export function validateCatalogListRequest(value: unknown): CatalogListRequest {
+const CatalogCardSummaryRowSchema = CatalogCardSummarySchema.omit({ image: true }).extend({
+  hasImage: z.union([z.literal(0), z.literal(1)]),
+});
+type CatalogCardSummaryRow = z.infer<typeof CatalogCardSummaryRowSchema>;
+
+const CatalogTotalRowSchema = z.object({ total: z.number().int().nonnegative() });
+
+function toCatalogCardSummary(row: CatalogCardSummaryRow): CatalogCardSummary {
+  const { hasImage, ...card } = row;
+
+  return {
+    ...card,
+    image: hasImage
+      ? CatalogImageDescriptorSchema.parse({
+          faceIndex: 0,
+          printingId: row.id,
+          size: "small",
+        })
+      : null,
+  };
+}
+
+export function validateCatalogListRequest(
+  value: CatalogListRequest | JSONType | undefined,
+): CatalogListRequest {
   if (value === undefined) {
     return {};
   }
-  if (
-    !isRecord(value) ||
-    Object.keys(value).some(
-      (key) =>
-        ![
-          "includeArtSeries",
-          "includeDigital",
-          "limit",
-          "offset",
-          "query",
-          "uniqueCards",
-          "universe",
-        ].includes(key),
-    ) ||
-    (Object.hasOwn(value, "includeArtSeries") && typeof value.includeArtSeries !== "boolean") ||
-    (Object.hasOwn(value, "includeDigital") && typeof value.includeDigital !== "boolean") ||
-    (Object.hasOwn(value, "uniqueCards") && typeof value.uniqueCards !== "boolean") ||
-    (Object.hasOwn(value, "universe") &&
-      value.universe !== undefined &&
-      value.universe !== "beyond" &&
-      value.universe !== "within") ||
-    (Object.hasOwn(value, "query") &&
-      (typeof value.query !== "string" || value.query.length > 500)) ||
-    (Object.hasOwn(value, "limit") &&
-      (typeof value.limit !== "number" ||
-        !Number.isSafeInteger(value.limit) ||
-        value.limit < 1 ||
-        value.limit > 250)) ||
-    (Object.hasOwn(value, "offset") &&
-      (typeof value.offset !== "number" || !Number.isSafeInteger(value.offset) || value.offset < 0))
-  ) {
-    throw new TypeError("Invalid catalog list request.");
-  }
 
-  return { ...value };
+  return CatalogListRequestSchema.parse(value);
 }
 
 function toFtsQuery(query: string) {
   return (query.match(/[\p{L}\p{N}]+/gu) ?? []).map((term) => `"${term}"*`).join(" AND ");
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

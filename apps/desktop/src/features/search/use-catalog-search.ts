@@ -26,6 +26,7 @@ export function useCatalogSearch(
         uniqueCards,
         universe,
       }),
+    gcTime: Infinity,
     getNextPageParam: (lastPage, pages) =>
       lastPage.hasMore ? pages.reduce((count, page) => count + page.cards.length, 0) : undefined,
     initialPageParam: 0,

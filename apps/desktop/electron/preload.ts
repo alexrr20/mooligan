@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 
+import type { CatalogCardDetail } from "@mooligan/domain/catalog-detail";
+
 import type { AuthSnapshot } from "./auth/service";
 import type { CatalogProgress, CatalogStatus } from "./catalog/ipc";
 import type { CatalogListRequest } from "./catalog/query";
@@ -7,6 +9,8 @@ import type { PreferenceSyncSnapshot } from "./workspace/preference-sync";
 import type { Preferences, PreferencesUpdate } from "./workspace/preferences";
 
 contextBridge.exposeInMainWorld("catalog", {
+  detail: (printingId: string): Promise<CatalogCardDetail | null> =>
+    ipcRenderer.invoke("catalog:detail", printingId),
   download: (): Promise<CatalogStatus> => ipcRenderer.invoke("catalog:download"),
   list: (request?: CatalogListRequest) => ipcRenderer.invoke("catalog:list", request),
   onProgress: (callback: (progress: CatalogProgress) => void) => {

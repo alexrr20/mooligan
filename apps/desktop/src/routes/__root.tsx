@@ -19,17 +19,18 @@ const navigation = [
   { to: "/search", label: "Search", number: "06" },
   { to: "/settings", label: "Settings", number: "07" },
 ] as const;
+const reducedMotionByPreference = {
+  full: "never",
+  reduced: "always",
+  system: "user",
+} as const;
 
 function AppShell() {
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
   const { preferences } = usePreferences();
-  const reducedMotion = {
-    full: "never",
-    reduced: "always",
-    system: "user",
-  }[preferences.motion] as "always" | "never" | "user";
+  const reducedMotion = reducedMotionByPreference[preferences.motion];
 
   return (
     <MotionConfig reducedMotion={reducedMotion}>
@@ -63,7 +64,11 @@ function AppShell() {
           </div>
         </aside>
 
-        <main {...stylex.props(styles.main)} data-window-no-drag>
+        <main
+          {...stylex.props(styles.main)}
+          data-scroll-restoration-id="mooligan-main"
+          data-window-no-drag
+        >
           <motion.div
             key={pathname}
             {...stylex.props(styles.route)}

@@ -12,12 +12,18 @@ import {
   safeStorage,
   session,
   shell,
+  type OpenDialogOptions,
 } from "electron";
+import * as z from "zod";
 
 import { type AuthSnapshot, DesktopAuth, resolveAuthOrigin } from "./auth/service";
-import { registerAuthColdStart, registerAuthScheme } from "./auth/startup";
-import { registerCatalogIpc } from "./catalog/ipc";
+import { registerAuthColdStart } from "./auth/startup";
+import { createCatalogImageCache } from "./catalog/image-cache";
+import { resolveCatalogImageCacheDirectory } from "./catalog/image-cache-directory";
+import { registerCatalogImageProtocol } from "./catalog/image-protocol";
+import { queryCatalogImageSource, registerCatalogIpc } from "./catalog/ipc";
 import { assertTrustedSender, developmentRendererUrl } from "./ipc-security";
+import { registerDesktopSchemes } from "./protocols";
 import {
   PreferenceSyncCoordinator,
   type PreferenceSyncSnapshot,
@@ -27,8 +33,21 @@ import { parseWorkspaceBackup } from "./workspace/backup";
 import { WorkspaceManager } from "./workspace/store";
 
 app.enableSandbox();
-registerAuthScheme(protocol);
-const authStartup = registerAuthColdStart(app);
+registerDesktopSchemes(protocol);
+const authStartup = registerAuthColdStart({
+  onOpenUrl(listener) {
+    app.on("open-url", listener);
+  },
+  onSecondInstance(listener) {
+    app.on("second-instance", (event, commandLine, workingDirectory, additionalData) => {
+      const data = z.json().safeParse(additionalData);
+      listener(event, commandLine, workingDirectory, data.success ? data.data : null);
+    });
+  },
+  requestSingleInstanceLock: (additionalData) => app.requestSingleInstanceLock(additionalData),
+  setAsDefaultProtocolClient: (scheme, path, args) =>
+    app.setAsDefaultProtocolClient(scheme, path, args),
+});
 registerCatalogIpc();
 
 const MAX_WORKSPACE_BACKUP_BYTES = 50 * 1024 * 1024;
@@ -75,6 +94,11 @@ if (!authStartup.isPrimary) {
     .whenReady()
     .then(async () => {
       const workspace = new WorkspaceManager(app.getPath("userData"));
+      const imageCache = createCatalogImageCache({
+        cacheDirectory: resolveCatalogImageCacheDirectory(app.getPath("home")),
+      });
+      await imageCache.initialize().catch(() => undefined);
+      registerCatalogImageProtocol(session.defaultSession, imageCache, queryCatalogImageSource);
       const authOrigin = resolveAuthOrigin();
 
       const auth = new DesktopAuth({
@@ -144,8 +168,8 @@ if (!authStartup.isPrimary) {
       void auth
         .initialize()
         .then(applyAuthSnapshot)
-        .catch((error: unknown) => {
-          lastAuthError = publicAuthError(error);
+        .catch((cause: unknown) => {
+          lastAuthError = publicAuthError(cause);
           publish("auth:error", lastAuthError);
         });
 
@@ -182,7 +206,7 @@ if (!authStartup.isPrimary) {
         assertTrustedSender(event);
         return workspace.readPreferences();
       });
-      ipcMain.handle("preferences:update", (event, update: unknown) => {
+      ipcMain.handle("preferences:update", (event, update) => {
         assertTrustedSender(event);
         const preferences = workspace.updatePreferences(validatePreferencesUpdate(update));
         publish("preferences:changed", preferences);
@@ -220,9 +244,9 @@ if (!authStartup.isPrimary) {
       ipcMain.handle("workspace:import", async (event) => {
         assertTrustedSender(event);
         const owner = BrowserWindow.fromWebContents(event.sender);
-        const options = {
+        const options: OpenDialogOptions = {
           filters: [{ extensions: ["json"], name: "Mooligan workspace" }],
-          properties: ["openFile"] as "openFile"[],
+          properties: ["openFile"],
           title: "Import Mooligan workspace",
         };
         const result = owner
@@ -301,8 +325,8 @@ if (!authStartup.isPrimary) {
       });
       app.on("second-instance", focusWindow);
     })
-    .catch((error: unknown) => {
-      process.stderr.write(`Failed to create desktop window: ${String(error)}\n`);
+    .catch((cause: unknown) => {
+      process.stderr.write(`Failed to create desktop window: ${String(cause)}\n`);
       app.quit();
     });
 }
@@ -313,7 +337,7 @@ app.on("window-all-closed", () => {
   }
 });
 
-function publish(channel: string, value: unknown) {
+function publish<Value>(channel: string, value: Value) {
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) {
       window.webContents.send(channel, value);
@@ -334,12 +358,12 @@ function focusWindow() {
   window.focus();
 }
 
-function publicAuthError(error: unknown) {
+function publicAuthError(cause: unknown) {
   if (
-    error instanceof Error &&
-    ["AuthInputError", "AuthRequestError", "ProtectedStorageError"].includes(error.name)
+    cause instanceof Error &&
+    ["AuthInputError", "AuthRequestError", "ProtectedStorageError"].includes(cause.name)
   ) {
-    return error.message;
+    return cause.message;
   }
 
   return "Account sign-in could not be completed. Return to Settings and try again.";

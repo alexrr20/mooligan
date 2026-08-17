@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { SearchImageLoading } from "../src/features/search/search-image-loading.ts";
+import { CatalogImageLoading } from "../src/features/catalog/catalog-image-loading.ts";
 
 type PendingTimer = {
   callback: () => void;
@@ -11,15 +11,15 @@ type PendingTimer = {
 function createHarness(ids: readonly string[]) {
   const activated: string[] = [];
   let timer: PendingTimer | undefined;
-  const coordinator = new SearchImageLoading((id) => activated.push(id), {
-    clearTimeout: (handle) => {
-      if (handle === timer) {
-        timer = undefined;
-      }
-    },
-    setTimeout: (callback, delay) => {
-      timer = { callback, delay };
-      return timer;
+  const coordinator = new CatalogImageLoading((id) => activated.push(id), {
+    schedule: (callback, delay) => {
+      const scheduled = { callback, delay };
+      timer = scheduled;
+      return () => {
+        if (timer === scheduled) {
+          timer = undefined;
+        }
+      };
     },
   });
   const generation = coordinator.reset(ids);

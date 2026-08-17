@@ -5,9 +5,13 @@ import { DatabaseSync } from "node:sqlite";
 
 import { CatalogSnapshotSchema, type CatalogSnapshot } from "@mooligan/domain/catalog";
 import { ScryfallCardDownloadSchema, type CatalogRelease } from "@mooligan/domain/catalog-sync";
+import * as z from "zod";
 
 const transactionSize = 500;
 export const catalogSchemaVersion = 2;
+const IntegrityCheckSchema = z.object({ quick_check: z.literal("ok") });
+const CatalogCountSchema = z.object({ cardCount: z.number().int().nonnegative() });
+const CatalogMetadataSchema = CatalogSnapshotSchema.extend({ schemaVersion: z.number().int() });
 
 export function readGzipJsonLines(input: Readable) {
   return createInterface({ input: input.pipe(createGunzip()), crlfDelay: Infinity });
@@ -40,7 +44,7 @@ export async function importCatalog(
         continue;
       }
 
-      let value: unknown;
+      let value;
 
       try {
         value = JSON.parse(line);
@@ -179,16 +183,16 @@ function validateCatalog(path: string, expected: CatalogSnapshot) {
       )
       .get();
     const count = database.prepare("SELECT COUNT(*) AS cardCount FROM cards").get();
-    const snapshot = CatalogSnapshotSchema.safeParse(metadata);
+    const snapshot = CatalogMetadataSchema.safeParse(metadata);
+    const integrity = IntegrityCheckSchema.safeParse(check);
+    const catalogCount = CatalogCountSchema.safeParse(count);
 
     if (
-      !isRecord(check) ||
-      check.quick_check !== "ok" ||
+      !integrity.success ||
       !snapshot.success ||
-      !isRecord(count) ||
-      !isRecord(metadata) ||
-      metadata.schemaVersion !== catalogSchemaVersion ||
-      count.cardCount !== expected.cardCount ||
+      !catalogCount.success ||
+      snapshot.data.schemaVersion !== catalogSchemaVersion ||
+      catalogCount.data.cardCount !== expected.cardCount ||
       snapshot.data.updatedAt !== expected.updatedAt
     ) {
       throw new Error("The downloaded card database failed validation.");
@@ -196,8 +200,4 @@ function validateCatalog(path: string, expected: CatalogSnapshot) {
   } finally {
     database.close();
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }

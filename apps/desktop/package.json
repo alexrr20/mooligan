@@ -13,6 +13,9 @@
     "start": "electron .",
     "test": "node --test test/*.test.ts"
   },
+  "dependencies": {
+    "zod": "catalog:"
+  },
   "devDependencies": {
     "@base-ui/react": "catalog:",
     "@mooligan/domain": "workspace:*",
@@ -28,6 +31,7 @@
     "better-auth": "catalog:",
     "electron": "catalog:",
     "electron-builder": "catalog:",
+    "mana-font": "catalog:",
     "motion": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",

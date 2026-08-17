@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import * as z from "zod";
+import type { JSONType } from "zod";
 
 import type { MotionPreference, Preferences } from "../electron/workspace/preferences.ts";
 import {
@@ -11,6 +13,11 @@ import type { PreferenceSyncState, RemoteMotionPreference } from "../electron/wo
 
 const REMOTE_A = "01989924-0000-7000-8000-000000000001";
 const REMOTE_B = "01989924-0000-7000-8000-000000000002";
+const UpdateRequestSchema = z.object({
+  updates: z.tuple([
+    z.object({ key: z.literal("motion"), value: z.enum(["full", "reduced", "system"]) }),
+  ]),
+});
 
 void test("first bind uploads local motion and an existing account downloads cloud motion", async () => {
   const local = new FakeWorkspace();
@@ -107,20 +114,20 @@ void test("switching accounts selects isolated local workspaces", async () => {
   const workspace = new FakeWorkspace();
   const auth = new FakeAuth();
   const sync = new PreferenceSyncCoordinator(auth, workspace);
-  let account = "user-a";
+  let account: keyof typeof cloud = "user-a";
   const cloud = {
     "user-a": { motion: remote("full", 1), workspaceId: REMOTE_A },
     "user-b": { motion: remote("reduced", 1), workspaceId: REMOTE_B },
   };
 
   auth.respond = (request) => {
-    const current = cloud[account as keyof typeof cloud];
+    const current = cloud[account];
     if (request.path === "/sync/workspace/bind") {
       return json(bindResponse(current.workspaceId, current.motion));
     }
 
     if (request.init?.method === "POST") {
-      const body = request.body as { updates: [{ value: MotionPreference }] };
+      const body = UpdateRequestSchema.parse(request.body);
       current.motion = remote(body.updates[0].value, current.motion.version + 1);
     }
 
@@ -290,7 +297,7 @@ class FakeWorkspace implements PreferenceSyncWorkspace {
 }
 
 type CapturedRequest = {
-  body: unknown;
+  body: JSONType | undefined;
   init: RequestInit | undefined;
   path: `/sync/${string}`;
 };
@@ -302,8 +309,9 @@ class FakeAuth implements PreferenceSyncAuth {
   };
 
   async request(path: `/sync/${string}`, init?: RequestInit) {
+    const body = z.string().safeParse(init?.body);
     const request = {
-      body: typeof init?.body === "string" ? JSON.parse(init.body) : undefined,
+      body: body.success ? z.json().parse(JSON.parse(body.data)) : undefined,
       init,
       path,
     };
@@ -343,7 +351,7 @@ function preferencesResponse(motion: RemoteMotionPreference) {
   return { preferences: { motion } };
 }
 
-function json(value: unknown) {
+function json(value: JSONType) {
   return new Response(JSON.stringify(value), {
     headers: { "content-type": "application/json" },
   });

@@ -1,28 +1,32 @@
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 
-import type { App, Protocol } from "electron";
+import type { Event } from "electron";
+import * as z from "zod";
+import type { JSONType } from "zod";
 
 import { AUTH_PROTOCOL, isAuthCallbackUrl } from "./service.ts";
 
-type StartupApp = Pick<App, "on" | "requestSingleInstanceLock" | "setAsDefaultProtocolClient">;
+type AuthLaunchData = { authCallback?: string };
+
+export interface StartupApp {
+  onOpenUrl(listener: (event: Event, url: string) => void): void;
+  onSecondInstance(
+    listener: (
+      event: Event,
+      commandLine: string[],
+      workingDirectory: string,
+      additionalData: JSONType,
+    ) => void,
+  ): void;
+  requestSingleInstanceLock(additionalData?: AuthLaunchData): boolean;
+  setAsDefaultProtocolClient(protocol: string, path?: string, args?: string[]): boolean;
+}
 
 export interface AuthColdStart {
   isPrimary: boolean;
   protocolRegistered: boolean;
-  start(
-    handler: (url: string) => Promise<unknown>,
-    onError?: (error: unknown) => void,
-  ): Promise<void>;
-}
-
-export function registerAuthScheme(protocol: Pick<Protocol, "registerSchemesAsPrivileged">) {
-  protocol.registerSchemesAsPrivileged([
-    {
-      privileges: { secure: true, standard: false },
-      scheme: AUTH_PROTOCOL,
-    },
-  ]);
+  start(handler: (url: string) => Promise<void>, onError?: (cause: unknown) => void): Promise<void>;
 }
 
 export function registerAuthColdStart(
@@ -36,7 +40,7 @@ export function registerAuthColdStart(
     queue.add(callback);
   }
 
-  app.on("open-url", (event, url) => {
+  app.onOpenUrl((event, url) => {
     event.preventDefault();
     queue.add(url);
   });
@@ -46,9 +50,10 @@ export function registerAuthColdStart(
     initialCallback ? { authCallback: initialCallback } : undefined,
   );
 
-  app.on("second-instance", (_event, commandLine, _workingDirectory, additionalData) => {
-    if (isRecord(additionalData)) {
-      queue.add(additionalData.authCallback);
+  app.onSecondInstance((_event, commandLine, _workingDirectory, additionalData) => {
+    const data = z.object({ authCallback: z.json().optional() }).safeParse(additionalData);
+    if (data.success && data.data.authCallback !== undefined) {
+      queue.add(data.data.authCallback);
     }
     for (const argument of commandLine) {
       queue.add(argument);
@@ -65,11 +70,11 @@ export function registerAuthColdStart(
 class CallbackQueue {
   readonly #pending: string[] = [];
   readonly #seen = new Set<string>();
-  #handler: ((url: string) => Promise<unknown>) | undefined;
-  #onError: ((error: unknown) => void) | undefined;
+  #handler: ((url: string) => Promise<void>) | undefined;
+  #onError: ((cause: unknown) => void) | undefined;
   #tail = Promise.resolve();
 
-  add(value: unknown) {
+  add(value: JSONType) {
     if (!isAuthCallbackUrl(value)) {
       return;
     }
@@ -87,7 +92,7 @@ class CallbackQueue {
     }
   }
 
-  start(handler: (url: string) => Promise<unknown>, onError?: (error: unknown) => void) {
+  start(handler: (url: string) => Promise<void>, onError?: (cause: unknown) => void) {
     if (this.#handler) {
       throw new Error("Authentication callback handling has already started.");
     }
@@ -106,9 +111,9 @@ class CallbackQueue {
     this.#tail = this.#tail
       .then(() => this.#handler?.(url))
       .then(() => undefined)
-      .catch((error: unknown) => {
+      .catch((cause: unknown) => {
         try {
-          this.#onError?.(error);
+          this.#onError?.(cause);
         } catch {
           // Callback reporting must not stop later OS deliveries.
         }
@@ -117,15 +122,11 @@ class CallbackQueue {
 }
 
 function registerProtocolClient(app: StartupApp, argv: readonly string[]) {
-  const electronProcess = process as NodeJS.Process & { defaultApp?: boolean };
+  const electronProcess = z.object({ defaultApp: z.boolean().optional() }).parse(process);
 
   if (electronProcess.defaultApp && argv[1]) {
     return app.setAsDefaultProtocolClient(AUTH_PROTOCOL, process.execPath, [resolve(argv[1])]);
   }
 
   return app.setAsDefaultProtocolClient(AUTH_PROTOCOL);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

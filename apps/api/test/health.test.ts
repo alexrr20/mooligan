@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 // oxlint-disable-next-line vite-plus/prefer-vite-plus-imports -- Cloudflare's pool must share Vitest's runner instance.
 import { test, vi } from "vitest";
+import * as z from "zod";
 
 import { refreshCatalogRelease } from "../src/catalog-release.ts";
 import { api } from "../src/index.ts";
@@ -80,10 +81,13 @@ type ReleaseRow = {
   updated_at: string;
 };
 
+const WriteParametersSchema = z.tuple([z.string(), z.string(), z.number()]);
+
 function releaseDatabase(initial?: ReleaseRow) {
   let current = initial;
   let writes = 0;
 
+  // SAFETY: this fake implements only the D1 surface exercised by refreshCatalogRelease.
   const database = {
     prepare(query: string) {
       let parameters: unknown[] = [];
@@ -97,22 +101,24 @@ function releaseDatabase(initial?: ReleaseRow) {
             return null;
           }
 
+          // SAFETY: the query branches mirror the two row types requested by the production function.
           return (
             query.includes("compressed_size") ? current : { updated_at: current.updated_at }
           ) as T;
         },
         async run() {
-          const [updatedAt, downloadUrl, compressedSize] = parameters;
+          const [updatedAt, downloadUrl, compressedSize] = WriteParametersSchema.parse(parameters);
           current = {
-            compressed_size: compressedSize as number,
-            download_url: downloadUrl as string,
-            updated_at: updatedAt as string,
+            compressed_size: compressedSize,
+            download_url: downloadUrl,
+            updated_at: updatedAt,
           };
           writes += 1;
           return { success: true };
         },
       };
 
+      // SAFETY: the fake statement implements every method used by refreshCatalogRelease.
       return statement as D1PreparedStatement;
     },
   } as D1Database;

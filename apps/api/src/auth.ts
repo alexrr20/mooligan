@@ -1,6 +1,12 @@
 import { electron } from "@better-auth/electron";
 import { betterAuth } from "better-auth";
 import { v7 as uuidv7 } from "uuid";
+import * as z from "zod";
+
+const TrustedOriginsSchema = z
+  .array(z.string())
+  .length(2)
+  .refine((origins) => new Set(origins).size === origins.length);
 
 export function createAuth(environment: Env) {
   const baseURL = authOrigin(environment.BETTER_AUTH_URL);
@@ -60,22 +66,22 @@ function authOrigin(value: string) {
 }
 
 function trustedOrigins(value: string | readonly string[], baseURL: string) {
-  let parsed: unknown = value;
+  const encoded = z.string().safeParse(value);
+  let parsed = value;
 
-  if (typeof value === "string") {
+  if (encoded.success) {
     try {
-      parsed = JSON.parse(value);
+      parsed = JSON.parse(encoded.data);
     } catch {
       throw new Error("BETTER_AUTH_TRUSTED_ORIGINS must be a JSON array.");
     }
   }
 
+  const origins = TrustedOriginsSchema.safeParse(parsed);
   if (
-    !Array.isArray(parsed) ||
-    parsed.length !== 2 ||
-    !parsed.every((origin) => typeof origin === "string") ||
-    !parsed.includes(baseURL) ||
-    !parsed.includes("com.mooligan.app:/")
+    !origins.success ||
+    !origins.data.includes(baseURL) ||
+    !origins.data.includes("com.mooligan.app:/")
   ) {
     throw new Error("BETTER_AUTH_TRUSTED_ORIGINS must contain only Mooligan's exact origins.");
   }

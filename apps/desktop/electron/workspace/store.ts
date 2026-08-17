@@ -6,8 +6,11 @@ import { DatabaseSync } from "node:sqlite";
 import type { CollectionLot } from "@mooligan/domain/collection";
 import type { Deck } from "@mooligan/domain/decks";
 import type { CardList } from "@mooligan/domain/lists";
+import * as z from "zod";
+import type { JSONType } from "zod";
 
 import {
+  MotionPreferenceSchema,
   preferenceDefinitions,
   type MotionPreference,
   type Preferences,
@@ -41,6 +44,27 @@ type WorkspaceMetadata = {
   remoteWorkspaceId: string | null;
   workspaceId: string;
 };
+
+const PreferenceRowSchema = z.object({ key: z.string(), value: z.string() });
+const PreferenceSyncRowSchema = z.object({
+  pending: z.union([z.literal(0), z.literal(1)]),
+  remoteUpdatedAt: z.string().nullable(),
+  remoteValue: z.string().nullable(),
+  remoteVersion: z.number().int().positive().nullable(),
+});
+const WorkspaceMetadataSchema = z.object({
+  boundUserId: z.string().nullable(),
+  remoteWorkspaceId: z.string().nullable(),
+  workspaceId: z.string(),
+});
+const WorkspaceIdSchema = z.uuidv4();
+const WorkspaceRegistryRowSchema = z.object({ workspaceId: WorkspaceIdSchema });
+const EntityRowSchema = z.object({ id: z.string(), payload: z.string() });
+export const RemoteMotionPreferenceSchema = z.strictObject({
+  updatedAt: z.iso.datetime({ offset: true }),
+  value: MotionPreferenceSchema,
+  version: z.number().int().positive(),
+});
 
 export class WorkspaceStore {
   readonly #database: DatabaseSync;
@@ -238,7 +262,7 @@ export class WorkspaceStore {
   }
 
   putCollectionLot(value: CollectionLot): CollectionLot {
-    return putEntity(this.#database, "collection_lots", value, validateCollectionLot);
+    return putEntity(this.#database, "collection_lots", value);
   }
 
   readCollectionLots(): CollectionLot[] {
@@ -246,7 +270,7 @@ export class WorkspaceStore {
   }
 
   putDeck(value: Deck): Deck {
-    return putEntity(this.#database, "decks", value, validateDeck);
+    return putEntity(this.#database, "decks", value);
   }
 
   readDecks(): Deck[] {
@@ -254,7 +278,7 @@ export class WorkspaceStore {
   }
 
   putCardList(value: CardList): CardList {
-    return putEntity(this.#database, "card_lists", value, validateCardList);
+    return putEntity(this.#database, "card_lists", value);
   }
 
   readCardLists(): CardList[] {
@@ -263,12 +287,10 @@ export class WorkspaceStore {
 
   readPreferences(): Preferences {
     const rows = this.#database.prepare("SELECT key, value FROM preferences").all();
-    const values: Record<string, unknown> = {};
+    const values: Record<string, JSONType> = {};
 
-    for (const row of rows) {
-      if (!isRecord(row) || typeof row.key !== "string" || typeof row.value !== "string") {
-        throw new Error("The local preferences are invalid.");
-      }
+    for (const rawRow of rows) {
+      const row = PreferenceRowSchema.parse(rawRow);
 
       try {
         values[row.key] = JSON.parse(row.value);
@@ -310,27 +332,18 @@ export class WorkspaceStore {
   }
 
   readPreferenceSyncState(): PreferenceSyncState {
-    const row = this.#database
-      .prepare(
-        `SELECT remote_version AS remoteVersion,
+    const row = PreferenceSyncRowSchema.parse(
+      this.#database
+        .prepare(
+          `SELECT remote_version AS remoteVersion,
                 pending,
                 remote_value AS remoteValue,
                 remote_updated_at AS remoteUpdatedAt
          FROM preference_sync_state
          WHERE key = 'motion'`,
-      )
-      .get();
-
-    if (
-      !isRecord(row) ||
-      (row.remoteVersion !== null &&
-        (typeof row.remoteVersion !== "number" || !Number.isSafeInteger(row.remoteVersion))) ||
-      (row.pending !== 0 && row.pending !== 1) ||
-      (row.remoteValue !== null && typeof row.remoteValue !== "string") ||
-      (row.remoteUpdatedAt !== null && typeof row.remoteUpdatedAt !== "string")
-    ) {
-      throw new Error("The local preference sync state is invalid.");
-    }
+        )
+        .get(),
+    );
 
     let conflict: RemoteMotionPreference | null = null;
 
@@ -352,7 +365,7 @@ export class WorkspaceStore {
       motion: {
         conflict,
         pending: row.pending === 1,
-        remoteVersion: row.remoteVersion as number | null,
+        remoteVersion: row.remoteVersion,
       },
     };
   }
@@ -429,26 +442,17 @@ export class WorkspaceStore {
   }
 
   #readMetadata(): WorkspaceMetadata {
-    const metadata = this.#database
-      .prepare(
-        `SELECT workspace_id AS workspaceId,
+    return WorkspaceMetadataSchema.parse(
+      this.#database
+        .prepare(
+          `SELECT workspace_id AS workspaceId,
                 bound_user_id AS boundUserId,
                 remote_workspace_id AS remoteWorkspaceId
          FROM workspace_metadata
          WHERE singleton = 1`,
-      )
-      .get();
-
-    if (
-      !isRecord(metadata) ||
-      typeof metadata.workspaceId !== "string" ||
-      (metadata.boundUserId !== null && typeof metadata.boundUserId !== "string") ||
-      (metadata.remoteWorkspaceId !== null && typeof metadata.remoteWorkspaceId !== "string")
-    ) {
-      throw new Error("The local workspace metadata is invalid.");
-    }
-
-    return metadata as WorkspaceMetadata;
+        )
+        .get(),
+    );
   }
 }
 
@@ -483,10 +487,8 @@ export class WorkspaceManager {
 
       if (active === undefined) {
         this.#active = this.#createWorkspace(null);
-      } else if (isRecord(active) && isWorkspaceId(active.workspaceId)) {
-        this.#active = this.#openWorkspace(active.workspaceId);
       } else {
-        throw new Error("The local workspace registry is invalid.");
+        this.#active = this.#openWorkspace(WorkspaceRegistryRowSchema.parse(active).workspaceId);
       }
     } catch (error) {
       this.#database.close();
@@ -586,10 +588,8 @@ export class WorkspaceManager {
       )
       .all(this.#active.workspaceId);
 
-    for (const row of rows) {
-      if (!isRecord(row) || !isWorkspaceId(row.workspaceId)) {
-        throw new Error("The local workspace registry is invalid.");
-      }
+    for (const rawRow of rows) {
+      const row = WorkspaceRegistryRowSchema.parse(rawRow);
 
       const candidate = this.#openWorkspace(row.workspaceId);
 
@@ -676,21 +676,10 @@ export class WorkspaceManager {
   }
 }
 
-function validateRemoteMotionPreference(value: unknown): RemoteMotionPreference {
-  if (
-    !isRecord(value) ||
-    Object.keys(value).some((key) => !["updatedAt", "value", "version"].includes(key)) ||
-    Object.keys(value).length !== 3 ||
-    typeof value.updatedAt !== "string" ||
-    new Date(value.updatedAt).toISOString() !== value.updatedAt ||
-    !Number.isSafeInteger(value.version) ||
-    (value.version as number) < 1
-  ) {
-    throw new TypeError("Invalid remote motion preference.");
-  }
-
-  validatePreferences({ motion: value.value });
-  return value as RemoteMotionPreference;
+function validateRemoteMotionPreference(
+  value: RemoteMotionPreference | JSONType,
+): RemoteMotionPreference {
+  return RemoteMotionPreferenceSchema.parse(value);
 }
 
 function transact<Result>(database: DatabaseSync, callback: () => Result): Result {
@@ -711,11 +700,8 @@ type EntityTable = "card_lists" | "collection_lots" | "decks";
 function putEntity<Entity extends { id: string }>(
   database: DatabaseSync,
   table: EntityTable,
-  value: unknown,
-  validate: (value: unknown) => Entity,
+  entity: Entity,
 ): Entity {
-  const entity = validate(value);
-
   database
     .prepare(
       `INSERT INTO ${table} (id, payload)
@@ -730,15 +716,13 @@ function putEntity<Entity extends { id: string }>(
 function readEntities<Entity extends { id: string }>(
   database: DatabaseSync,
   table: EntityTable,
-  validate: (value: unknown) => Entity,
+  validate: (value: JSONType) => Entity,
 ): Entity[] {
   return database
     .prepare(`SELECT id, payload FROM ${table} ORDER BY id`)
     .all()
-    .map((row) => {
-      if (!isRecord(row) || typeof row.id !== "string" || typeof row.payload !== "string") {
-        throw new Error("The local workspace data is invalid.");
-      }
+    .map((rawRow) => {
+      const row = EntityRowSchema.parse(rawRow);
 
       let entity: Entity;
 
@@ -770,18 +754,7 @@ function replaceEntities<Entity extends { id: string }>(
 }
 
 function assertIdentifier(value: string, name: string) {
-  if (typeof value !== "string" || value.length === 0) {
+  if (value.length === 0) {
     throw new TypeError(`Invalid ${name}.`);
   }
-}
-
-function isWorkspaceId(value: unknown): value is string {
-  return (
-    typeof value === "string" &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value)
-  );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }

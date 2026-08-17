@@ -16,6 +16,7 @@ import { Route as ListsRouteImport } from "./routes/lists";
 import { Route as SearchRouteImport } from "./routes/search";
 import { Route as SetsRouteImport } from "./routes/sets";
 import { Route as SettingsRouteImport } from "./routes/settings";
+import { Route as CardsPrintingIdRouteImport } from "./routes/cards.$printingId";
 
 const IndexRoute = IndexRouteImport.update({
   id: "/",
@@ -52,6 +53,11 @@ const SettingsRoute = SettingsRouteImport.update({
   path: "/settings",
   getParentRoute: () => rootRouteImport,
 } as any);
+const CardsPrintingIdRoute = CardsPrintingIdRouteImport.update({
+  id: "/cards/$printingId",
+  path: "/cards/$printingId",
+  getParentRoute: () => rootRouteImport,
+} as any);
 
 export interface FileRoutesByFullPath {
   "/": typeof IndexRoute;
@@ -61,6 +67,7 @@ export interface FileRoutesByFullPath {
   "/search": typeof SearchRoute;
   "/sets": typeof SetsRoute;
   "/settings": typeof SettingsRoute;
+  "/cards/$printingId": typeof CardsPrintingIdRoute;
 }
 export interface FileRoutesByTo {
   "/": typeof IndexRoute;
@@ -70,6 +77,7 @@ export interface FileRoutesByTo {
   "/search": typeof SearchRoute;
   "/sets": typeof SetsRoute;
   "/settings": typeof SettingsRoute;
+  "/cards/$printingId": typeof CardsPrintingIdRoute;
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
@@ -80,6 +88,7 @@ export interface FileRoutesById {
   "/search": typeof SearchRoute;
   "/sets": typeof SetsRoute;
   "/settings": typeof SettingsRoute;
+  "/cards/$printingId": typeof CardsPrintingIdRoute;
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
@@ -90,7 +99,8 @@ export interface FileRouteTypes {
     | "/lists"
     | "/search"
     | "/sets"
-    | "/settings";
+    | "/settings"
+    | "/cards/$printingId";
   fileRoutesByTo: FileRoutesByTo;
   to:
     | "/"
@@ -99,7 +109,8 @@ export interface FileRouteTypes {
     | "/lists"
     | "/search"
     | "/sets"
-    | "/settings";
+    | "/settings"
+    | "/cards/$printingId";
   id:
     | "__root__"
     | "/"
@@ -108,7 +119,8 @@ export interface FileRouteTypes {
     | "/lists"
     | "/search"
     | "/sets"
-    | "/settings";
+    | "/settings"
+    | "/cards/$printingId";
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
@@ -119,6 +131,7 @@ export interface RootRouteChildren {
   SearchRoute: typeof SearchRoute;
   SetsRoute: typeof SetsRoute;
   SettingsRoute: typeof SettingsRoute;
+  CardsPrintingIdRoute: typeof CardsPrintingIdRoute;
 }
 
 declare module "@tanstack/react-router" {
@@ -172,6 +185,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof SettingsRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/cards/$printingId": {
+      id: "/cards/$printingId";
+      path: "/cards/$printingId";
+      fullPath: "/cards/$printingId";
+      preLoaderRoute: typeof CardsPrintingIdRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
   }
 }
 
@@ -183,6 +203,7 @@ const rootRouteChildren: RootRouteChildren = {
   SearchRoute: SearchRoute,
   SetsRoute: SetsRoute,
   SettingsRoute: SettingsRoute,
+  CardsPrintingIdRoute: CardsPrintingIdRoute,
 };
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

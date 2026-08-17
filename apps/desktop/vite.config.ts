@@ -6,8 +6,8 @@ import electron from "vite-plugin-electron/simple";
 
 const productionServiceOrigin = "https://mooligan-api.bessa.workers.dev";
 const developmentCsp =
-  "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://127.0.0.1:3000 ws://127.0.0.1:5173; img-src 'self' data: https://cards.scryfall.io; object-src 'none'; base-uri 'none'";
-const productionCsp = `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ${productionServiceOrigin}; img-src 'self' data: https://cards.scryfall.io; object-src 'none'; base-uri 'none'`;
+  "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://127.0.0.1:3000 ws://127.0.0.1:5173; img-src 'self' data: mooligan-image:; object-src 'none'; base-uri 'none'";
+const productionCsp = `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ${productionServiceOrigin}; img-src 'self' data: mooligan-image:; object-src 'none'; base-uri 'none'`;
 
 export default defineConfig(({ command }) => ({
   base: "./",
