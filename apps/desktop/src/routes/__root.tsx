@@ -1,7 +1,7 @@
 import { Tooltip } from "@base-ui/react/tooltip";
 import * as stylex from "@stylexjs/stylex";
 import { createRootRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { motion, MotionConfig } from "motion/react";
+import { motion, MotionConfig, useReducedMotionConfig } from "motion/react";
 
 import { CatalogSetup } from "../components/catalog-setup";
 import { usePreferences } from "../features/preferences/use-preferences";
@@ -40,39 +40,7 @@ function AppShell() {
           <span {...stylex.props(styles.wordmark)}>Mooligan</span>
         </header>
 
-        <Tooltip.Provider delay={450} closeDelay={0} timeout={350}>
-          <nav {...stylex.props(styles.navigation)} aria-label="Primary" data-window-no-drag>
-            <div {...stylex.props(styles.navGroup)}>
-              {navigation.map((item) => (
-                <Tooltip.Root key={item.to}>
-                  <Tooltip.Trigger
-                    render={
-                      <Link
-                        {...stylex.props(styles.navItem)}
-                        activeOptions={{ exact: item.to === "/" }}
-                        activeProps={{
-                          style: {
-                            color: "#1b1d19",
-                            backgroundColor: colors.accent,
-                          },
-                        }}
-                        aria-label={item.label}
-                        to={item.to}
-                      />
-                    }
-                  >
-                    <NavigationIcon name={item.icon} />
-                  </Tooltip.Trigger>
-                  <Tooltip.Portal>
-                    <Tooltip.Positioner sideOffset={10}>
-                      <Tooltip.Popup className="navigation-tooltip">{item.label}</Tooltip.Popup>
-                    </Tooltip.Positioner>
-                  </Tooltip.Portal>
-                </Tooltip.Root>
-              ))}
-            </div>
-          </nav>
-        </Tooltip.Provider>
+        <Navigation />
 
         <main
           {...stylex.props(styles.main)}
@@ -92,6 +60,46 @@ function AppShell() {
       </div>
       <CatalogSetup />
     </MotionConfig>
+  );
+}
+
+function Navigation() {
+  const reduceMotion = useReducedMotionConfig() ?? false;
+
+  return (
+    <Tooltip.Provider delay={450} closeDelay={0} timeout={350}>
+      <nav {...stylex.props(styles.navigation)} aria-label="Primary" data-window-no-drag>
+        <div {...stylex.props(styles.navGroup)}>
+          {navigation.map((item) => (
+            <Tooltip.Root key={item.to}>
+              <Tooltip.Trigger
+                render={
+                  <Link
+                    {...stylex.props(styles.navItem, reduceMotion && styles.navItemReducedMotion)}
+                    activeOptions={{ exact: item.to === "/" }}
+                    activeProps={{
+                      style: {
+                        color: "#1b1d19",
+                        backgroundColor: colors.accent,
+                      },
+                    }}
+                    aria-label={item.label}
+                    to={item.to}
+                  />
+                }
+              >
+                <NavigationIcon name={item.icon} />
+              </Tooltip.Trigger>
+              <Tooltip.Portal>
+                <Tooltip.Positioner sideOffset={10}>
+                  <Tooltip.Popup className="navigation-tooltip">{item.label}</Tooltip.Popup>
+                </Tooltip.Positioner>
+              </Tooltip.Portal>
+            </Tooltip.Root>
+          ))}
+        </div>
+      </nav>
+    </Tooltip.Provider>
   );
 }
 
@@ -226,6 +234,12 @@ const styles = stylex.create({
       outlineStyle: "solid",
       outlineColor: colors.accent,
       outlineOffset: "2px",
+    },
+  },
+  navItemReducedMotion: {
+    transition: "color 160ms ease, background-color 160ms ease",
+    ":active": {
+      transform: "none",
     },
   },
   navIcon: {
