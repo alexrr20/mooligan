@@ -336,8 +336,15 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
         { formatId: "modern", formatName: "Modern", status: "legal" },
       ]);
       assert.deepEqual(
-        sharedDetail.siblingPrintings.map((printing) => printing.id),
-        ["printing-3", "printing-1", "art-series-1"],
+        sharedDetail.siblingPrintings.map(({ id, image }) => ({ id, image })),
+        [
+          { id: "printing-3", image: undefined },
+          {
+            id: "printing-1",
+            image: { faceIndex: 0, printingId: "printing-1", size: "grid" },
+          },
+          { id: "art-series-1", image: undefined },
+        ],
       );
       assert.equal(sharedDetail.selectedPrinting.id, "printing-1");
       assert.deepEqual(sharedDetail.selectedPrinting.artists, ["Test Artist"]);
