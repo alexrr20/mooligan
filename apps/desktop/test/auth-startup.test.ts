@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { test } from "node:test";
 
-import type { App, Protocol } from "electron";
+import type { Protocol } from "electron";
 
-import { registerAuthColdStart, registerAuthScheme } from "../electron/auth/startup.ts";
+import { registerAuthColdStart, type StartupApp } from "../electron/auth/startup.ts";
+import { registerDesktopSchemes } from "../electron/protocols.ts";
 import { AUTH_PROTOCOL } from "../electron/auth/service.ts";
 
 void test("cold-start callbacks queue before readiness and duplicate OS delivery is harmless", async () => {
@@ -12,7 +13,7 @@ void test("cold-start callbacks queue before readiness and duplicate OS delivery
   const initial = callback("A".repeat(32), state);
   const later = callback("B".repeat(32), state);
   const app = new FakeApp();
-  const coldStart = registerAuthColdStart(app as unknown as App, ["mooligan", initial]);
+  const coldStart = registerAuthColdStart(app, ["mooligan", initial]);
   let prevented = false;
 
   app.emit(
@@ -41,27 +42,39 @@ void test("cold-start callbacks queue before readiness and duplicate OS delivery
 });
 
 void test("the custom scheme is registered as secure before Electron readiness", () => {
-  let registered: unknown;
-  const protocol = {
-    registerSchemesAsPrivileged(schemes: unknown) {
+  let registered: Parameters<Protocol["registerSchemesAsPrivileged"]>[0] | undefined;
+  const protocol: Pick<Protocol, "registerSchemesAsPrivileged"> = {
+    registerSchemesAsPrivileged(schemes) {
       registered = schemes;
     },
   };
 
-  registerAuthScheme(protocol as unknown as Protocol);
+  registerDesktopSchemes(protocol);
   assert.deepEqual(registered, [
     {
       privileges: { secure: true, standard: false },
       scheme: AUTH_PROTOCOL,
     },
+    {
+      privileges: { secure: true, standard: true, supportFetchAPI: true },
+      scheme: "mooligan-image",
+    },
   ]);
 });
 
-class FakeApp extends EventEmitter {
+class FakeApp extends EventEmitter implements StartupApp {
   lockData: unknown;
   protocolRegistration: unknown;
 
-  requestSingleInstanceLock(additionalData?: Record<string, unknown>) {
+  onOpenUrl(listener: Parameters<StartupApp["onOpenUrl"]>[0]) {
+    this.on("open-url", listener);
+  }
+
+  onSecondInstance(listener: Parameters<StartupApp["onSecondInstance"]>[0]) {
+    this.on("second-instance", listener);
+  }
+
+  requestSingleInstanceLock(additionalData?: { authCallback?: string }) {
     this.lockData = additionalData;
     return true;
   }

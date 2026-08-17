@@ -1,10 +1,13 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
-import { v7 as uuidv7, validate as validateUuid } from "uuid";
+import { v7 as uuidv7 } from "uuid";
+import * as z from "zod";
+import type { JSONType } from "zod";
 
 import { createAuth } from "./auth.js";
 
-type MotionPreference = "full" | "reduced" | "system";
+const MotionPreferenceSchema = z.enum(["full", "reduced", "system"]);
+type MotionPreference = z.infer<typeof MotionPreferenceSchema>;
 
 type PreferenceEntry = {
   updatedAt: string;
@@ -24,7 +27,14 @@ type WorkspaceRow = {
   owner_user_id: string;
 };
 
-const motionValues: readonly MotionPreference[] = ["full", "reduced", "system"];
+const MotionPreferencesSchema = z.strictObject({ motion: MotionPreferenceSchema });
+const BindRequestSchema = z.strictObject({
+  localWorkspaceId: z.uuid(),
+  preferences: MotionPreferencesSchema.optional(),
+});
+const UpdateRequestSchema = z.strictObject({
+  updates: z.tuple([z.strictObject({ key: z.literal("motion"), value: MotionPreferenceSchema })]),
+});
 
 const syncApi = new Hono<{
   Bindings: Env;
@@ -230,81 +240,22 @@ function toPreferences(rows: PreferenceRow[]): { motion?: PreferenceEntry } {
     : {};
 }
 
-async function readJson(request: Request): Promise<unknown> {
+async function readJson(request: Request): Promise<JSONType> {
   try {
-    return await request.json();
+    return z.json().parse(await request.json());
   } catch {
     return null;
   }
 }
 
-function parseBindRequest(value: unknown) {
-  if (
-    !isRecord(value) ||
-    !hasOnlyKeys(value, ["localWorkspaceId", "preferences"]) ||
-    typeof value.localWorkspaceId !== "string" ||
-    !validateUuid(value.localWorkspaceId)
-  ) {
-    return null;
-  }
-
-  if (!Object.hasOwn(value, "preferences")) {
-    return { localWorkspaceId: value.localWorkspaceId };
-  }
-
-  if (!isMotionPreferences(value.preferences)) {
-    return null;
-  }
-
-  return {
-    localWorkspaceId: value.localWorkspaceId,
-    preferences: value.preferences,
-  };
+function parseBindRequest(value: JSONType) {
+  const request = BindRequestSchema.safeParse(value);
+  return request.success ? request.data : null;
 }
 
-function parseUpdateRequest(value: unknown) {
-  if (
-    !isRecord(value) ||
-    !hasOnlyKeys(value, ["updates"]) ||
-    !Array.isArray(value.updates) ||
-    value.updates.length !== 1
-  ) {
-    return null;
-  }
-
-  const update = value.updates[0];
-
-  if (
-    !isRecord(update) ||
-    !hasOnlyKeys(update, ["key", "value"]) ||
-    update.key !== "motion" ||
-    !isMotionValue(update.value)
-  ) {
-    return null;
-  }
-
-  return { updates: [{ key: "motion" as const, value: update.value }] };
-}
-
-function isMotionPreferences(value: unknown): value is { motion: MotionPreference } {
-  return (
-    isRecord(value) &&
-    hasOnlyKeys(value, ["motion"]) &&
-    Object.hasOwn(value, "motion") &&
-    isMotionValue(value.motion)
-  );
-}
-
-function isMotionValue(value: unknown): value is MotionPreference {
-  return motionValues.includes(value as MotionPreference);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function hasOnlyKeys(value: Record<string, unknown>, keys: readonly string[]) {
-  return Object.keys(value).every((key) => keys.includes(key));
+function parseUpdateRequest(value: JSONType) {
+  const request = UpdateRequestSchema.safeParse(value);
+  return request.success ? request.data : null;
 }
 
 export { syncApi };

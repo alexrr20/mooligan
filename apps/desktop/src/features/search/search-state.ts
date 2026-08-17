@@ -9,6 +9,28 @@ export type CatalogSearchState = {
   universe?: UniverseFilter;
 };
 
+export const CatalogSearchStateSchema = z.strictObject({
+  artSeries: z.literal(true).optional(),
+  digital: z.literal(true).optional(),
+  grid: z.literal(true).optional(),
+  query: z
+    .string()
+    .min(1)
+    .max(100)
+    .refine((value) => value === value.trim())
+    .optional(),
+  uniqueCards: z.literal(true).optional(),
+  universe: z.enum(["beyond", "within"]).optional(),
+});
+const CatalogSearchInputSchema = z.object({
+  artSeries: z.json().optional(),
+  digital: z.json().optional(),
+  grid: z.json().optional(),
+  query: z.json().optional(),
+  uniqueCards: z.json().optional(),
+  universe: z.json().optional(),
+});
+
 export function reconcileCatalogSearchDraft(
   draft: string,
   previousActiveQuery: string,
@@ -17,17 +39,21 @@ export function reconcileCatalogSearchDraft(
   return draft.trim() === previousActiveQuery ? activeQuery : draft;
 }
 
-export function validateCatalogSearch(search: Record<string, unknown>): CatalogSearchState {
-  const query = typeof search.query === "string" ? search.query.trim().slice(0, 100) : "";
+export function validateCatalogSearch(search: CatalogSearchState | JSONType): CatalogSearchState {
+  const input = CatalogSearchInputSchema.parse(search);
+  const queryValue = z.string().safeParse(input.query);
+  const query = queryValue.success ? queryValue.data.trim().slice(0, 100) : "";
 
   return {
-    ...(search.artSeries === true && { artSeries: true as const }),
-    ...(search.digital === true && { digital: true as const }),
-    ...(search.grid === true && { grid: true as const }),
+    ...(input.artSeries === true && { artSeries: true as const }),
+    ...(input.digital === true && { digital: true as const }),
+    ...(input.grid === true && { grid: true as const }),
     ...(query && { query }),
-    ...(search.uniqueCards === true && { uniqueCards: true as const }),
-    ...((search.universe === "beyond" || search.universe === "within") && {
-      universe: search.universe,
+    ...(input.uniqueCards === true && { uniqueCards: true as const }),
+    ...((input.universe === "beyond" || input.universe === "within") && {
+      universe: input.universe,
     }),
   };
 }
+import * as z from "zod";
+import type { JSONType } from "zod";

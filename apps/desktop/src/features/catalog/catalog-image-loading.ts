@@ -1,19 +1,137 @@
+import { useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
+
 const BACKGROUND_IMAGE_CONCURRENCY = 6;
 const INITIAL_IMAGE_TIMEOUT_MS = 5_000;
 
 type ImageState = "background" | "foreground" | "pending" | "settled";
 
 type TimerApi = {
-  clearTimeout: (handle: unknown) => void;
-  setTimeout: (callback: () => void, delay: number) => unknown;
+  schedule: (callback: () => void, delay: number) => () => void;
 };
 
 const defaultTimers: TimerApi = {
-  clearTimeout: (handle) => globalThis.clearTimeout(handle as ReturnType<typeof setTimeout>),
-  setTimeout: (callback, delay) => globalThis.setTimeout(callback, delay),
+  schedule: (callback, delay) => {
+    const handle = globalThis.setTimeout(callback, delay);
+    return () => globalThis.clearTimeout(handle);
+  },
 };
 
-export class SearchImageLoading {
+type ActiveImages = {
+  failed: ReadonlySet<string>;
+  generation: number;
+  ids: ReadonlySet<string>;
+};
+
+export function useCatalogImageLoading<Element extends HTMLElement, ResetKey>(
+  containerRef: RefObject<Element | null>,
+  imageIds: readonly string[],
+  resetKey: ResetKey,
+  enabled = true,
+  rootMargin = "0px",
+) {
+  const observerRef = useRef<IntersectionObserver>(null);
+  const generationRef = useRef(0);
+  const [active, setActive] = useState<ActiveImages>({
+    failed: new Set(),
+    generation: 0,
+    ids: new Set(),
+  });
+  const coordinator = useMemo(
+    () =>
+      new CatalogImageLoading((id, generation) => {
+        setActive((current) => {
+          if (current.generation !== generation) {
+            return { failed: new Set(), generation, ids: new Set([id]) };
+          }
+          if (current.ids.has(id)) {
+            return current;
+          }
+
+          const ids = new Set(current.ids);
+          ids.add(id);
+          return { ...current, ids };
+        });
+      }),
+    [],
+  );
+
+  useLayoutEffect(() => {
+    const generation = coordinator.reset();
+    generationRef.current = generation;
+    setActive({ failed: new Set(), generation, ids: new Set() });
+
+    const Observer = globalThis.IntersectionObserver;
+    if (!enabled || !Observer) {
+      return () => coordinator.reset();
+    }
+
+    let initialObservation = true;
+    const observer = new Observer(
+      (entries) => {
+        const visibleIds = entries.flatMap((entry) => {
+          if (!(entry.target instanceof HTMLElement)) return [];
+          const id = entry.target.dataset.catalogImageId;
+          return entry.isIntersecting && id ? [id] : [];
+        });
+
+        if (initialObservation) {
+          initialObservation = false;
+          coordinator.initialVisible(visibleIds, generation);
+        } else {
+          coordinator.visible(visibleIds, generation);
+        }
+      },
+      { root: null, rootMargin },
+    );
+    observerRef.current = observer;
+
+    return () => {
+      observer.disconnect();
+      observerRef.current = null;
+      coordinator.reset();
+    };
+  }, [coordinator, enabled, resetKey, rootMargin]);
+
+  useLayoutEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    const generation = generationRef.current;
+    coordinator.append(imageIds, generation);
+    const observer = observerRef.current;
+
+    if (!observer) {
+      coordinator.initialVisible(imageIds, generation);
+      return;
+    }
+
+    const frames = containerRef.current?.querySelectorAll<HTMLElement>("[data-catalog-image-id]");
+    frames?.forEach((frame) => observer.observe(frame));
+    return () => frames?.forEach((frame) => observer.unobserve(frame));
+  }, [containerRef, coordinator, enabled, imageIds]);
+
+  return {
+    ...active,
+    settle(id: string, failed = false) {
+      coordinator.settled(id, active.generation);
+      if (!failed) {
+        return;
+      }
+
+      setActive((current) => {
+        if (current.generation !== active.generation || current.failed.has(id)) {
+          return current;
+        }
+        const nextFailed = new Set(current.failed);
+        nextFailed.add(id);
+        return { ...current, failed: nextFailed };
+      });
+    },
+  };
+}
+
+export class CatalogImageLoading {
   readonly #activate: (id: string, generation: number) => void;
   readonly #timers: TimerApi;
   readonly #states = new Map<string, ImageState>();
@@ -24,7 +142,7 @@ export class SearchImageLoading {
   #initialReported = false;
   #nextPendingIndex = 0;
   #order: string[] = [];
-  #timeout: unknown;
+  #cancelSafetyTimeout: (() => void) | undefined;
 
   constructor(
     activate: (id: string, generation: number) => void,
@@ -127,9 +245,9 @@ export class SearchImageLoading {
   }
 
   #clearSafetyTimeout() {
-    if (this.#timeout !== undefined) {
-      this.#timers.clearTimeout(this.#timeout);
-      this.#timeout = undefined;
+    if (this.#cancelSafetyTimeout) {
+      this.#cancelSafetyTimeout();
+      this.#cancelSafetyTimeout = undefined;
     }
   }
 
@@ -171,13 +289,13 @@ export class SearchImageLoading {
   }
 
   #startSafetyTimeout() {
-    if (this.#backgroundReleased || this.#timeout !== undefined || this.#order.length === 0) {
+    if (this.#backgroundReleased || this.#cancelSafetyTimeout || this.#order.length === 0) {
       return;
     }
 
     const generation = this.#generation;
-    this.#timeout = this.#timers.setTimeout(() => {
-      this.#timeout = undefined;
+    this.#cancelSafetyTimeout = this.#timers.schedule(() => {
+      this.#cancelSafetyTimeout = undefined;
       if (generation === this.#generation) {
         this.#releaseBackground();
       }

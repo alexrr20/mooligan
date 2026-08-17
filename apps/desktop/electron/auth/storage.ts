@@ -2,6 +2,9 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
+import * as z from "zod";
+import type { JSONType } from "zod";
+
 const MAX_ENCRYPTED_STATE_BYTES = 1024 * 1024;
 const MAX_PLAINTEXT_STATE_BYTES = 512 * 1024;
 
@@ -27,6 +30,22 @@ export interface ProtectedAuthState {
   cookies: Record<string, StoredAuthCookie>;
   pendingAuth: PendingAuth | null;
 }
+
+const StoredAuthCookieSchema = z.object({
+  expiresAt: z.number().finite().nullable(),
+  value: z.string(),
+});
+const PendingAuthSchema = z.object({
+  expiresAt: z.number().finite(),
+  state: z.string(),
+  verifier: z.string(),
+});
+export const ProtectedAuthStateSchema = z.object({
+  cookies: z.record(z.string(), StoredAuthCookieSchema),
+  pendingAuth: PendingAuthSchema.nullable(),
+  version: z.literal(1),
+});
+const FileSystemErrorSchema = z.object({ code: z.string().optional() });
 
 export interface AuthStateStorage {
   load(): Promise<ProtectedAuthState>;
@@ -138,7 +157,7 @@ export class EncryptedAuthStorage implements AuthStateStorage {
           throw new ProtectedStorageError("Protected authentication storage is unavailable.");
         }
       })
-      .catch((error: unknown) => {
+      .catch((error) => {
         if (error instanceof ProtectedStorageError) {
           throw error;
         }
@@ -154,7 +173,7 @@ export function emptyAuthState(): ProtectedAuthState {
 }
 
 function parseProtectedAuthState(serialized: string) {
-  let value: unknown;
+  let value;
 
   try {
     value = JSON.parse(serialized);
@@ -167,51 +186,15 @@ function parseProtectedAuthState(serialized: string) {
   return validateProtectedAuthState(value);
 }
 
-function validateProtectedAuthState(value: unknown): ProtectedAuthState {
-  if (!isRecord(value) || value.version !== 1 || !isRecord(value.cookies)) {
+function validateProtectedAuthState(value: ProtectedAuthState | JSONType): ProtectedAuthState {
+  const state = ProtectedAuthStateSchema.safeParse(value);
+  if (!state.success) {
     throw new ProtectedStorageError("Protected authentication state is invalid.");
   }
-
-  const cookies: Record<string, StoredAuthCookie> = {};
-
-  for (const [name, cookie] of Object.entries(value.cookies)) {
-    if (
-      !isRecord(cookie) ||
-      typeof cookie.value !== "string" ||
-      (cookie.expiresAt !== null &&
-        (typeof cookie.expiresAt !== "number" || !Number.isFinite(cookie.expiresAt)))
-    ) {
-      throw new ProtectedStorageError("Protected authentication state is invalid.");
-    }
-    cookies[name] = { expiresAt: cookie.expiresAt, value: cookie.value };
-  }
-
-  let pendingAuth: PendingAuth | null = null;
-
-  if (value.pendingAuth !== null) {
-    if (
-      !isRecord(value.pendingAuth) ||
-      typeof value.pendingAuth.state !== "string" ||
-      typeof value.pendingAuth.verifier !== "string" ||
-      typeof value.pendingAuth.expiresAt !== "number" ||
-      !Number.isFinite(value.pendingAuth.expiresAt)
-    ) {
-      throw new ProtectedStorageError("Protected authentication state is invalid.");
-    }
-    pendingAuth = {
-      expiresAt: value.pendingAuth.expiresAt,
-      state: value.pendingAuth.state,
-      verifier: value.pendingAuth.verifier,
-    };
-  }
-
-  return { cookies, pendingAuth, version: 1 };
+  return state.data;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isFileNotFound(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
+function isFileNotFound(cause: unknown) {
+  const error = FileSystemErrorSchema.safeParse(cause);
+  return error.success && error.data.code === "ENOENT";
 }

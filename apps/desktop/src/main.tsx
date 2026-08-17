@@ -7,8 +7,10 @@ import "./global.css";
 import { routeTree } from "./routeTree.gen";
 
 const router = createRouter({
-  routeTree,
+  getScrollRestorationKey: (location) => location.href,
   history: createHashHistory(),
+  routeTree,
+  scrollRestoration: true,
 });
 const queryClient = new QueryClient();
 

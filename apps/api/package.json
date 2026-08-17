@@ -18,7 +18,8 @@
     "@mooligan/domain": "workspace:*",
     "better-auth": "catalog:",
     "hono": "catalog:",
-    "uuid": "catalog:"
+    "uuid": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "catalog:",

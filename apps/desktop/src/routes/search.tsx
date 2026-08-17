@@ -10,6 +10,7 @@ import {
   SearchViewToggle,
 } from "../features/search/search-controls";
 import { SearchResults } from "../features/search/search-results";
+import { createCatalogSearchOrigin } from "../features/cards/card-navigation";
 import { type CatalogSearchState, validateCatalogSearch } from "../features/search/search-state";
 import { useCatalogSearch } from "../features/search/use-catalog-search";
 
@@ -102,6 +103,7 @@ function SearchPage() {
           hasMore={hasMore}
           imagesReady={imagesReady}
           loading={loading}
+          origin={createCatalogSearchOrigin(searchState)}
           total={total}
           onLoadMore={loadMore}
         />

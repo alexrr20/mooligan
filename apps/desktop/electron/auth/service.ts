@@ -6,6 +6,8 @@ import {
   splitSetCookieHeader,
   stripSecureCookiePrefix,
 } from "better-auth/cookies";
+import * as z from "zod";
+import type { JSONType } from "zod";
 
 import {
   type AsyncSafeStorage,
@@ -32,6 +34,25 @@ const SAFE_COOKIE_VALUE = /^[\x21\x23-\x2B\x2D-\x3A\x3C-\x5B\x5D-\x7E]*$/;
 const PKCE_VALUE = /^[A-Za-z0-9_-]{43}$/;
 const RAW_AUTHORIZATION_CODE = /^[A-Za-z0-9]{32}$/;
 const ENCODED_AUTHORIZATION_CODE = /^[A-Za-z0-9_-]+={0,2}$/;
+const RedirectTokenSchema = z.strictObject({
+  identifier: z.string().regex(RAW_AUTHORIZATION_CODE),
+  state: z.string().regex(PKCE_VALUE),
+});
+const AuthUserPayloadSchema = z.object({
+  email: z
+    .string()
+    .min(1)
+    .max(320)
+    .refine((value) => !hasControlCharacter(value)),
+  id: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
+  image: z.json().optional(),
+  name: z
+    .string()
+    .min(1)
+    .max(200)
+    .refine((value) => !hasControlCharacter(value)),
+});
+const AuthUserEnvelopeSchema = z.object({ user: z.json() });
 
 export type AuthStatus =
   | "signed-out"
@@ -57,7 +78,7 @@ type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Resp
 export interface DesktopAuthOptions {
   filePath: string;
   safeStorage: AsyncSafeStorage;
-  openExternal(url: string): Promise<unknown>;
+  openExternal(url: string): Promise<void>;
   origin?: string;
   fetch?: Fetch;
   now?: () => number;
@@ -85,7 +106,7 @@ export class AuthRequestError extends Error {
 export class DesktopAuth {
   readonly #origin: string;
   readonly #storage: AuthStateStorage;
-  readonly #openExternal: (url: string) => Promise<unknown>;
+  readonly #openExternal: (url: string) => Promise<void>;
   readonly #fetch: Fetch;
   readonly #now: () => number;
   readonly #cookiePrefix: string;
@@ -154,7 +175,7 @@ export class DesktopAuth {
     });
   }
 
-  handleCallback(url: unknown): Promise<AuthSnapshot> {
+  handleCallback(url: string): Promise<AuthSnapshot> {
     return this.#serialize(async () => {
       const token = parseDeepLink(url);
       return await this.#exchange(token);
@@ -172,7 +193,7 @@ export class DesktopAuth {
     return this.#serialize(async () => {
       const state = await this.#requireState();
       const cookies = { ...state.cookies };
-      let failure: unknown;
+      let failure: Error | undefined;
 
       try {
         const response = await this.#send("/api/auth/sign-out", {
@@ -186,7 +207,10 @@ export class DesktopAuth {
           );
         }
       } catch (error) {
-        failure = error;
+        failure =
+          error instanceof Error
+            ? error
+            : new AuthRequestError("Sign-out failed unexpectedly.", { cause: error });
       }
 
       if (failure) {
@@ -328,8 +352,8 @@ export class DesktopAuth {
       throw new AuthRequestError("The authentication service rejected the sign-in response.");
     }
 
-    const data = await readJson(response);
-    const user = sanitizeUser(isRecord(data) ? data.user : null);
+    const data = AuthUserEnvelopeSchema.parse(await readJson(response));
+    const user = sanitizeUser(data.user);
     const next = this.#cookiesFromResponse(response, state.cookies);
 
     if (Object.keys(next).length === 0) {
@@ -369,7 +393,8 @@ export class DesktopAuth {
         return this.#setSnapshot("signed-out", null);
       }
 
-      return this.#setSnapshot("signed-in", sanitizeUser(isRecord(data) ? data.user : null));
+      const session = AuthUserEnvelopeSchema.parse(data);
+      return this.#setSnapshot("signed-in", sanitizeUser(session.user));
     } catch (error) {
       if (error instanceof ProtectedStorageError) {
         throw error;
@@ -436,7 +461,7 @@ export class DesktopAuth {
   }
 
   #cookiesFromResponse(response: Response, current: Record<string, StoredAuthCookie>) {
-    const next: Record<string, StoredAuthCookie> = { ...current };
+    const next = { ...current };
     const now = this.#now();
 
     for (const header of response.headers.getSetCookie()) {
@@ -591,12 +616,13 @@ export function resolveAuthOrigin(value = process.env[AUTH_ORIGIN_ENV]) {
   return url.origin;
 }
 
-export function isAuthCallbackUrl(value: unknown): value is string {
-  if (typeof value !== "string") {
+export function isAuthCallbackUrl(value: JSONType): value is string {
+  const candidate = z.string().safeParse(value);
+  if (!candidate.success) {
     return false;
   }
   try {
-    parseDeepLink(value);
+    parseDeepLink(candidate.data);
     return true;
   } catch {
     return false;
@@ -608,8 +634,8 @@ interface RedirectToken {
   state: string;
 }
 
-function parseDeepLink(value: unknown) {
-  if (typeof value !== "string" || value.length > 2_048) {
+function parseDeepLink(value: string) {
+  if (value.length > 2_048) {
     throw new AuthInputError("The sign-in callback is invalid.");
   }
 
@@ -652,7 +678,7 @@ function parseEncodedAuthorizationCode(value: string): RedirectToken {
     throw new AuthInputError("The authorization code is invalid.");
   }
 
-  let data: unknown;
+  let data;
   try {
     const decoded = Buffer.from(encoded, "base64url");
     const canonical = decoded.toString("base64url");
@@ -665,18 +691,12 @@ function parseEncodedAuthorizationCode(value: string): RedirectToken {
     throw new AuthInputError("The authorization code is invalid.");
   }
 
-  if (
-    !isRecord(data) ||
-    Object.keys(data).length !== 2 ||
-    typeof data.identifier !== "string" ||
-    !RAW_AUTHORIZATION_CODE.test(data.identifier) ||
-    typeof data.state !== "string" ||
-    !PKCE_VALUE.test(data.state)
-  ) {
+  const token = RedirectTokenSchema.safeParse(data);
+  if (!token.success) {
     throw new AuthInputError("The authorization code is invalid.");
   }
 
-  return { identifier: data.identifier, state: data.state };
+  return token.data;
 }
 
 function createPendingAuth(now: number): PendingAuth {
@@ -719,27 +739,17 @@ function cookieExpiry(
   return null;
 }
 
-function sanitizeUser(value: unknown): AuthUser {
-  if (
-    !isRecord(value) ||
-    typeof value.id !== "string" ||
-    !/^[A-Za-z0-9_-]{1,128}$/.test(value.id) ||
-    typeof value.name !== "string" ||
-    value.name.length === 0 ||
-    value.name.length > 200 ||
-    hasControlCharacter(value.name) ||
-    typeof value.email !== "string" ||
-    value.email.length === 0 ||
-    value.email.length > 320 ||
-    hasControlCharacter(value.email)
-  ) {
+function sanitizeUser(value: JSONType): AuthUser {
+  const user = AuthUserPayloadSchema.safeParse(value);
+  if (!user.success) {
     throw new AuthRequestError("The authentication service returned an invalid user.");
   }
 
   let image: string | null = null;
-  if (typeof value.image === "string" && value.image.length <= 2_048) {
+  const imageValue = z.string().max(2_048).safeParse(user.data.image);
+  if (imageValue.success) {
     try {
-      const url = new URL(value.image);
+      const url = new URL(imageValue.data);
       if (url.protocol === "https:") {
         image = url.href;
       }
@@ -748,12 +758,12 @@ function sanitizeUser(value: unknown): AuthUser {
     }
   }
 
-  return { email: value.email, id: value.id, image, name: value.name };
+  return { email: user.data.email, id: user.data.id, image, name: user.data.name };
 }
 
-async function readJson(response: Response) {
+async function readJson(response: Response): Promise<JSONType> {
   try {
-    return await response.json();
+    return z.json().parse(await response.json());
   } catch (error) {
     throw new AuthRequestError("The authentication service returned invalid data.", {
       cause: error,
@@ -796,10 +806,6 @@ function sameCookies(
 
 function isLoopback(hostname: string) {
   return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "[::1]";
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function hasControlCharacter(value: string) {

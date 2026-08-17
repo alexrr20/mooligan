@@ -3,6 +3,7 @@ import type {
   AuthStatus as AuthStatusType,
   AuthUser as AuthUserType,
 } from "../electron/auth/service";
+import type { CatalogCardDetail as CatalogCardDetailType } from "@mooligan/domain/catalog-detail";
 import type {
   CatalogProgress as CatalogProgressType,
   CatalogStatus as CatalogStatusType,
@@ -23,6 +24,7 @@ import type {
 } from "../electron/workspace/preferences";
 
 type CatalogApi = {
+  detail: (printingId: string) => Promise<CatalogCardDetailType | null>;
   download: () => Promise<CatalogStatusType>;
   list: (request?: CatalogListRequest) => Promise<CatalogListPageType>;
   onProgress: (callback: (progress: CatalogProgressType) => void) => () => void;
@@ -59,6 +61,7 @@ declare global {
   type CatalogProgress = CatalogProgressType;
   type CatalogStatus = CatalogStatusType;
   type CatalogCardSummary = CatalogCardSummaryType;
+  type CatalogCardDetail = CatalogCardDetailType;
   type AuthSnapshot = AuthSnapshotType;
   type AuthStatus = AuthStatusType;
   type AuthUser = AuthUserType;
