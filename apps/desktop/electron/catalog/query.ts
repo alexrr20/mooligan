@@ -100,8 +100,8 @@ const cardColumns = `cards.id,
                        json_extract(cards.json, '$.card_faces[0].image_uris.thumb')
                      ) IS NULL THEN 0 ELSE 1 END AS hasImage,
                      CASE WHEN COALESCE(
-                       json_extract(cards.json, '$.image_uris.small'),
-                       json_extract(cards.json, '$.card_faces[0].image_uris.small')
+                       json_extract(cards.json, '$.image_uris.grid'),
+                       json_extract(cards.json, '$.card_faces[0].image_uris.grid')
                      ) IS NULL THEN 0 ELSE 1 END AS hasGridImage,
                      cards.set_code AS setCode,
                      cards.set_name AS setName,
@@ -271,7 +271,7 @@ function toCatalogCardSummary(row: CatalogCardSummaryRow): CatalogCardSummary {
       ? CatalogImageDescriptorSchema.parse({
           faceIndex: 0,
           printingId: row.id,
-          size: "small",
+          size: "grid",
         })
       : null,
     image: hasImage

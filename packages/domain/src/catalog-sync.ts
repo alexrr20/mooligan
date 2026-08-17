@@ -21,6 +21,7 @@ export const ScryfallBulkDataSchema = z.object({
 });
 
 const ScryfallImageUrisSchema = z.object({
+  grid: z.url().nullish(),
   normal: z.url().nullish(),
   small: z.url().nullish(),
   thumb: z.url().nullish(),
