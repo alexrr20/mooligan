@@ -1,0 +1,516 @@
+.ms {
+  --ms-mana-b: #a7999e;
+  --ms-mana-c: #d0c6bb;
+  --ms-mana-g: #9fcba6;
+  --ms-mana-r: #f19b79;
+  --ms-mana-u: #bcdaf7;
+  --ms-mana-w: #fdfbce;
+
+  display: inline-block;
+  font-family: "Mana";
+  font-size: inherit;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1em;
+  text-rendering: auto;
+  text-transform: none;
+  vertical-align: middle;
+  -webkit-font-smoothing: antialiased;
+}
+
+.ms::before {
+  content: var(--ms-before);
+}
+
+.ms::after {
+  content: var(--ms-after, none);
+}
+
+.ms-w,
+.ms-wu,
+.ms-wb {
+  --ms-before: "\e600";
+}
+
+.ms-u,
+.ms-ub,
+.ms-ur {
+  --ms-before: "\e601";
+}
+
+.ms-b,
+.ms-br,
+.ms-bg {
+  --ms-before: "\e602";
+}
+
+.ms-r,
+.ms-rw,
+.ms-rg {
+  --ms-before: "\e603";
+}
+
+.ms-g,
+.ms-gw,
+.ms-gu {
+  --ms-before: "\e604";
+}
+
+.ms-0 {
+  --ms-before: "\e605";
+}
+
+.ms-1 {
+  --ms-before: "\e606";
+}
+
+.ms-2,
+.ms-2w,
+.ms-2u,
+.ms-2b,
+.ms-2r,
+.ms-2g {
+  --ms-before: "\e607";
+}
+
+.ms-2 {
+  margin-left: inherit !important;
+}
+
+.ms-3 {
+  --ms-before: "\e608";
+}
+
+.ms-4 {
+  --ms-before: "\e609";
+}
+
+.ms-5 {
+  --ms-before: "\e60a";
+}
+
+.ms-6 {
+  --ms-before: "\e60b";
+}
+
+.ms-7 {
+  --ms-before: "\e60c";
+}
+
+.ms-8 {
+  --ms-before: "\e60d";
+}
+
+.ms-9 {
+  --ms-before: "\e60e";
+}
+
+.ms-10 {
+  --ms-before: "\e60f";
+}
+
+.ms-11 {
+  --ms-before: "\e610";
+}
+
+.ms-12 {
+  --ms-before: "\e611";
+}
+
+.ms-13 {
+  --ms-before: "\e612";
+}
+
+.ms-14 {
+  --ms-before: "\e613";
+}
+
+.ms-15 {
+  --ms-before: "\e614";
+}
+
+.ms-16 {
+  --ms-before: "\e62a";
+}
+
+.ms-17 {
+  --ms-before: "\e62b";
+}
+
+.ms-18 {
+  --ms-before: "\e62c";
+}
+
+.ms-19 {
+  --ms-before: "\e62d";
+}
+
+.ms-20 {
+  --ms-before: "\e62e";
+}
+
+.ms-x {
+  --ms-before: "\e615";
+}
+
+.ms-y {
+  --ms-before: "\e616";
+}
+
+.ms-z {
+  --ms-before: "\e617";
+}
+
+.ms-s {
+  --ms-before: "\e619";
+}
+
+.ms-c,
+.ms-cw,
+.ms-cu,
+.ms-cb,
+.ms-cr,
+.ms-cg {
+  --ms-before: "\e904";
+}
+
+.ms-e {
+  --ms-before: "\e907";
+}
+
+.ms-acorn {
+  --ms-before: "\e929";
+}
+
+.ms-tk {
+  --ms-before: "\e9c4";
+}
+
+.ms-1-2 {
+  --ms-before: "\e902";
+}
+
+.ms-infinity {
+  --ms-before: "\e903";
+}
+
+.ms-l {
+  --ms-before: "\ea2d";
+}
+
+.ms-d {
+  --ms-before: "\ea2e";
+}
+
+.ms-h,
+.ms-p,
+.ms-wp,
+.ms-up,
+.ms-bp,
+.ms-rp,
+.ms-gp,
+.ms-wup,
+.ms-wbp,
+.ms-ubp,
+.ms-urp,
+.ms-brp,
+.ms-bgp,
+.ms-rwp,
+.ms-rgp,
+.ms-gwp,
+.ms-gup {
+  --ms-before: "\e618";
+}
+
+.ms-paw {
+  --ms-before: "\ea32";
+}
+
+.ms-tap {
+  --ms-before: "\e61a";
+}
+
+.ms-untap {
+  --ms-before: "\e61b";
+}
+
+.ms-chaos {
+  --ms-before: "\e61d";
+}
+
+.ms-100 {
+  --ms-before: "\e900";
+}
+
+.ms-1000000 {
+  --ms-before: "\e901";
+}
+
+.ms-rw,
+.ms-gw,
+.ms-2w,
+.ms-cw {
+  --ms-after: "\e600";
+}
+
+.ms-wu,
+.ms-gu,
+.ms-2u,
+.ms-cu {
+  --ms-after: "\e601";
+}
+
+.ms-wb,
+.ms-ub,
+.ms-2b,
+.ms-cb {
+  --ms-after: "\e602";
+}
+
+.ms-ur,
+.ms-br,
+.ms-2r,
+.ms-cr {
+  --ms-after: "\e603";
+}
+
+.ms-bg,
+.ms-rg,
+.ms-2g,
+.ms-cg {
+  --ms-after: "\e604";
+}
+
+.ms-wup,
+.ms-wbp,
+.ms-ubp,
+.ms-urp,
+.ms-brp,
+.ms-bgp,
+.ms-rwp,
+.ms-rgp,
+.ms-gwp,
+.ms-gup {
+  --ms-after: "\e618";
+}
+
+.ms-cost {
+  width: 1.3em;
+  height: 1.3em;
+  border-radius: 1em;
+  color: #111;
+  background-color: #beb9b2;
+  font-size: 0.95em;
+  line-height: 1.35em;
+  text-align: center;
+}
+
+.ms-cost:is(.ms-w, .ms-wp) {
+  background-color: #f0f2c0;
+}
+
+.ms-cost:is(.ms-u, .ms-up) {
+  background-color: #b5cde3;
+}
+
+.ms-cost:is(.ms-b, .ms-bp) {
+  background-color: #aca29a;
+}
+
+.ms-cost:is(.ms-r, .ms-rp) {
+  background-color: #db8664;
+}
+
+.ms-cost:is(.ms-g, .ms-gp) {
+  background-color: #93b483;
+}
+
+.ms-cost.ms-split {
+  --ms-split-top: var(--ms-mana-c);
+  --ms-split-bottom: var(--ms-mana-u);
+
+  position: relative;
+  background: linear-gradient(
+    135deg,
+    var(--ms-split-top) 0%,
+    var(--ms-split-top) 50%,
+    var(--ms-split-bottom) 50%,
+    var(--ms-split-bottom) 100%
+  );
+}
+
+.ms-cost.ms-split::before,
+.ms-cost.ms-split::after {
+  position: absolute;
+  font-size: 0.55em !important;
+}
+
+.ms-cost.ms-split::before {
+  top: -0.38em;
+  left: 0.28em;
+}
+
+.ms-cost.ms-split::after {
+  top: 0.5em;
+  left: 1em;
+}
+
+.ms-cost:is(.ms-wu, .ms-wup) {
+  --ms-split-top: var(--ms-mana-w);
+}
+
+.ms-cost:is(.ms-wb, .ms-wbp) {
+  --ms-split-top: var(--ms-mana-w);
+  --ms-split-bottom: var(--ms-mana-b);
+}
+
+.ms-cost:is(.ms-ub, .ms-ubp) {
+  --ms-split-top: var(--ms-mana-u);
+  --ms-split-bottom: var(--ms-mana-b);
+}
+
+.ms-cost:is(.ms-ur, .ms-urp) {
+  --ms-split-top: var(--ms-mana-u);
+  --ms-split-bottom: var(--ms-mana-r);
+}
+
+.ms-cost:is(.ms-br, .ms-brp) {
+  --ms-split-top: var(--ms-mana-b);
+  --ms-split-bottom: var(--ms-mana-r);
+}
+
+.ms-cost:is(.ms-bg, .ms-bgp) {
+  --ms-split-top: var(--ms-mana-b);
+  --ms-split-bottom: var(--ms-mana-g);
+}
+
+.ms-cost:is(.ms-rw, .ms-rwp) {
+  --ms-split-top: var(--ms-mana-r);
+  --ms-split-bottom: var(--ms-mana-w);
+}
+
+.ms-cost:is(.ms-rg, .ms-rgp) {
+  --ms-split-top: var(--ms-mana-r);
+  --ms-split-bottom: var(--ms-mana-g);
+}
+
+.ms-cost:is(.ms-gw, .ms-gwp) {
+  --ms-split-top: var(--ms-mana-g);
+  --ms-split-bottom: var(--ms-mana-w);
+}
+
+.ms-cost:is(.ms-gu, .ms-gup) {
+  --ms-split-top: var(--ms-mana-g);
+}
+
+.ms-cost:is(.ms-2w, .ms-cw) {
+  --ms-split-bottom: var(--ms-mana-w);
+}
+
+.ms-cost:is(.ms-2b, .ms-cb) {
+  --ms-split-bottom: var(--ms-mana-b);
+}
+
+.ms-cost:is(.ms-2r, .ms-cr) {
+  --ms-split-bottom: var(--ms-mana-r);
+}
+
+.ms-cost:is(.ms-2g, .ms-cg) {
+  --ms-split-bottom: var(--ms-mana-g);
+}
+
+.ms-cost.ms-p::before {
+  display: inline-block;
+  transform: scale(1.2);
+}
+
+.ms-cost:is(
+  .ms-wp,
+  .ms-up,
+  .ms-bp,
+  .ms-rp,
+  .ms-gp,
+  .ms-cw,
+  .ms-cu,
+  .ms-cb,
+  .ms-cr,
+  .ms-cg,
+  .ms-wup,
+  .ms-wbp,
+  .ms-ubp,
+  .ms-urp,
+  .ms-brp,
+  .ms-bgp,
+  .ms-rwp,
+  .ms-rgp,
+  .ms-gwp,
+  .ms-gup
+)::before,
+.ms-cost:is(
+  .ms-wup,
+  .ms-wbp,
+  .ms-ubp,
+  .ms-urp,
+  .ms-brp,
+  .ms-bgp,
+  .ms-rwp,
+  .ms-rgp,
+  .ms-gwp,
+  .ms-gup
+)::after {
+  display: inline-block;
+  transform: scale(1.2) translateX(0.01rem) translateY(-0.03rem);
+}
+
+.ms-cost.ms-s::before {
+  position: relative;
+  top: -0.05em;
+  display: inline-block;
+  color: #fff;
+  font-size: 0.85em;
+  -webkit-text-stroke: 2px #fff;
+}
+
+.ms-cost.ms-s::after {
+  position: absolute;
+  margin-left: -0.9em;
+  color: #333;
+  content: "\e619";
+  font-size: 1.1em;
+}
+
+.ms-cost.ms-untap {
+  color: #fff;
+  background-color: #111;
+}
+
+.ms-cost.ms-shadow {
+  box-shadow:
+    -0.06em 0.07em 0 #111,
+    0 0.06em 0 #111;
+}
+
+.ms-cost.ms-shadow.ms-untap {
+  box-shadow:
+    -0.06em 0.07em 0 #fff,
+    0 0.06em 0 #fff;
+}
+
+.ms-half {
+  width: 0.675em;
+  margin-left: 0.675em;
+  overflow: hidden;
+  border-radius: 0 1em 1em 0;
+}
+
+.ms-half::before {
+  margin-left: -0.65em;
+}
+
+.ms-cost.ms-100 {
+  width: 2.4em;
+}
+
+.ms-cost.ms-1000000 {
+  width: 5.4em;
+}

@@ -42,13 +42,6 @@ export function CardLegalities({ legalities }: CardLegalitiesProps) {
 
   return (
     <section {...stylex.props(styles.section)} aria-labelledby="legalities-heading">
-      <div {...stylex.props(styles.sectionHead)}>
-        <h2 {...stylex.props(styles.sectionTitle)} id="legalities-heading">
-          03 / Format legalities
-        </h2>
-        <span>Current catalog status</span>
-      </div>
-
       <ul {...stylex.props(styles.grid)}>
         {ordered.map(({ legality }) => (
           <li {...stylex.props(styles.item)} key={legality.formatId}>
@@ -82,25 +75,6 @@ const styles = stylex.create({
   section: {
     marginTop: "46px",
     borderTop: "1px solid #55584f",
-  },
-  sectionHead: {
-    minHeight: "39px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "20px",
-    borderBottom: "1px solid #34362f",
-    color: "#85887e",
-    fontSize: "7px",
-    letterSpacing: "0.13em",
-    textTransform: "uppercase",
-  },
-  sectionTitle: {
-    margin: 0,
-    color: "inherit",
-    fontSize: "inherit",
-    fontWeight: 400,
-    letterSpacing: "inherit",
   },
   grid: {
     margin: 0,

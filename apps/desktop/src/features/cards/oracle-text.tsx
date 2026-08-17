@@ -155,8 +155,8 @@ function createSymbolDefinitions() {
   for (const [color, name] of Object.entries(COLORS)) {
     add(color, color.toLowerCase(), `${name} mana`, true);
     add(`${color}/P`, `${color.toLowerCase()}p`, `${name} Phyrexian mana`, true);
-    add(`2/${color}`, `2${color.toLowerCase()}`, `two generic or ${name} mana`, true);
-    add(`C/${color}`, `c${color.toLowerCase()}`, `colorless or ${name} mana`, true);
+    add(`2/${color}`, `2${color.toLowerCase()}`, `two generic or ${name} mana`, true, ["ms-split"]);
+    add(`C/${color}`, `c${color.toLowerCase()}`, `colorless or ${name} mana`, true, ["ms-split"]);
     add(`H${color}`, color.toLowerCase(), `half ${name} mana`, true, ["ms-half"]);
   }
 
@@ -175,8 +175,10 @@ function createSymbolDefinitions() {
   for (const [first, second] of hybridPairs) {
     const pair = `${first}/${second}`;
     const glyph = `${first.toLowerCase()}${second.toLowerCase()}`;
-    add(pair, glyph, `${COLORS[first]} or ${COLORS[second]} mana`, true);
-    add(`${pair}/P`, `${glyph}p`, `${COLORS[first]} or ${COLORS[second]} Phyrexian mana`, true);
+    add(pair, glyph, `${COLORS[first]} or ${COLORS[second]} mana`, true, ["ms-split"]);
+    add(`${pair}/P`, `${glyph}p`, `${COLORS[first]} or ${COLORS[second]} Phyrexian mana`, true, [
+      "ms-split",
+    ]);
   }
 
   add("C", "c", "colorless mana", true);

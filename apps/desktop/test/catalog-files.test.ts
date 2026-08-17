@@ -360,16 +360,25 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
         queryImageSource({ faceIndex: 1, printingId: "printing-2", size: "normal" }),
         "https://cards.scryfall.io/normal/back/2.jpg",
       );
+      assert.equal(
+        queryImageSource({ faceIndex: 0, printingId: "printing-1", size: "thumb" }),
+        "https://cards.scryfall.io/thumb/front/1.webp",
+      );
 
       assert.deepEqual(queryCatalog({ limit: 1 }), {
         cards: [
           {
             collectorNumber: "1",
+            gridImage: {
+              faceIndex: 0,
+              printingId: "printing-1",
+              size: "small",
+            },
             id: "printing-1",
             image: {
               faceIndex: 0,
               printingId: "printing-1",
-              size: "small",
+              size: "thumb",
             },
             name: "Mooligan Test Card",
             rarity: "rare",
@@ -389,8 +398,16 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
         ["printing-1", "printing-3", "printing-2"],
       );
       assert.deepEqual(
-        queryCatalog({ query: "alternate" }).cards.map(({ image }) => image),
-        [{ faceIndex: 0, printingId: "printing-3", size: "small" }],
+        queryCatalog({ query: "alternate" }).cards.map(({ gridImage, image }) => ({
+          gridImage,
+          image,
+        })),
+        [
+          {
+            gridImage: { faceIndex: 0, printingId: "printing-3", size: "small" },
+            image: null,
+          },
+        ],
       );
       assert.deepEqual(
         queryCatalog({ query: "series" }).cards.map((card) => card.id),
@@ -426,11 +443,16 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
         cards: [
           {
             collectorNumber: "1",
+            gridImage: {
+              faceIndex: 0,
+              printingId: "printing-1",
+              size: "small",
+            },
             id: "printing-1",
             image: {
               faceIndex: 0,
               printingId: "printing-1",
-              size: "small",
+              size: "thumb",
             },
             name: "Mooligan Test Card",
             rarity: "rare",
@@ -440,11 +462,16 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
           },
           {
             collectorNumber: "2",
+            gridImage: {
+              faceIndex: 0,
+              printingId: "printing-2",
+              size: "small",
+            },
             id: "printing-2",
             image: {
               faceIndex: 0,
               printingId: "printing-2",
-              size: "small",
+              size: "thumb",
             },
             name: "Second Test Card",
             rarity: "common",
@@ -464,11 +491,16 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
         cards: [
           {
             collectorNumber: "2",
+            gridImage: {
+              faceIndex: 0,
+              printingId: "printing-2",
+              size: "small",
+            },
             id: "printing-2",
             image: {
               faceIndex: 0,
               printingId: "printing-2",
-              size: "small",
+              size: "thumb",
             },
             name: "Second Test Card",
             rarity: "common",
@@ -537,11 +569,16 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
             cards: [
               {
                 collectorNumber: "2",
+                gridImage: {
+                  faceIndex: 0,
+                  printingId: "printing-2",
+                  size: "small",
+                },
                 id: "printing-2",
                 image: {
                   faceIndex: 0,
                   printingId: "printing-2",
-                  size: "small",
+                  size: "thumb",
                 },
                 name: "Second Test Card",
                 rarity: "common",

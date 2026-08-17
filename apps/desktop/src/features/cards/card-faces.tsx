@@ -12,11 +12,6 @@ export function CardFaces({ card }: CardFacesProps) {
 
   return (
     <section {...stylex.props(styles.section)} aria-label="Oracle information">
-      <div {...stylex.props(styles.sectionHead)}>
-        <span>01 / Oracle record</span>
-        <span>{multipleFaces ? `${card.faces.length} ordered faces` : "Current rules text"}</span>
-      </div>
-
       <div {...stylex.props(styles.faces)}>
         {card.faces.map((face, index) => (
           <CardFace
@@ -162,18 +157,6 @@ const styles = stylex.create({
   section: {
     marginTop: "36px",
     borderTop: "1px solid #55584f",
-  },
-  sectionHead: {
-    minHeight: "39px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "20px",
-    borderBottom: "1px solid #34362f",
-    color: "#85887e",
-    fontSize: "7px",
-    letterSpacing: "0.13em",
-    textTransform: "uppercase",
   },
   faces: {
     display: "grid",

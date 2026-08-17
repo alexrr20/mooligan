@@ -11,6 +11,7 @@ const catalogPrintingIdSchema = z.string().min(1).max(128);
 
 export const CatalogCardSummarySchema = z.object({
   collectorNumber: z.string(),
+  gridImage: CatalogImageDescriptorSchema.nullable(),
   id: catalogPrintingIdSchema,
   image: CatalogImageDescriptorSchema.nullable(),
   name: z.string(),
@@ -95,15 +96,20 @@ export function parseCatalogQueryWorkerResponse(
 const cardColumns = `cards.id,
                      cards.name,
                      CASE WHEN COALESCE(
+                       json_extract(cards.json, '$.image_uris.thumb'),
+                       json_extract(cards.json, '$.card_faces[0].image_uris.thumb')
+                     ) IS NULL THEN 0 ELSE 1 END AS hasImage,
+                     CASE WHEN COALESCE(
                        json_extract(cards.json, '$.image_uris.small'),
                        json_extract(cards.json, '$.card_faces[0].image_uris.small')
-                     ) IS NULL THEN 0 ELSE 1 END AS hasImage,
+                     ) IS NULL THEN 0 ELSE 1 END AS hasGridImage,
                      cards.set_code AS setCode,
                      cards.set_name AS setName,
                      cards.collector_number AS collectorNumber,
                      cards.type_line AS typeLine,
                      cards.rarity`;
-const summaryColumns = "id, name, hasImage, setCode, setName, collectorNumber, typeLine, rarity";
+const summaryColumns =
+  "id, name, hasImage, hasGridImage, setCode, setName, collectorNumber, typeLine, rarity";
 const artSeriesFilter = "? OR COALESCE(json_extract(cards.json, '$.layout'), '') <> 'art_series'";
 const digitalFilter = "? OR COALESCE(json_extract(cards.json, '$.digital'), 0) = 0";
 const universesBeyond = `EXISTS (
@@ -245,7 +251,11 @@ export function createCatalogQuery(database: DatabaseSync) {
   };
 }
 
-const CatalogCardSummaryRowSchema = CatalogCardSummarySchema.omit({ image: true }).extend({
+const CatalogCardSummaryRowSchema = CatalogCardSummarySchema.omit({
+  gridImage: true,
+  image: true,
+}).extend({
+  hasGridImage: z.union([z.literal(0), z.literal(1)]),
   hasImage: z.union([z.literal(0), z.literal(1)]),
 });
 type CatalogCardSummaryRow = z.infer<typeof CatalogCardSummaryRowSchema>;
@@ -253,15 +263,22 @@ type CatalogCardSummaryRow = z.infer<typeof CatalogCardSummaryRowSchema>;
 const CatalogTotalRowSchema = z.object({ total: z.number().int().nonnegative() });
 
 function toCatalogCardSummary(row: CatalogCardSummaryRow): CatalogCardSummary {
-  const { hasImage, ...card } = row;
+  const { hasGridImage, hasImage, ...card } = row;
 
   return {
     ...card,
-    image: hasImage
+    gridImage: hasGridImage
       ? CatalogImageDescriptorSchema.parse({
           faceIndex: 0,
           printingId: row.id,
           size: "small",
+        })
+      : null,
+    image: hasImage
+      ? CatalogImageDescriptorSchema.parse({
+          faceIndex: 0,
+          printingId: row.id,
+          size: "thumb",
         })
       : null,
   };
