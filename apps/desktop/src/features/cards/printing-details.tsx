@@ -10,11 +10,6 @@ export function PrintingDetails({ printing }: PrintingDetailsProps) {
 
   return (
     <section {...stylex.props(styles.section)} aria-label="Selected printing">
-      <div {...stylex.props(styles.sectionHead)}>
-        <span>02 / Exact edition</span>
-        <span>Selected printing</span>
-      </div>
-
       <dl {...stylex.props(styles.details)}>
         {rows.map((row) => (
           <div {...stylex.props(styles.detail)} key={row.label}>
@@ -90,18 +85,6 @@ const styles = stylex.create({
   section: {
     marginTop: "46px",
     borderTop: "1px solid #55584f",
-  },
-  sectionHead: {
-    minHeight: "39px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "20px",
-    borderBottom: "1px solid #34362f",
-    color: "#85887e",
-    fontSize: "7px",
-    letterSpacing: "0.13em",
-    textTransform: "uppercase",
   },
   details: {
     margin: "14px 0 0",

@@ -68,6 +68,8 @@ void test("ordinary, hybrid, Phyrexian, variable, tap, and untap symbols are rec
 
   assert.match(oracle.getManaSymbol("{G}")?.className ?? "", /\bms-g\b/);
   assert.match(oracle.getManaSymbol("{W/U}")?.className ?? "", /\bms-wu\b/);
+  assert.match(oracle.getManaSymbol("{W/U}")?.className ?? "", /\bms-split\b/);
+  assert.match(oracle.getManaSymbol("{2/W}")?.className ?? "", /\bms-split\b/);
   assert.match(oracle.getManaSymbol("{B/P}")?.label ?? "", /Phyrexian/i);
   assert.match(oracle.getManaSymbol("{T}")?.className ?? "", /\bms-tap\b/);
   assert.match(oracle.getManaSymbol("{Q}")?.className ?? "", /\bms-untap\b/);

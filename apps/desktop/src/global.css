@@ -1,4 +1,4 @@
-@import "mana-font/css/mana.css";
+@import "./features/cards/mana-symbols.css";
 
 * {
   box-sizing: border-box;

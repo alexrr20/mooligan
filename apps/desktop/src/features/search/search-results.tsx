@@ -32,7 +32,10 @@ export function SearchResults({
   total,
 }: SearchResultsProps) {
   const listRef = useRef<HTMLOListElement>(null);
-  const imageIds = useMemo(() => cards.flatMap((card) => (card.image ? [card.id] : [])), [cards]);
+  const imageIds = useMemo(
+    () => cards.flatMap((card) => ((grid ? card.gridImage : card.image) ? [card.id] : [])),
+    [cards, grid],
+  );
   const imageLoading = useCatalogImageLoading(listRef, imageIds, grid, imagesReady, "240px 0px");
 
   if (error) {
@@ -75,7 +78,8 @@ export function SearchResults({
       ) : null}
       <ol ref={listRef} {...stylex.props(styles.cardList, grid && styles.cardGrid)} start={1}>
         {cards.map((card, index) => {
-          const imageUrl = card.image ? catalogImageUrl(card.image) : null;
+          const image = grid ? card.gridImage : card.image;
+          const imageUrl = image ? catalogImageUrl(image) : null;
           const imageActive = imageUrl && imageLoading.ids.has(card.id);
           const imageFailed = imageLoading.failed.has(card.id);
 

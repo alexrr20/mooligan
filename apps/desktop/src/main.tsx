@@ -2,9 +2,17 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createHashHistory, createRouter, RouterProvider } from "@tanstack/react-router";
 import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
+import manaFontUrl from "mana-font/fonts/mana.woff2?url";
 
 import "./global.css";
 import { routeTree } from "./routeTree.gen";
+
+document.fonts.add(
+  new FontFace("Mana", `url("${manaFontUrl}") format("woff2")`, {
+    style: "normal",
+    weight: "400",
+  }),
+);
 
 const router = createRouter({
   getScrollRestorationKey: (location) => location.href,

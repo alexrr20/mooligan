@@ -29,7 +29,7 @@ export const CatalogCardIdentitySchema = z.object({
 });
 export type CatalogCardIdentity = z.infer<typeof CatalogCardIdentitySchema>;
 
-export const CatalogImageSizeSchema = z.enum(["normal", "small"]);
+export const CatalogImageSizeSchema = z.enum(["normal", "small", "thumb"]);
 export type CatalogImageSize = z.infer<typeof CatalogImageSizeSchema>;
 
 export const CatalogImageDescriptorSchema = z.object({
