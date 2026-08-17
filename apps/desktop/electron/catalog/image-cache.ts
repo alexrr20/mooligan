@@ -100,18 +100,21 @@ export function createCatalogImageCache(options: CatalogImageCacheOptions): Cata
     throw new TypeError("The response size limit must be between 1 byte and 15 MiB");
   }
 
-  const failedSources = new Set<string>();
+  const invalidSources = new Set<string>();
   const downloads = new Map<string, Promise<CatalogImageCacheResult>>();
   let evictionQueue = Promise.resolve();
   let initialization: Promise<void> | undefined;
 
   function initialize() {
-    initialization ??= prepareCacheDirectory(cacheDirectory);
+    initialization ??= prepareCacheDirectory(cacheDirectory).catch((cause: unknown) => {
+      initialization = undefined;
+      throw cause;
+    });
     return initialization;
   }
 
   async function get(sourceUrl: string): Promise<CatalogImageCacheResult> {
-    if (failedSources.has(sourceUrl)) {
+    if (invalidSources.has(sourceUrl)) {
       return UNAVAILABLE;
     }
 
@@ -120,7 +123,7 @@ export function createCatalogImageCache(options: CatalogImageCacheOptions): Cata
     try {
       source = describeSource(sourceUrl);
     } catch {
-      failedSources.add(sourceUrl);
+      invalidSources.add(sourceUrl);
       return UNAVAILABLE;
     }
 
@@ -130,10 +133,6 @@ export function createCatalogImageCache(options: CatalogImageCacheOptions): Cata
       const cached = await readCacheHit(cacheDirectory, source, now());
       if (cached) {
         return cached;
-      }
-
-      if (failedSources.has(source.canonicalUrl)) {
-        return UNAVAILABLE;
       }
 
       const existingDownload = downloads.get(source.fileName);
@@ -155,16 +154,12 @@ export function createCatalogImageCache(options: CatalogImageCacheOptions): Cata
         now,
         source,
       })
-        .catch(() => {
-          failedSources.add(source.canonicalUrl);
-          return UNAVAILABLE;
-        })
+        .catch(() => UNAVAILABLE)
         .finally(() => downloads.delete(source.fileName));
 
       downloads.set(source.fileName, download);
       return download;
     } catch {
-      failedSources.add(source.canonicalUrl);
       return UNAVAILABLE;
     }
   }

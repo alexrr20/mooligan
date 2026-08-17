@@ -132,7 +132,7 @@ void test("concurrent cache misses share one download and cache hits update acce
   }
 });
 
-void test("source, response, and response-size validation fail closed and failures are memoized", async () => {
+void test("source and response validation fail closed without persisting response failures", async () => {
   const directory = await mkdtemp(join(tmpdir(), "mooligan-image-cache-"));
   const invalidSources = [
     "http://cards.scryfall.io/small/front/card.jpg",
@@ -182,14 +182,14 @@ void test("source, response, and response-size validation fail closed and failur
       assert.deepEqual(await cache.get(url), { status: "unavailable" });
     }
 
-    assert.equal(requests, failures.length);
+    assert.equal(requests, failures.length * 2);
     assert.deepEqual(await readdir(directory), []);
   } finally {
     await rm(directory, { force: true, recursive: true });
   }
 });
 
-void test("startup removes abandoned partials and interrupted writes never become hits", async () => {
+void test("startup removes abandoned partials and interrupted downloads can be retried", async () => {
   const directory = await mkdtemp(join(tmpdir(), "mooligan-image-cache-"));
   const abandoned = join(directory, "abandoned-download.part");
   const unrelated = join(directory, "keep-me.txt");
@@ -200,6 +200,10 @@ void test("startup removes abandoned partials and interrupted writes never becom
     cacheDirectory: directory,
     fetch: async () => {
       requests += 1;
+      if (requests > 1) {
+        return imageResponse(new Uint8Array([1, 2]));
+      }
+
       return new Response(
         new ReadableStream({
           start(controller) {
@@ -218,11 +222,43 @@ void test("startup removes abandoned partials and interrupted writes never becom
 
     const url = "https://cards.scryfall.io/normal/front/interrupted.jpeg";
     assert.deepEqual(await cache.get(url), { status: "unavailable" });
-    assert.deepEqual(await cache.get(url), { status: "unavailable" });
-    assert.equal(requests, 1);
-    assert.deepEqual(await readdir(directory), ["keep-me.txt"]);
+    const retry = await cache.get(url);
+    assert.equal(retry.status, "available");
+    assert.equal(retry.status === "available" && retry.source, "network");
+    assert.equal(requests, 2);
+    assert.equal(
+      (await readdir(directory)).some((name) => name.endsWith(".part")),
+      false,
+    );
   } finally {
     await rm(directory, { force: true, recursive: true });
+  }
+});
+
+void test("cache initialization is retried after a transient filesystem failure", async () => {
+  const parent = await mkdtemp(join(tmpdir(), "mooligan-image-cache-"));
+  const directory = join(parent, "catalog-images");
+  await writeFile(directory, "temporarily blocked");
+  let requests = 0;
+  const cache = createCatalogImageCache({
+    cacheDirectory: directory,
+    fetch: async () => {
+      requests += 1;
+      return imageResponse(new Uint8Array([1, 2, 3]));
+    },
+  });
+  const url = "https://cards.scryfall.io/normal/front/recovered.jpg";
+
+  try {
+    assert.deepEqual(await cache.get(url), { status: "unavailable" });
+    await rm(directory, { force: true });
+
+    const retry = await cache.get(url);
+    assert.equal(retry.status, "available");
+    assert.equal(retry.status === "available" && retry.source, "network");
+    assert.equal(requests, 1);
+  } finally {
+    await rm(parent, { force: true, recursive: true });
   }
 });
 
