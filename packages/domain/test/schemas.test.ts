@@ -61,6 +61,7 @@ void test("a single-face card normalizes card, printing, and sibling facts", () 
     finishes: ["nonfoil", "foil"],
     id: "printing-bolt",
     image_uris: {
+      grid: "https://cards.scryfall.io/grid/front/bolt.webp",
       normal: "https://cards.scryfall.io/normal/front/bolt.jpg",
       small: "https://cards.scryfall.io/small/front/bolt.jpg",
     },
@@ -77,7 +78,10 @@ void test("a single-face card normalizes card, printing, and sibling facts", () 
   const sibling = scryfallCard({
     digital: true,
     id: "printing-bolt-promo",
-    image_uris: { small: "https://cards.scryfall.io/small/front/promo-bolt.jpg" },
+    image_uris: {
+      grid: "https://cards.scryfall.io/grid/front/promo-bolt.webp",
+      small: "https://cards.scryfall.io/small/front/promo-bolt.jpg",
+    },
     lang: "ja",
     name: "Lightning Bolt",
     oracle_id: "oracle-bolt",
@@ -107,10 +111,25 @@ void test("a single-face card normalizes card, printing, and sibling facts", () 
     { faceIndex: 0, printingId: "printing-bolt", size: "small" },
   ]);
   assert.deepEqual(
-    detail.siblingPrintings.map(({ id, isDigital, isPromo }) => ({ id, isDigital, isPromo })),
+    detail.siblingPrintings.map(({ id, image, isDigital, isPromo }) => ({
+      id,
+      image,
+      isDigital,
+      isPromo,
+    })),
     [
-      { id: "printing-bolt", isDigital: false, isPromo: false },
-      { id: "printing-bolt-promo", isDigital: true, isPromo: true },
+      {
+        id: "printing-bolt",
+        image: { faceIndex: 0, printingId: "printing-bolt", size: "grid" },
+        isDigital: false,
+        isPromo: false,
+      },
+      {
+        id: "printing-bolt-promo",
+        image: { faceIndex: 0, printingId: "printing-bolt-promo", size: "grid" },
+        isDigital: true,
+        isPromo: true,
+      },
     ],
   );
   assert.equal(JSON.stringify(detail).includes("cards.scryfall.io"), false);

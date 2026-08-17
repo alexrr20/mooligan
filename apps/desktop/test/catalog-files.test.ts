@@ -336,8 +336,15 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
         { formatId: "modern", formatName: "Modern", status: "legal" },
       ]);
       assert.deepEqual(
-        sharedDetail.siblingPrintings.map((printing) => printing.id),
-        ["printing-3", "printing-1", "art-series-1"],
+        sharedDetail.siblingPrintings.map(({ id, image }) => ({ id, image })),
+        [
+          { id: "printing-3", image: undefined },
+          {
+            id: "printing-1",
+            image: { faceIndex: 0, printingId: "printing-1", size: "grid" },
+          },
+          { id: "art-series-1", image: undefined },
+        ],
       );
       assert.equal(sharedDetail.selectedPrinting.id, "printing-1");
       assert.deepEqual(sharedDetail.selectedPrinting.artists, ["Test Artist"]);
@@ -364,6 +371,10 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
         queryImageSource({ faceIndex: 0, printingId: "printing-1", size: "thumb" }),
         "https://cards.scryfall.io/thumb/front/1.webp",
       );
+      assert.equal(
+        queryImageSource({ faceIndex: 0, printingId: "printing-1", size: "grid" }),
+        "https://cards.scryfall.io/grid/front/1.webp",
+      );
 
       assert.deepEqual(queryCatalog({ limit: 1 }), {
         cards: [
@@ -372,7 +383,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
             gridImage: {
               faceIndex: 0,
               printingId: "printing-1",
-              size: "small",
+              size: "grid",
             },
             id: "printing-1",
             image: {
@@ -404,7 +415,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
         })),
         [
           {
-            gridImage: { faceIndex: 0, printingId: "printing-3", size: "small" },
+            gridImage: null,
             image: null,
           },
         ],
@@ -446,7 +457,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
             gridImage: {
               faceIndex: 0,
               printingId: "printing-1",
-              size: "small",
+              size: "grid",
             },
             id: "printing-1",
             image: {
@@ -465,7 +476,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
             gridImage: {
               faceIndex: 0,
               printingId: "printing-2",
-              size: "small",
+              size: "grid",
             },
             id: "printing-2",
             image: {
@@ -494,7 +505,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
             gridImage: {
               faceIndex: 0,
               printingId: "printing-2",
-              size: "small",
+              size: "grid",
             },
             id: "printing-2",
             image: {
@@ -572,7 +583,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
                 gridImage: {
                   faceIndex: 0,
                   printingId: "printing-2",
-                  size: "small",
+                  size: "grid",
                 },
                 id: "printing-2",
                 image: {

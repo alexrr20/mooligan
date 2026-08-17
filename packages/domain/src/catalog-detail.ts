@@ -29,7 +29,7 @@ export const CatalogCardIdentitySchema = z.object({
 });
 export type CatalogCardIdentity = z.infer<typeof CatalogCardIdentitySchema>;
 
-export const CatalogImageSizeSchema = z.enum(["normal", "small", "thumb"]);
+export const CatalogImageSizeSchema = z.enum(["grid", "normal", "small", "thumb"]);
 export type CatalogImageSize = z.infer<typeof CatalogImageSizeSchema>;
 
 export const CatalogImageDescriptorSchema = z.object({
@@ -331,7 +331,7 @@ function normalizeSelectedPrinting(card: ScryfallCardDownload): CatalogSelectedP
 }
 
 function normalizeSiblingPrinting(card: ScryfallCardDownload): CatalogSiblingPrinting {
-  const image = normalizeImages(card).find(({ size }) => size === "small");
+  const image = normalizeImages(card, ["grid"])[0];
   const language = nonempty(card.lang);
 
   const printing: CatalogSiblingPrinting = {
@@ -349,7 +349,10 @@ function normalizeSiblingPrinting(card: ScryfallCardDownload): CatalogSiblingPri
   return printing;
 }
 
-function normalizeImages(card: ScryfallCardDownload): CatalogImageDescriptor[] {
+function normalizeImages(
+  card: ScryfallCardDownload,
+  sizes: readonly CatalogImageSize[] = ["normal", "small"],
+): CatalogImageDescriptor[] {
   const faceImages = card.card_faces?.some((face) => face.image_uris)
     ? card.card_faces.map((face) => face.image_uris)
     : [card.image_uris];
@@ -359,7 +362,7 @@ function normalizeImages(card: ScryfallCardDownload): CatalogImageDescriptor[] {
       return [];
     }
 
-    return (["normal", "small"] as const).flatMap((size) =>
+    return sizes.flatMap((size) =>
       images[size] ? [{ faceIndex, printingId: card.id, size }] : [],
     );
   });
