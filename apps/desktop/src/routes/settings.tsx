@@ -2,7 +2,6 @@ import * as stylex from "@stylexjs/stylex";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { Button } from "../components/button";
-import { PageFrame } from "../components/page";
 import { useAuth } from "../features/auth/use-auth";
 import { usePreferenceSync } from "../features/preferences/use-preference-sync";
 import { usePreferences } from "../features/preferences/use-preferences";
@@ -12,7 +11,6 @@ import { colors } from "../styles/tokens.stylex.js";
 export const Route = createFileRoute("/settings")({
   component: SettingsPage,
 });
-
 function SettingsPage() {
   const auth = useAuth();
   const preferenceSync = usePreferenceSync();
@@ -20,7 +18,7 @@ function SettingsPage() {
   const { error, loading, preferences, saving, update } = usePreferences();
 
   return (
-    <PageFrame>
+    <div>
       <AccountSetting auth={auth} preferenceSync={preferenceSync} />
 
       <section {...stylex.props(styles.setting)} aria-labelledby="motion-heading">
@@ -83,7 +81,7 @@ function SettingsPage() {
       </section>
 
       <BackupSetting backup={backup} />
-    </PageFrame>
+    </div>
   );
 }
 
