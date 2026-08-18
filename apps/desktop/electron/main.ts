@@ -54,8 +54,8 @@ const MAX_WORKSPACE_BACKUP_BYTES = 50 * 1024 * 1024;
 
 async function createWindow() {
   const window = new BrowserWindow({
-    width: 1280,
-    height: 760,
+    width: 1480,
+    height: 840,
     minWidth: 720,
     minHeight: 520,
     show: false,

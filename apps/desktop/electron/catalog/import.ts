@@ -8,7 +8,7 @@ import { ScryfallCardDownloadSchema, type CatalogRelease } from "@mooligan/domai
 import * as z from "zod";
 
 const transactionSize = 500;
-export const catalogSchemaVersion = 2;
+export const catalogSchemaVersion = 3;
 const IntegrityCheckSchema = z.object({ quick_check: z.literal("ok") });
 const CatalogCountSchema = z.object({ cardCount: z.number().int().nonnegative() });
 const CatalogMetadataSchema = CatalogSnapshotSchema.extend({ schemaVersion: z.number().int() });
@@ -32,8 +32,8 @@ export async function importCatalog(
     createCatalogSchema(database);
     const insert = database.prepare(
       `INSERT INTO cards
-       (id, oracle_id, name, set_code, set_name, collector_number, type_line, rarity, json, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, oracle_id, name, set_code, set_name, collector_number, type_line, rarity, released_at, json, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
 
     database.exec("BEGIN");
@@ -70,6 +70,7 @@ export async function importCatalog(
         card.data.collector_number,
         card.data.type_line,
         card.data.rarity,
+        card.data.released_at ?? null,
         line,
         release.updatedAt,
       );
@@ -138,6 +139,7 @@ function createCatalogSchema(database: DatabaseSync) {
       collector_number TEXT NOT NULL,
       type_line TEXT NOT NULL,
       rarity TEXT NOT NULL,
+      released_at TEXT,
       json TEXT NOT NULL CHECK (json_valid(json)),
       updated_at TEXT NOT NULL
     );
@@ -157,11 +159,13 @@ function createCatalogSchema(database: DatabaseSync) {
 
 function createCatalogIndexes(database: DatabaseSync) {
   database.exec(`
-    CREATE INDEX cards_browse_order
+    CREATE INDEX cards_recent_order
       ON cards (
+        released_at DESC,
         name COLLATE NOCASE,
         set_code COLLATE NOCASE,
-        collector_number COLLATE NOCASE
+        collector_number COLLATE NOCASE,
+        id
       );
     CREATE INDEX cards_oracle_id ON cards (oracle_id);
     INSERT INTO card_search(card_search) VALUES ('rebuild');

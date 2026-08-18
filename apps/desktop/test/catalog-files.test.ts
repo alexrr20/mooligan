@@ -31,24 +31,35 @@ const QueryPlanRowSchema = z.object({ detail: z.string() });
 void test("catalog search state keeps only valid non-default values", () => {
   assert.deepEqual(
     validateCatalogSearch({
+      adCards: true,
       artSeries: true,
       digital: true,
       grid: true,
       query: `  Mooligan ${"x".repeat(120)}  `,
+      tokens: true,
       uniqueCards: true,
       universe: "beyond",
     }),
     {
+      adCards: true,
       artSeries: true,
       digital: true,
       grid: true,
       query: `Mooligan ${"x".repeat(91)}`,
+      tokens: true,
       uniqueCards: true,
       universe: "beyond",
     },
   );
   assert.deepEqual(
-    validateCatalogSearch({ digital: false, grid: "true", query: "   ", universe: "all" }),
+    validateCatalogSearch({
+      adCards: false,
+      digital: false,
+      grid: "true",
+      query: "   ",
+      tokens: false,
+      universe: "all",
+    }),
     {},
   );
 });
@@ -66,16 +77,20 @@ void test("catalog IPC input accepts only the narrow list request", () => {
   assert.deepEqual(validateCatalogListRequest({ universe: undefined }), { universe: undefined });
   assert.deepEqual(
     validateCatalogListRequest({
+      includeAdCards: false,
       includeArtSeries: false,
       includeDigital: false,
+      includeTokens: false,
       limit: 100,
       offset: 0,
       query: "mox",
       universe: "within",
     }),
     {
+      includeAdCards: false,
       includeArtSeries: false,
       includeDigital: false,
+      includeTokens: false,
       limit: 100,
       offset: 0,
       query: "mox",
@@ -86,6 +101,89 @@ void test("catalog IPC input accepts only the narrow list request", () => {
   assert.throws(() => validateCatalogListRequest({ limit: 251 }));
   assert.throws(() => validateCatalogListRequest({ universe: "all" }));
   assert.throws(() => validateCatalogListRequest({ extra: true }));
+});
+
+void test("catalog filters tokens and ad cards independently", () => {
+  const database = new DatabaseSync(":memory:");
+
+  try {
+    database.exec(`
+      CREATE TABLE catalog_meta (
+        singleton INTEGER PRIMARY KEY,
+        card_count INTEGER NOT NULL
+      );
+      CREATE TABLE cards (
+        id TEXT PRIMARY KEY,
+        oracle_id TEXT,
+        name TEXT NOT NULL,
+        set_code TEXT NOT NULL,
+        set_name TEXT NOT NULL,
+        collector_number TEXT NOT NULL,
+        type_line TEXT NOT NULL,
+        rarity TEXT NOT NULL,
+        released_at TEXT NOT NULL,
+        json TEXT NOT NULL
+      );
+      CREATE VIRTUAL TABLE card_search USING fts5(
+        name,
+        set_code,
+        collector_number,
+        set_name,
+        type_line,
+        content = 'cards',
+        content_rowid = 'rowid'
+      );
+    `);
+    const insert = database.prepare(
+      `INSERT INTO cards
+       (id, oracle_id, name, set_code, set_name, collector_number, type_line, rarity, released_at, json)
+       VALUES (?, ?, ?, 'tst', 'Filter Test', ?, ?, 'common', '2024-01-01', ?)`,
+    );
+    const cards = [
+      ["normal", "Alpha Card", "1", "Artifact", "normal"],
+      ["token", "Goblin", "2", "Token Creature — Goblin", "token"],
+      ["double-token", "Punchcard", "3", "Card // Card", "double_faced_token"],
+      ["helper", "Ready to Attack", "4", "Card", "token"],
+      ["ad", "1997 World Championships Ad", "0", "Card", "token"],
+    ] as const;
+
+    for (const [id, name, collectorNumber, typeLine, layout] of cards) {
+      insert.run(
+        id,
+        `${id}-oracle`,
+        name,
+        collectorNumber,
+        typeLine,
+        JSON.stringify({ digital: false, layout }),
+      );
+    }
+    database.prepare("INSERT INTO catalog_meta (singleton, card_count) VALUES (1, ?)").run(5);
+    database.exec("INSERT INTO card_search(card_search) VALUES ('rebuild')");
+
+    const queryCatalog = createCatalogQuery(database);
+    const ids = (request: Parameters<typeof queryCatalog>[0]) =>
+      queryCatalog(request).cards.map((card) => card.id);
+
+    assert.deepEqual(ids({ includeAdCards: false, includeTokens: false }), ["normal"]);
+    assert.deepEqual(ids({ includeAdCards: false, includeTokens: true }), [
+      "normal",
+      "token",
+      "double-token",
+      "helper",
+    ]);
+    assert.deepEqual(ids({ includeAdCards: true, includeTokens: false }), ["ad", "normal"]);
+    assert.deepEqual(ids({ includeAdCards: true, includeTokens: true }), [
+      "ad",
+      "normal",
+      "token",
+      "double-token",
+      "helper",
+    ]);
+    assert.deepEqual(ids({ includeAdCards: false, includeTokens: true, query: "world" }), []);
+    assert.deepEqual(ids({ includeAdCards: true, includeTokens: false, query: "world" }), ["ad"]);
+  } finally {
+    database.close();
+  }
 });
 
 void test("an interrupted catalog replacement restores the previous catalog", async () => {
@@ -379,22 +477,14 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
       assert.deepEqual(queryCatalog({ limit: 1 }), {
         cards: [
           {
-            collectorNumber: "1",
-            gridImage: {
-              faceIndex: 0,
-              printingId: "printing-1",
-              size: "grid",
-            },
-            id: "printing-1",
-            image: {
-              faceIndex: 0,
-              printingId: "printing-1",
-              size: "thumb",
-            },
+            collectorNumber: "8",
+            gridImage: null,
+            id: "printing-3",
+            image: null,
             name: "Mooligan Test Card",
-            rarity: "rare",
-            setCode: "moo",
-            setName: "Mooligan Test Set",
+            rarity: "uncommon",
+            setCode: "zzz",
+            setName: "Alternate Test Set",
             typeLine: "Artifact",
           },
         ],
@@ -406,7 +496,11 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
       assert.equal(withoutArtSeries.total, 3);
       assert.deepEqual(
         withoutArtSeries.cards.map((card) => card.id),
-        ["printing-1", "printing-3", "printing-2"],
+        ["printing-3", "printing-1", "printing-2"],
+      );
+      assert.deepEqual(
+        queryCatalog({ query: "mooligan" }).cards.map((card) => card.id),
+        ["printing-3", "printing-1", "printing-2", "art-series-1"],
       );
       assert.deepEqual(
         queryCatalog({ query: "alternate" }).cards.map(({ gridImage, image }) => ({
@@ -431,7 +525,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
       });
       assert.deepEqual(
         queryCatalog({ includeDigital: false }).cards.map((card) => card.id),
-        ["printing-1", "art-series-1", "printing-2"],
+        ["printing-1", "printing-2", "art-series-1"],
       );
       assert.deepEqual(
         queryCatalog({ universe: "beyond" }).cards.map((card) => card.id),
@@ -439,7 +533,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
       );
       assert.deepEqual(
         queryCatalog({ universe: "within" }).cards.map((card) => card.id),
-        ["printing-3", "art-series-1", "printing-2"],
+        ["printing-3", "printing-2", "art-series-1"],
       );
       assert.equal(queryCatalog({ limit: 1, universe: "within" }).total, null);
       assert.deepEqual(
@@ -453,22 +547,14 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
       assert.deepEqual(queryCatalog({ uniqueCards: true }), {
         cards: [
           {
-            collectorNumber: "1",
-            gridImage: {
-              faceIndex: 0,
-              printingId: "printing-1",
-              size: "grid",
-            },
-            id: "printing-1",
-            image: {
-              faceIndex: 0,
-              printingId: "printing-1",
-              size: "thumb",
-            },
+            collectorNumber: "8",
+            gridImage: null,
+            id: "printing-3",
+            image: null,
             name: "Mooligan Test Card",
-            rarity: "rare",
-            setCode: "moo",
-            setName: "Mooligan Test Set",
+            rarity: "uncommon",
+            setCode: "zzz",
+            setName: "Alternate Test Set",
             typeLine: "Artifact",
           },
           {
@@ -538,15 +624,17 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
             `EXPLAIN QUERY PLAN
              SELECT id
              FROM cards
-             ORDER BY name COLLATE NOCASE,
+             ORDER BY released_at DESC,
+                      name COLLATE NOCASE,
                       set_code COLLATE NOCASE,
-                      collector_number COLLATE NOCASE
+                      collector_number COLLATE NOCASE,
+                      id
              LIMIT 100`,
           )
           .all()
           .some((row) => {
             const plan = QueryPlanRowSchema.safeParse(row);
-            return plan.success && plan.data.detail.includes("USING INDEX cards_browse_order");
+            return plan.success && plan.data.detail.includes("cards_recent_order");
           }),
       );
       assert.ok(

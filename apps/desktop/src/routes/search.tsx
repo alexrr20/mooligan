@@ -23,22 +23,28 @@ function SearchPage() {
   const searchState = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const activeQuery = searchState.query ?? "";
+  const includeAdCards = searchState.adCards === true;
   const includeArtSeries = searchState.artSeries === true;
   const includeDigital = searchState.digital === true;
+  const includeTokens = searchState.tokens === true;
   const gridView = searchState.grid === true;
   const uniqueCards = searchState.uniqueCards === true;
   const { cards, error, hasMore, imagesReady, loading, loadMore, total } = useCatalogSearch(
     activeQuery,
     uniqueCards,
+    includeAdCards,
     includeArtSeries,
     includeDigital,
+    includeTokens,
     searchState.universe,
   );
   const resultIdentity = JSON.stringify([
     activeQuery,
     uniqueCards,
+    includeAdCards,
     includeArtSeries,
     includeDigital,
+    includeTokens,
     searchState.universe,
   ]);
   const updateSearch = useCallback(
@@ -68,9 +74,19 @@ function SearchPage() {
               onChange={(checked) => updateSearch({ uniqueCards: checked || undefined })}
             />
             <SearchToggle
+              checked={includeTokens}
+              label="Tokens"
+              onChange={(checked) => updateSearch({ tokens: checked || undefined })}
+            />
+            <SearchToggle
               checked={includeArtSeries}
               label="Art series"
               onChange={(checked) => updateSearch({ artSeries: checked || undefined })}
+            />
+            <SearchToggle
+              checked={includeAdCards}
+              label="Ad cards"
+              onChange={(checked) => updateSearch({ adCards: checked || undefined })}
             />
             <SearchToggle
               checked={includeDigital}

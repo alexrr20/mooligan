@@ -23,8 +23,10 @@ export const CatalogCardSummarySchema = z.object({
 export type CatalogCardSummary = z.infer<typeof CatalogCardSummarySchema>;
 
 export const CatalogListRequestSchema = z.strictObject({
+  includeAdCards: z.boolean().optional(),
   includeArtSeries: z.boolean().optional(),
   includeDigital: z.boolean().optional(),
+  includeTokens: z.boolean().optional(),
   limit: z.number().int().min(1).max(250).optional(),
   offset: z.number().int().nonnegative().optional(),
   query: z.string().max(500).optional(),
@@ -107,27 +109,41 @@ const cardColumns = `cards.id,
                      cards.set_name AS setName,
                      cards.collector_number AS collectorNumber,
                      cards.type_line AS typeLine,
-                     cards.rarity`;
+                     cards.rarity,
+                     cards.released_at AS releasedOn`;
 const summaryColumns =
-  "id, name, hasImage, hasGridImage, setCode, setName, collectorNumber, typeLine, rarity";
+  "id, name, hasImage, hasGridImage, setCode, setName, collectorNumber, typeLine, rarity, releasedOn";
 const artSeriesFilter = "? OR COALESCE(json_extract(cards.json, '$.layout'), '') <> 'art_series'";
 const digitalFilter = "? OR COALESCE(json_extract(cards.json, '$.digital'), 0) = 0";
+const tokenCard =
+  "COALESCE(json_extract(cards.json, '$.layout'), '') IN ('token', 'double_faced_token')";
+const adCard = `COALESCE(json_extract(cards.json, '$.layout'), '') = 'token'
+  AND cards.type_line = 'Card'
+  AND substr(cards.name, -3) = ' Ad'`;
+const tokenFilter = `? OR NOT (${tokenCard}) OR (${adCard})`;
+const adCardFilter = `? OR NOT (${adCard})`;
 const universesBeyond = `EXISTS (
   SELECT 1
   FROM json_each(cards.json, '$.promo_types')
   WHERE value = 'universesbeyond'
 )`;
 const universeFilter = `? = '' OR (${universesBeyond}) = (? = 'beyond')`;
-const cardFilter = `(${artSeriesFilter}) AND (${digitalFilter}) AND (${universeFilter})`;
+const cardFilter = `(${artSeriesFilter})
+  AND (${digitalFilter})
+  AND (${tokenFilter})
+  AND (${adCardFilter})
+  AND (${universeFilter})`;
 
 export function createCatalogQuery(database: DatabaseSync) {
   const browse = database.prepare(
     `SELECT ${cardColumns}
      FROM cards
      WHERE ${cardFilter}
-     ORDER BY cards.name COLLATE NOCASE,
+     ORDER BY cards.released_at DESC,
+              cards.name COLLATE NOCASE,
               cards.set_code COLLATE NOCASE,
-              cards.collector_number COLLATE NOCASE
+              cards.collector_number COLLATE NOCASE,
+              cards.id
      LIMIT ? OFFSET ?`,
   );
   const search = database.prepare(
@@ -135,7 +151,12 @@ export function createCatalogQuery(database: DatabaseSync) {
      FROM card_search
      JOIN cards ON cards.rowid = card_search.rowid
      WHERE card_search MATCH ? AND (${cardFilter})
-     ORDER BY rank
+     ORDER BY cards.released_at DESC,
+              rank,
+              cards.name COLLATE NOCASE,
+              cards.set_code COLLATE NOCASE,
+              cards.collector_number COLLATE NOCASE,
+              cards.id
      LIMIT ? OFFSET ?`,
   );
   const browseUniqueCards = database.prepare(
@@ -143,7 +164,8 @@ export function createCatalogQuery(database: DatabaseSync) {
        SELECT ${cardColumns},
               ROW_NUMBER() OVER (
                 PARTITION BY COALESCE(cards.oracle_id, cards.id)
-                ORDER BY cards.set_code COLLATE NOCASE,
+                ORDER BY cards.released_at DESC,
+                         cards.set_code COLLATE NOCASE,
                          cards.collector_number COLLATE NOCASE,
                          cards.id
               ) AS printingRank
@@ -153,9 +175,11 @@ export function createCatalogQuery(database: DatabaseSync) {
      SELECT ${summaryColumns}
      FROM ranked
      WHERE printingRank = 1
-     ORDER BY name COLLATE NOCASE,
+     ORDER BY releasedOn DESC,
+              name COLLATE NOCASE,
               setCode COLLATE NOCASE,
-              collectorNumber COLLATE NOCASE
+              collectorNumber COLLATE NOCASE,
+              id
      LIMIT ? OFFSET ?`,
   );
   const searchUniqueCards = database.prepare(
@@ -170,7 +194,8 @@ export function createCatalogQuery(database: DatabaseSync) {
        SELECT *,
               ROW_NUMBER() OVER (
                 PARTITION BY COALESCE(oracleId, id)
-                ORDER BY searchRank,
+                ORDER BY releasedOn DESC,
+                         searchRank,
                          setCode COLLATE NOCASE,
                          collectorNumber COLLATE NOCASE,
                          id
@@ -180,10 +205,12 @@ export function createCatalogQuery(database: DatabaseSync) {
      SELECT ${summaryColumns}
      FROM ranked
      WHERE printingRank = 1
-     ORDER BY searchRank,
+     ORDER BY releasedOn DESC,
+              searchRank,
               name COLLATE NOCASE,
               setCode COLLATE NOCASE,
-              collectorNumber COLLATE NOCASE
+              collectorNumber COLLATE NOCASE,
+              id
      LIMIT ? OFFSET ?`,
   );
   const catalogTotal = database.prepare(
@@ -208,11 +235,20 @@ export function createCatalogQuery(database: DatabaseSync) {
       Number.isSafeInteger(request.offset) && request.offset! >= 0 ? request.offset! : 0;
     const query = request.query?.trim().slice(0, 100) ?? "";
     const ftsQuery = toFtsQuery(query);
+    const includeAdCards = request.includeAdCards !== false;
     const includeArtSeries = request.includeArtSeries !== false;
     const includeDigital = request.includeDigital !== false;
+    const includeTokens = request.includeTokens !== false;
     const uniqueCards = request.uniqueCards === true;
     const universe = request.universe ?? "";
-    const filterArguments = [Number(includeArtSeries), Number(includeDigital), universe, universe];
+    const filterArguments = [
+      Number(includeArtSeries),
+      Number(includeDigital),
+      Number(includeTokens),
+      Number(includeAdCards),
+      universe,
+      universe,
+    ];
 
     if (query && !ftsQuery) {
       return { cards: [], hasMore: false, total: 0 };
@@ -235,7 +271,7 @@ export function createCatalogQuery(database: DatabaseSync) {
     const hasMore = rows.length > limit;
     const cards = rows.slice(0, limit).map(toCatalogCardSummary);
     const total =
-      ftsQuery || !includeDigital || universe
+      ftsQuery || !includeAdCards || !includeDigital || !includeTokens || universe
         ? hasMore
           ? null
           : offset + cards.length
@@ -257,13 +293,14 @@ const CatalogCardSummaryRowSchema = CatalogCardSummarySchema.omit({
 }).extend({
   hasGridImage: z.union([z.literal(0), z.literal(1)]),
   hasImage: z.union([z.literal(0), z.literal(1)]),
+  releasedOn: z.iso.date().nullable(),
 });
 type CatalogCardSummaryRow = z.infer<typeof CatalogCardSummaryRowSchema>;
 
 const CatalogTotalRowSchema = z.object({ total: z.number().int().nonnegative() });
 
 function toCatalogCardSummary(row: CatalogCardSummaryRow): CatalogCardSummary {
-  const { hasGridImage, hasImage, ...card } = row;
+  const { hasGridImage, hasImage, releasedOn: _, ...card } = row;
 
   return {
     ...card,

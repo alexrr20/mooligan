@@ -91,9 +91,11 @@ export function SearchResults({
                 state={withCatalogSearchOrigin(origin)}
                 to="/cards/$printingId"
               >
-                <span {...stylex.props(styles.rowNumber, grid && styles.tileNumber)}>
-                  {String(index + 1).padStart(3, "0")}
-                </span>
+                {!grid ? (
+                  <span {...stylex.props(styles.rowNumber)}>
+                    {String(index + 1).padStart(3, "0")}
+                  </span>
+                ) : null}
                 <div
                   {...stylex.props(styles.cardImageFrame, grid && styles.tileImageFrame)}
                   data-catalog-image-id={imageUrl ? card.id : undefined}
@@ -235,21 +237,6 @@ const styles = stylex.create({
         transform: "translateY(-4px)",
       },
     },
-  },
-  tileNumber: {
-    minWidth: "31px",
-    minHeight: "22px",
-    paddingInline: "5px",
-    position: "absolute",
-    zIndex: 1,
-    top: "9px",
-    left: "9px",
-    display: "grid",
-    placeItems: "center",
-    border: "1px solid #1b1d19",
-    borderRadius: "2px",
-    color: "#1b1d19",
-    backgroundColor: colors.accent,
   },
   cardImageFrame: {
     width: {
