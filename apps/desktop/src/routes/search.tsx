@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
 
-import { PageFrame } from "../components/page";
+import { PageFrame } from "../components/page-frame";
 import {
   SearchForm,
   SearchToggle,
@@ -18,7 +18,6 @@ export const Route = createFileRoute("/search")({
   component: SearchPage,
   validateSearch: validateCatalogSearch,
 });
-
 function SearchPage() {
   const searchState = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });

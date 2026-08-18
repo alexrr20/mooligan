@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { Button } from "../components/button";
-import { PageFrame } from "../components/page";
+import { PageFrame } from "../components/page-frame";
 import { useAuth } from "../features/auth/use-auth";
 import { usePreferenceSync } from "../features/preferences/use-preference-sync";
 import { usePreferences } from "../features/preferences/use-preferences";
@@ -12,7 +12,6 @@ import { colors } from "../styles/tokens.stylex.js";
 export const Route = createFileRoute("/settings")({
   component: SettingsPage,
 });
-
 function SettingsPage() {
   const auth = useAuth();
   const preferenceSync = usePreferenceSync();
