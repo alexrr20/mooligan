@@ -2,6 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
 
+import { PageFrame } from "../components/page-frame";
 import {
   SearchForm,
   SearchToggle,
@@ -60,7 +61,7 @@ function SearchPage() {
   );
 
   return (
-    <div>
+    <PageFrame>
       <section {...stylex.props(styles.catalog)} aria-label="Card index">
         <SearchForm activeQuery={activeQuery} onSearch={search} />
 
@@ -122,7 +123,7 @@ function SearchPage() {
           onLoadMore={loadMore}
         />
       </section>
-    </div>
+    </PageFrame>
   );
 }
 
