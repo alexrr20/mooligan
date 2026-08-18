@@ -65,7 +65,7 @@ export function PrintingGallery({
       </div>
 
       <ul ref={listRef} {...stylex.props(styles.grid)}>
-        {visiblePrintings.map((printing, index) => {
+        {visiblePrintings.map((printing) => {
           const selected = printing.id === selectedPrintingId;
           const imageActive = imageLoading.ids.has(printing.id);
           const imageFailed = imageLoading.failed.has(printing.id);
@@ -83,9 +83,6 @@ export function PrintingGallery({
                   {...stylex.props(styles.imageFrame)}
                   data-catalog-image-id={printing.image ? printing.id : undefined}
                 >
-                  <span {...stylex.props(styles.index)} aria-hidden="true">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
                   {printing.image && imageActive && !imageFailed ? (
                     <img
                       {...stylex.props(styles.image)}
@@ -239,22 +236,6 @@ const styles = stylex.create({
     borderRadius: "4px",
     backgroundColor: "#171815",
     boxShadow: "6px 7px 0 rgba(0, 0, 0, 0.38)",
-  },
-  index: {
-    minWidth: "27px",
-    minHeight: "20px",
-    paddingInline: "5px",
-    position: "absolute",
-    zIndex: 2,
-    top: "8px",
-    left: "8px",
-    display: "grid",
-    placeItems: "center",
-    borderRadius: "2px",
-    color: "#1b1d19",
-    backgroundColor: colors.accent,
-    fontSize: "7px",
-    letterSpacing: "0.08em",
   },
   image: {
     width: "100%",

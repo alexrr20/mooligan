@@ -36,9 +36,7 @@ function AppShell() {
   return (
     <MotionConfig reducedMotion={reducedMotion}>
       <div {...stylex.props(styles.app)}>
-        <header {...stylex.props(styles.chrome)} data-window-drag-region>
-          <span {...stylex.props(styles.wordmark)}>Mooligan</span>
-        </header>
+        <header {...stylex.props(styles.chrome)} data-window-drag-region></header>
 
         <Navigation />
 

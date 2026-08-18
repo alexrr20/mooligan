@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>Mooligan · Card detail layouts</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main id="stage"></main>
+
+    <nav class="proto-picker" aria-label="Prototype variants" data-position="top">
+      <span class="proto-picker-highlight" aria-hidden="true"></span>
+      <button class="proto-picker-item" data-active aria-current="true">Workbench</button>
+      <button class="proto-picker-item">Codex</button>
+      <button class="proto-picker-item">Contact Sheet</button>
+      <button class="proto-picker-item">Centerfold</button>
+      <span class="proto-picker-divider" aria-hidden="true"></span>
+      <button class="proto-picker-item proto-picker-replay" aria-label="Replay animation (R)">
+        ↻
+      </button>
+    </nav>
+
+    <script type="module" src="./harness.js"></script>
+  </body>
+</html>

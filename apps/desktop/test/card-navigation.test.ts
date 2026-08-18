@@ -13,20 +13,24 @@ import {
 
 void test("a validated search origin round-trips through history state", () => {
   const origin = createCatalogSearchOrigin({
+    adCards: true,
     artSeries: true,
     digital: true,
     grid: true,
     query: "  black lotus  ",
+    tokens: true,
     uniqueCards: true,
     universe: "within",
   });
 
   assert.deepEqual(origin, {
     search: {
+      adCards: true,
       artSeries: true,
       digital: true,
       grid: true,
       query: "black lotus",
+      tokens: true,
       uniqueCards: true,
       universe: "within",
     },

@@ -5,8 +5,10 @@ import type { UniverseFilter } from "./search-state";
 export function useCatalogSearch(
   query: string,
   uniqueCards: boolean,
+  includeAdCards: boolean,
   includeArtSeries: boolean,
   includeDigital: boolean,
+  includeTokens: boolean,
   universe: UniverseFilter | undefined,
 ) {
   const catalog = window.catalog;
@@ -14,12 +16,22 @@ export function useCatalogSearch(
     queryKey: [
       "catalog",
       "cards",
-      { includeArtSeries, includeDigital, query, uniqueCards, universe },
+      {
+        includeAdCards,
+        includeArtSeries,
+        includeDigital,
+        includeTokens,
+        query,
+        uniqueCards,
+        universe,
+      },
     ],
     queryFn: ({ pageParam }) =>
       catalog.list({
+        includeAdCards,
         includeArtSeries,
         includeDigital,
+        includeTokens,
         limit: 100,
         offset: pageParam,
         query,
