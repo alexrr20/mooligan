@@ -81,7 +81,7 @@ const styles = stylex.create({
   main: {
     minWidth: 0,
     minHeight: 0,
-    padding: "0 12px 12px",
+    padding: "0 12px 108px",
     overflowY: "auto",
     backgroundColor: "#0a0a0a",
   },
