@@ -1,6 +1,8 @@
 import type { CatalogSelectedPrinting } from "@mooligan/domain/catalog-detail";
 import * as stylex from "@stylexjs/stylex";
 
+import { PrintingPrices } from "./printing-prices";
+
 type PrintingDetailsProps = {
   printing: CatalogSelectedPrinting;
 };
@@ -10,6 +12,7 @@ export function PrintingDetails({ printing }: PrintingDetailsProps) {
 
   return (
     <section {...stylex.props(styles.section)} aria-label="Selected printing">
+      <PrintingPrices variant="detail" />
       <dl {...stylex.props(styles.details)}>
         {rows.map((row) => (
           <div {...stylex.props(styles.detail)} key={row.label}>
@@ -87,7 +90,7 @@ const styles = stylex.create({
     borderTop: "1px solid #55584f",
   },
   details: {
-    margin: "14px 0 0",
+    margin: "1px 0 0",
     display: "grid",
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
     gap: "1px",

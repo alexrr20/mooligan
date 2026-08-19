@@ -7,6 +7,7 @@ import { colors } from "../../styles/tokens.stylex.js";
 import { useCatalogImageLoading } from "../catalog/catalog-image-loading";
 import { catalogImageUrl } from "../catalog/catalog-image";
 import { type CatalogSearchOrigin, withCatalogSearchOrigin } from "../cards/card-navigation";
+import { PrintingPrices } from "../cards/printing-prices";
 
 type SearchResultsProps = {
   cards: CatalogCardSummary[];
@@ -72,7 +73,7 @@ export function SearchResults({
         <div {...stylex.props(styles.columnHead)} aria-hidden="true">
           <span>No.</span>
           <span>Image</span>
-          <span>Card / Type</span>
+          <span>Card</span>
           <span>Printing</span>
         </div>
       ) : null}
@@ -117,18 +118,24 @@ export function SearchResults({
                     </span>
                   )}
                 </div>
+                {grid ? (
+                  <div {...stylex.props(styles.tilePrices)}>
+                    <PrintingPrices />
+                  </div>
+                ) : null}
                 <div {...stylex.props(styles.cardIdentity, grid && styles.tileIdentity)}>
                   <strong {...stylex.props(styles.cardName, grid && styles.tileName)}>
                     {card.name}
                   </strong>
-                  <span {...stylex.props(styles.typeLine)}>{card.typeLine ?? "Card"}</span>
                 </div>
                 <div {...stylex.props(styles.printing, grid && styles.tilePrinting)}>
-                  <span {...stylex.props(styles.setCode)}>{card.setCode}</span>
                   <span {...stylex.props(styles.printingCopy)}>
-                    {card.setName ?? "Unknown set"} · #{card.collectorNumber}
-                    {card.rarity ? ` · ${card.rarity}` : ""}
+                    {card.setName ?? "Unknown set"}
                   </span>
+                  <span {...stylex.props(styles.printingCopy, styles.printingNumber)}>
+                    #{card.collectorNumber}
+                  </span>
+                  {!grid ? <PrintingPrices /> : null}
                 </div>
               </Link>
             </li>
@@ -248,7 +255,7 @@ const styles = stylex.create({
     display: "grid",
     placeItems: "center",
     border: "1px solid #34362f",
-    borderRadius: "3px",
+    borderRadius: "3.5% / 2.5%",
     backgroundColor: "#1b1d19",
     boxShadow: "3px 3px 0 rgba(0, 0, 0, 0.35)",
   },
@@ -266,7 +273,6 @@ const styles = stylex.create({
   },
   tileImageFrame: {
     width: "100%",
-    borderRadius: "5px",
     boxShadow: "6px 6px 0 rgba(0, 0, 0, 0.4)",
   },
   cardIdentity: {
@@ -286,7 +292,7 @@ const styles = stylex.create({
     whiteSpace: "nowrap",
   },
   tileIdentity: {
-    padding: "15px 4px 0",
+    padding: "12px 4px 0",
   },
   tileName: {
     overflow: "visible",
@@ -295,38 +301,11 @@ const styles = stylex.create({
     textOverflow: "clip",
     whiteSpace: "normal",
   },
-  typeLine: {
-    overflow: "hidden",
-    color: "#a6a89d",
-    fontSize: "9px",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  },
   printing: {
     minWidth: 0,
-    display: "grid",
-    gridTemplateColumns: "42px minmax(0, 1fr)",
-    alignItems: "center",
-    gap: "10px",
   },
   tilePrinting: {
     padding: "10px 4px 0",
-    gridTemplateColumns: "40px minmax(0, 1fr)",
-    gap: "8px",
-  },
-  setCode: {
-    minHeight: "24px",
-    display: "grid",
-    placeItems: "center",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: colors.accent,
-    borderRadius: "2px",
-    color: "#1b1d19",
-    backgroundColor: colors.accent,
-    fontSize: "8px",
-    letterSpacing: "0.08em",
-    textTransform: "uppercase",
   },
   printingCopy: {
     overflow: "hidden",
@@ -334,9 +313,16 @@ const styles = stylex.create({
     fontSize: "7px",
     letterSpacing: "0.05em",
     lineHeight: 1.55,
+    display: "block",
     textOverflow: "ellipsis",
     textTransform: "uppercase",
     whiteSpace: "nowrap",
+  },
+  printingNumber: {
+    marginTop: "2px",
+  },
+  tilePrices: {
+    paddingInline: "4px",
   },
   message: {
     minHeight: "180px",

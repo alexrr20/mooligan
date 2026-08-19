@@ -1,6 +1,7 @@
 import { Button as BaseButton } from "@base-ui/react/button";
 import * as stylex from "@stylexjs/stylex";
-import { colors, fontSizes } from "../styles/tokens.stylex.js";
+import { colors } from "../styles/tokens.stylex.js";
+import { typography } from "../styles/typography";
 
 export type ButtonProps = Omit<BaseButton.Props, "className" | "style"> & {
   fullWidth?: boolean;
@@ -22,6 +23,7 @@ export function Button({
     <BaseButton
       {...props}
       {...stylex.props(
+        typography.control,
         styles.root,
         variant === "primary" && styles.primary,
         variant === "secondary" && styles.secondary,
@@ -48,11 +50,6 @@ const styles = stylex.create({
     borderStyle: "none",
     borderColor: "transparent",
     borderRadius: "12px",
-    letterSpacing: "-0.4px",
-    fontFamily: "inherit",
-    fontSize: fontSizes.sm,
-    fontWeight: 600,
-    textTransform: "uppercase",
     whiteSpace: "nowrap",
     cursor: "pointer",
   },
@@ -85,13 +82,11 @@ const styles = stylex.create({
     minHeight: "34px",
     paddingInline: "11px",
     gap: "10px",
-    fontSize: "8px",
   },
   large: {
     minHeight: "44px",
     paddingInline: "16px",
     gap: "22px",
-    fontSize: "10px",
   },
   fullWidth: {
     width: "100%",

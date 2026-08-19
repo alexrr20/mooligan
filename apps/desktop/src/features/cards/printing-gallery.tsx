@@ -12,6 +12,7 @@ import {
   getNextGalleryVisibleCount,
   withCatalogSearchOrigin,
 } from "./card-navigation";
+import { PrintingPrices } from "./printing-prices";
 
 type PrintingGalleryProps = {
   cardName: string;
@@ -113,6 +114,7 @@ export function PrintingGallery({
                     {` · ${titleCase(printing.rarity)}`}
                     {printing.language ? ` · ${printing.language.toUpperCase()}` : ""}
                   </p>
+                  <PrintingPrices />
                   {printing.isPromo || printing.isDigital ? (
                     <div {...stylex.props(styles.labels)}>
                       {printing.isPromo ? <span {...stylex.props(styles.label)}>Promo</span> : null}
@@ -233,7 +235,7 @@ const styles = stylex.create({
     display: "grid",
     placeItems: "center",
     border: "1px solid #34362f",
-    borderRadius: "4px",
+    borderRadius: "3.5% / 2.5%",
     backgroundColor: "#171815",
     boxShadow: "6px 7px 0 rgba(0, 0, 0, 0.38)",
   },

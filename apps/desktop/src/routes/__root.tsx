@@ -81,11 +81,13 @@ const styles = stylex.create({
   main: {
     minWidth: 0,
     minHeight: 0,
-    paddingBottom: "108px",
+    padding: "0 12px 108px",
     overflowY: "auto",
     backgroundColor: "#0a0a0a",
   },
   route: {
     minHeight: "100%",
+    borderRadius: "10px",
+    backgroundColor: "#121213",
   },
 });

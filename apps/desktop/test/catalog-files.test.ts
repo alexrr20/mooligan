@@ -15,7 +15,11 @@ import {
   createCatalogImageSourceQuery,
   validateCatalogPrintingId,
 } from "../electron/catalog/detail.ts";
-import { importCatalog, readGzipJsonLines } from "../electron/catalog/import.ts";
+import {
+  compactCatalogName,
+  importCatalog,
+  readGzipJsonLines,
+} from "../electron/catalog/import.ts";
 import {
   createCatalogQuery,
   type CatalogQueryWorkerResponse,
@@ -70,6 +74,11 @@ void test("a completed search cannot overwrite a newer query draft", () => {
     reconcileCatalogSearchDraft("lightning", "lightning", "counterspell"),
     "counterspell",
   );
+});
+
+void test("catalog names can be searched without punctuation or spaces", () => {
+  assert.equal(compactCatalogName("Y'shtola"), "yshtola");
+  assert.equal(compactCatalogName("Sol Ring"), "solring");
 });
 
 void test("catalog IPC input accepts only the narrow list request", () => {
@@ -501,6 +510,10 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
       assert.deepEqual(
         queryCatalog({ query: "mooligan" }).cards.map((card) => card.id),
         ["printing-3", "printing-1", "printing-2", "art-series-1"],
+      );
+      assert.deepEqual(
+        queryCatalog({ query: "mooligantestcard" }).cards.map((card) => card.id),
+        ["printing-3", "printing-1", "art-series-1"],
       );
       assert.deepEqual(
         queryCatalog({ query: "alternate" }).cards.map(({ gridImage, image }) => ({

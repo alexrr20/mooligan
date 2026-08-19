@@ -8,7 +8,7 @@ import { ScryfallCardDownloadSchema, type CatalogRelease } from "@mooligan/domai
 import * as z from "zod";
 
 const transactionSize = 500;
-export const catalogSchemaVersion = 3;
+export const catalogSchemaVersion = 4;
 const IntegrityCheckSchema = z.object({ quick_check: z.literal("ok") });
 const CatalogCountSchema = z.object({ cardCount: z.number().int().nonnegative() });
 const CatalogMetadataSchema = CatalogSnapshotSchema.extend({ schemaVersion: z.number().int() });
@@ -32,8 +32,8 @@ export async function importCatalog(
     createCatalogSchema(database);
     const insert = database.prepare(
       `INSERT INTO cards
-       (id, oracle_id, name, set_code, set_name, collector_number, type_line, rarity, released_at, json, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, oracle_id, name, compact_name, set_code, set_name, collector_number, type_line, rarity, released_at, json, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
 
     database.exec("BEGIN");
@@ -65,6 +65,7 @@ export async function importCatalog(
         card.data.id,
         card.data.oracle_id ?? null,
         card.data.name,
+        compactCatalogName(card.data.name),
         card.data.set,
         card.data.set_name,
         card.data.collector_number,
@@ -134,6 +135,7 @@ function createCatalogSchema(database: DatabaseSync) {
       id TEXT PRIMARY KEY,
       oracle_id TEXT,
       name TEXT NOT NULL,
+      compact_name TEXT NOT NULL,
       set_code TEXT NOT NULL,
       set_name TEXT NOT NULL,
       collector_number TEXT NOT NULL,
@@ -146,6 +148,7 @@ function createCatalogSchema(database: DatabaseSync) {
 
     CREATE VIRTUAL TABLE card_search USING fts5(
       name,
+      compact_name,
       set_code,
       collector_number,
       set_name,
@@ -155,6 +158,10 @@ function createCatalogSchema(database: DatabaseSync) {
       prefix = '2 3 4'
     );
   `);
+}
+
+export function compactCatalogName(name: string) {
+  return (name.normalize("NFKD").match(/[\p{L}\p{N}]+/gu) ?? []).join("").toLowerCase();
 }
 
 function createCatalogIndexes(database: DatabaseSync) {

@@ -8,6 +8,7 @@ import { usePreferenceSync } from "../features/preferences/use-preference-sync";
 import { usePreferences } from "../features/preferences/use-preferences";
 import { useWorkspaceBackup } from "../features/preferences/use-workspace-backup";
 import { colors } from "../styles/tokens.stylex.js";
+import { typography } from "../styles/typography";
 
 export const Route = createFileRoute("/settings")({
   component: SettingsPage,
@@ -25,12 +26,12 @@ function SettingsPage() {
       <section {...stylex.props(styles.setting)} aria-labelledby="motion-heading">
         <div {...stylex.props(styles.settingIntro)}>
           <div>
-            <p {...stylex.props(styles.kicker)}>Appearance / Motion</p>
-            <h2 {...stylex.props(styles.settingTitle)} id="motion-heading">
+            <p {...stylex.props(typography.label, styles.kicker)}>Appearance / Motion</p>
+            <h2 {...stylex.props(typography.pageTitle, styles.settingTitle)} id="motion-heading">
               Choose the pace.
             </h2>
           </div>
-          <p {...stylex.props(styles.settingCopy)}>
+          <p {...stylex.props(typography.body, styles.settingCopy)}>
             Follow your operating system, keep transitions restrained, or show every interface
             movement. This preference is saved in your local workspace.
           </p>
@@ -58,10 +59,14 @@ function SettingsPage() {
                   type="radio"
                   value={option.value}
                 />
-                <span {...stylex.props(styles.optionNumber)}>0{index + 1}</span>
+                <span {...stylex.props(typography.label, styles.optionNumber)}>0{index + 1}</span>
                 <span {...stylex.props(styles.optionBody)}>
-                  <strong {...stylex.props(styles.optionTitle)}>{option.label}</strong>
-                  <span {...stylex.props(styles.optionCopy)}>{option.description}</span>
+                  <strong {...stylex.props(typography.heading, styles.optionTitle)}>
+                    {option.label}
+                  </strong>
+                  <span {...stylex.props(typography.bodySmall, styles.optionCopy)}>
+                    {option.description}
+                  </span>
                 </span>
                 <span {...stylex.props(styles.optionMark)} aria-hidden="true">
                   {selected ? "●" : "○"}
@@ -73,11 +78,17 @@ function SettingsPage() {
 
         <div {...stylex.props(styles.statusRow)}>
           <span {...stylex.props(styles.localDot)} aria-hidden="true" />
-          <p {...stylex.props(styles.status)} id="motion-status" aria-live="polite">
+          <p
+            {...stylex.props(typography.label, styles.status)}
+            id="motion-status"
+            aria-live="polite"
+          >
             {statusMessage({ error, loading, saving })}
           </p>
           <span {...stylex.props(styles.statusDivider)} aria-hidden="true" />
-          <p {...stylex.props(styles.status)}>{cloudMessage(preferenceSync.snapshot.status)}</p>
+          <p {...stylex.props(typography.label, styles.status)}>
+            {cloudMessage(preferenceSync.snapshot.status)}
+          </p>
         </div>
       </section>
 
@@ -100,12 +111,12 @@ function AccountSetting({
     <section {...stylex.props(styles.account)} aria-labelledby="account-heading">
       <div {...stylex.props(styles.settingIntro)}>
         <div>
-          <p {...stylex.props(styles.kicker)}>Account / Optional</p>
-          <h1 {...stylex.props(styles.settingTitle)} id="account-heading">
+          <p {...stylex.props(typography.label, styles.kicker)}>Account / Optional</p>
+          <h1 {...stylex.props(typography.pageTitle, styles.settingTitle)} id="account-heading">
             Local by default.
           </h1>
         </div>
-        <p {...stylex.props(styles.settingCopy)}>
+        <p {...stylex.props(typography.body, styles.settingCopy)}>
           Sign in only when you want cloud synchronization. Your library stays in its local
           workspace and remains available if the service is offline.
         </p>
@@ -124,14 +135,14 @@ function AccountSetting({
             {snapshot.user ? initials(snapshot.user.name) : "M"}
           </span>
           <div {...stylex.props(styles.accountIdentity)}>
-            <strong {...stylex.props(styles.accountName)}>
+            <strong {...stylex.props(typography.bodyLarge, styles.accountName)}>
               {accountTitle({ loading: auth.loading, snapshot })}
             </strong>
-            <span {...stylex.props(styles.accountEmail)}>
+            <span {...stylex.props(typography.bodySmall, styles.accountEmail)}>
               {snapshot.user?.email ?? accountDescription(snapshot.status)}
             </span>
           </div>
-          <span {...stylex.props(styles.accountBadge)}>
+          <span {...stylex.props(typography.label, styles.accountBadge)}>
             {accountBadge(snapshot.status, preferenceSync.snapshot.status)}
           </span>
         </div>
@@ -167,7 +178,7 @@ function AccountSetting({
       </div>
 
       {auth.error && (
-        <p {...stylex.props(styles.accountError)} role="alert">
+        <p {...stylex.props(typography.bodySmall, styles.accountError)} role="alert">
           {auth.error}
         </p>
       )}
@@ -177,7 +188,7 @@ function AccountSetting({
           {...stylex.props(styles.localDot, snapshot.status === "sync-paused" && styles.pausedDot)}
           aria-hidden="true"
         />
-        <p {...stylex.props(styles.status)} aria-live="polite">
+        <p {...stylex.props(typography.label, styles.status)} aria-live="polite">
           {auth.busy || preferenceSync.busy
             ? "Working…"
             : accountStatus(snapshot.status, preferenceSync.snapshot.status)}
@@ -192,12 +203,12 @@ function BackupSetting({ backup }: { backup: ReturnType<typeof useWorkspaceBacku
     <section {...stylex.props(styles.backup)} aria-labelledby="backup-heading">
       <div {...stylex.props(styles.settingIntro)}>
         <div>
-          <p {...stylex.props(styles.kicker)}>Data / Recovery</p>
-          <h2 {...stylex.props(styles.settingTitle)} id="backup-heading">
+          <p {...stylex.props(typography.label, styles.kicker)}>Data / Recovery</p>
+          <h2 {...stylex.props(typography.pageTitle, styles.settingTitle)} id="backup-heading">
             Keep your own copy.
           </h2>
         </div>
-        <p {...stylex.props(styles.settingCopy)}>
+        <p {...stylex.props(typography.body, styles.settingCopy)}>
           Export a validated copy of this workspace, including preferences, collection lots, decks,
           and lists. Backups never contain account sessions or cloud credentials.
         </p>
@@ -205,8 +216,10 @@ function BackupSetting({ backup }: { backup: ReturnType<typeof useWorkspaceBacku
 
       <div {...stylex.props(styles.backupActions)}>
         <div {...stylex.props(styles.backupCopy)}>
-          <strong {...stylex.props(styles.backupTitle)}>Workspace backup</strong>
-          <span {...stylex.props(styles.accountEmail)}>
+          <strong {...stylex.props(typography.bodyLarge, styles.backupTitle)}>
+            Workspace backup
+          </strong>
+          <span {...stylex.props(typography.bodySmall, styles.accountEmail)}>
             Import replaces user-owned data only after validation and confirmation.
           </span>
         </div>
@@ -221,14 +234,14 @@ function BackupSetting({ backup }: { backup: ReturnType<typeof useWorkspaceBacku
       </div>
 
       {backup.error && (
-        <p {...stylex.props(styles.accountError)} role="alert">
+        <p {...stylex.props(typography.bodySmall, styles.accountError)} role="alert">
           {backup.error}
         </p>
       )}
 
       <div {...stylex.props(styles.statusRow)}>
         <span {...stylex.props(styles.localDot)} aria-hidden="true" />
-        <p {...stylex.props(styles.status)} aria-live="polite">
+        <p {...stylex.props(typography.label, styles.status)} aria-live="polite">
           {backupStatus(backup)}
         </p>
       </div>
@@ -401,23 +414,15 @@ const styles = stylex.create({
   kicker: {
     margin: "0 0 12px",
     color: "#85887e",
-    fontSize: "8px",
-    letterSpacing: "0.16em",
-    textTransform: "uppercase",
   },
   settingTitle: {
     margin: 0,
     color: "#f4f1e8",
-    fontSize: "30px",
-    fontWeight: 400,
-    letterSpacing: "-0.03em",
   },
   settingCopy: {
     maxWidth: "520px",
     margin: 0,
     color: "#a6a89d",
-    fontSize: "12px",
-    lineHeight: 1.65,
   },
   accountPanel: {
     minHeight: "112px",
@@ -474,8 +479,6 @@ const styles = stylex.create({
   accountName: {
     overflow: "hidden",
     color: "#f4f1e8",
-    fontSize: "14px",
-    fontWeight: 400,
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   },
@@ -483,8 +486,6 @@ const styles = stylex.create({
     overflow: "hidden",
     maxWidth: "430px",
     color: "#85887e",
-    fontSize: "9px",
-    lineHeight: 1.5,
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   },
@@ -495,9 +496,6 @@ const styles = stylex.create({
     color: "#a6a89d",
     border: "1px solid #34362f",
     borderRadius: "999px",
-    fontSize: "7px",
-    letterSpacing: "0.12em",
-    textTransform: "uppercase",
   },
   accountActions: {
     display: "flex",
@@ -528,8 +526,6 @@ const styles = stylex.create({
   },
   backupTitle: {
     color: "#f4f1e8",
-    fontSize: "13px",
-    fontWeight: 400,
   },
   accountError: {
     margin: 0,
@@ -537,8 +533,6 @@ const styles = stylex.create({
     color: "#ef9a8f",
     backgroundColor: "rgba(170, 45, 34, 0.1)",
     borderTop: "1px solid #5d332e",
-    fontSize: "9px",
-    lineHeight: 1.5,
   },
   options: {
     minWidth: 0,
@@ -592,8 +586,6 @@ const styles = stylex.create({
   },
   optionNumber: {
     color: "#85887e",
-    fontSize: "8px",
-    letterSpacing: "0.1em",
   },
   optionBody: {
     minWidth: 0,
@@ -603,14 +595,10 @@ const styles = stylex.create({
   },
   optionTitle: {
     color: "inherit",
-    fontSize: "17px",
-    fontWeight: 400,
   },
   optionCopy: {
     maxWidth: "210px",
     color: "#85887e",
-    fontSize: "10px",
-    lineHeight: 1.55,
   },
   optionMark: {
     color: colors.accent,
@@ -636,9 +624,6 @@ const styles = stylex.create({
   status: {
     margin: 0,
     color: "#85887e",
-    fontSize: "8px",
-    letterSpacing: "0.12em",
-    textTransform: "uppercase",
   },
   statusDivider: {
     width: "1px",

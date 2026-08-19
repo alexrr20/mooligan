@@ -155,7 +155,7 @@ const styles = stylex.create({
     display: "grid",
     placeItems: "center",
     border: "1px solid #55584f",
-    borderRadius: "6px",
+    borderRadius: "3.5% / 2.5%",
     backgroundColor: "#141512",
     backgroundImage:
       "linear-gradient(135deg, transparent 0 49.7%, rgba(244, 241, 232, 0.055) 49.8% 50.2%, transparent 50.3%), linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px)",

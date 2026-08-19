@@ -31,6 +31,7 @@ export function BottomNavigation() {
 
   return (
     <Tooltip.Provider delay={450} closeDelay={0} timeout={350}>
+      <span {...stylex.props(styles.navBackdrop)} aria-hidden="true" />
       <nav {...stylex.props(styles.navigation)} aria-label="Primary" data-window-no-drag>
         <div {...stylex.props(styles.navGroup)} onPointerLeave={() => setHoverVisible(false)}>
           {navigation.map((item, index) => (
@@ -173,6 +174,20 @@ const styles = stylex.create({
     boxShadow: "0 18px 50px rgba(0, 0, 0, 0.42), 0 2px 10px rgba(0, 0, 0, 0.3)",
     backdropFilter: "blur(18px)",
     transform: "translateX(-50%)",
+  },
+  navBackdrop: {
+    width: "100%",
+    height: "132px",
+    position: "fixed",
+    zIndex: 9,
+    left: 0,
+    bottom: 0,
+    backgroundImage:
+      "linear-gradient(to bottom, transparent 0%, rgba(5, 6, 5, 0.32) 30%, rgba(5, 6, 5, 0.75) 68%, rgba(5, 6, 5, 0.98) 100%)",
+    backdropFilter: "blur(5px) saturate(0.9)",
+    maskImage:
+      "linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.12) 24%, rgba(0, 0, 0, 0.55) 60%, black 86%)",
+    pointerEvents: "none",
   },
   navGroup: {
     display: "flex",
