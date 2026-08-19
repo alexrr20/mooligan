@@ -13,6 +13,7 @@ import { SearchResults } from "../features/search/search-results";
 import { createCatalogSearchOrigin } from "../features/cards/card-navigation";
 import { type CatalogSearchState, validateCatalogSearch } from "../features/search/search-state";
 import { useCatalogSearch } from "../features/search/use-catalog-search";
+import { useSearchViewPreference } from "../features/search/use-search-view-preference";
 
 export const Route = createFileRoute("/search")({
   component: SearchPage,
@@ -26,7 +27,8 @@ function SearchPage() {
   const includeArtSeries = searchState.artSeries === true;
   const includeDigital = searchState.digital === true;
   const includeTokens = searchState.tokens === true;
-  const gridView = searchState.grid === true;
+  const { setView, view } = useSearchViewPreference(searchState.grid === true);
+  const gridView = view === "grid";
   const uniqueCards = searchState.uniqueCards === true;
   const { cards, error, hasMore, imagesReady, loading, loadMore, total } = useCatalogSearch(
     activeQuery,
@@ -98,7 +100,10 @@ function SearchPage() {
             />
             <SearchViewToggle
               grid={gridView}
-              onChange={(grid) => updateSearch({ grid: grid || undefined })}
+              onChange={(grid) => {
+                setView(grid ? "grid" : "list");
+                updateSearch({ grid: grid || undefined });
+              }}
             />
             <span {...stylex.props(styles.count)} aria-live="polite">
               {loading && cards.length === 0

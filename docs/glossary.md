@@ -57,3 +57,39 @@ The bounded, device-local store of artwork fetched for catalog printings that a
 user has viewed. It is replaceable application data, not part of the user's
 workspace, backups, or synchronization. An image's absence never makes its
 card record unavailable.
+
+## Preview printing
+
+An unreleased printing whose effective release date is later than the user's
+current local date. Preview status is derived from replaceable catalog data; it
+is not stored as a permanent property of a card or printing.
+
+## Spoiler protection
+
+The workspace policy that conceals preview printings until their release date
+unless the user has explicitly revealed them. Protection applies before
+catalog data crosses into the renderer, including search, card details,
+artwork, deck analytics, and other derived views. It is a product-visibility
+boundary, not encryption of the local catalog.
+
+## Protected preview
+
+A preview printing that remains concealed under the workspace's current
+spoiler policy. A protected preview contributes no card name, artwork, rules
+information, printing metadata, or derived characteristics to the visible UI.
+User-owned rows may retain a generic placeholder and quantity so their data is
+not lost.
+
+## Reveal
+
+A durable workspace decision that removes spoiler protection from one exact
+printing or one release family. A printing reveal never reveals sibling
+printings. A release reveal covers every current and future member of that
+release family. The global “Always show previews” policy reveals every preview
+without deleting narrower reveal decisions.
+
+## Release family
+
+A root set and every set connected beneath it through the catalog's parent-set
+relationships, including associated promos, tokens, Commander products, and
+other subsets. Entering through any member resolves to the same root family.

@@ -3,7 +3,7 @@ import { Switch } from "@base-ui/react/switch";
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useState } from "react";
 
-import { colors } from "../../styles/tokens.stylex.js";
+import { colors, letterSpacings } from "../../styles/tokens.stylex.js";
 import { reconcileCatalogSearchDraft, type UniverseFilter } from "./search-state";
 
 type SearchFormProps = {
@@ -40,12 +40,16 @@ export function SearchForm({ activeQuery, onSearch }: SearchFormProps) {
         onSearch(query.trim());
       }}
     >
+      <svg {...stylex.props(styles.searchIcon)} aria-hidden="true" fill="none" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="7" />
+        <path d="m20 20-4-4" />
+      </svg>
       <Input
         {...stylex.props(styles.searchInput)}
         aria-label="Search cards"
         id="card-search"
         name="query"
-        placeholder="Card, set, number, or type"
+        placeholder="CARD, SET, NUMBER, OR TYPE"
         type="search"
         value={query}
         onValueChange={setQuery}
@@ -155,28 +159,52 @@ export function SearchViewToggle({ grid, onChange }: SearchViewToggleProps) {
 
 const styles = stylex.create({
   searchBar: {
-    minHeight: "78px",
+    width: "100%",
+    height: "52px",
+    marginBlock: "16px",
+    paddingInline: "17px",
     display: "flex",
     alignItems: "center",
-    borderBottom: "1px solid #34362f",
+    gap: "12px",
+    border: "1px solid #2d2d30",
+    borderRadius: "12px",
+    backgroundColor: "#121213",
+    boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.025)",
+    transition: "border-color 160ms ease, box-shadow 160ms ease",
+    ":focus-within": {
+      borderColor: colors.accent,
+      boxShadow: "0 0 0 3px rgba(17, 197, 101, 0.12)",
+    },
+  },
+  searchIcon: {
+    width: "19px",
+    height: "19px",
+    flex: "0 0 auto",
+    color: "#77777c",
+    stroke: "currentColor",
+    strokeWidth: "1.8",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    pointerEvents: "none",
   },
   searchInput: {
     width: "100%",
     minWidth: 0,
-    padding: "13px 0",
-    borderWidth: "0 0 1px",
-    borderStyle: "solid",
-    borderColor: "#55584f",
+    height: "100%",
+    padding: 0,
+    borderWidth: 0,
+    borderStyle: "none",
     borderRadius: 0,
     color: "#f4f1e8",
     backgroundColor: "transparent",
-    fontSize: "18px",
+    letterSpacing: letterSpacings.tighter,
+    fontSize: "15px",
+    fontWeight: "600",
+    lineHeight: 1,
     outline: "none",
+    appearance: "none",
     "::placeholder": {
-      color: "#73766b",
-    },
-    ":focus": {
-      borderColor: colors.accent,
+      color: "#727277",
     },
   },
   filterToggle: {
