@@ -2,13 +2,13 @@ import { createFileRoute, useLocation } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef } from "react";
 
 import { CardDetail, CardDetailProblem, CardDetailSkeleton } from "../features/cards/card-detail";
-import { readCatalogSearchOrigin } from "../features/cards/card-navigation";
-import { useCatalogCardDetail } from "../features/cards/use-card-detail";
-import { ProtectedPreviewGate } from "../features/spoilers/protected-preview-gate";
 import {
   cardDetailFocusIdentity,
   shouldMoveCardDetailFocus,
-} from "../features/spoilers/spoiler-ui-state";
+} from "../features/cards/card-detail-focus";
+import { useCatalogCardDetail } from "../features/cards/use-card-detail";
+import { readCatalogSearchOrigin } from "../features/search/catalog-search-origin";
+import { ProtectedPreviewGate } from "../features/spoilers/protected-preview-gate";
 
 export const Route = createFileRoute("/cards/$printingId")({
   component: CardDetailRoute,

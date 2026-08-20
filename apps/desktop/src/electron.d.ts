@@ -17,12 +17,9 @@ import type {
 } from "../electron/catalog/ipc";
 import type {
   CatalogCardSummary as CatalogCardSummaryType,
-  CatalogListPage as CatalogListPageType,
-  CatalogListRequest,
   CatalogUpcomingPrinting as CatalogUpcomingPrintingType,
-  CatalogUpcomingPrintingPage as CatalogUpcomingPrintingPageType,
-  CatalogUpcomingPrintingRequest,
 } from "../electron/catalog/query";
+import type { DesktopApi } from "../electron/preload";
 import type {
   PreferenceSyncSnapshot as PreferenceSyncSnapshotType,
   PreferenceSyncStatus as PreferenceSyncStatusType,
@@ -30,58 +27,7 @@ import type {
 import type {
   MotionPreference as MotionPreferenceType,
   Preferences as PreferencesType,
-  PreferencesUpdate,
 } from "../electron/workspace/preferences";
-
-type CatalogApi = {
-  detail: (printingId: string) => Promise<CatalogPrintingResultType | null>;
-  download: () => Promise<CatalogStatusType>;
-  list: (request?: CatalogListRequest) => Promise<CatalogListPageType>;
-  onProgress: (callback: (progress: CatalogProgressType) => void) => () => void;
-  spoilerRevealSummaries: () => Promise<SpoilerRevealSummariesType>;
-  status: () => Promise<CatalogStatusType>;
-  upcoming: () => Promise<CatalogReleaseSummaryType[]>;
-  upcomingPrintings: (
-    request?: CatalogUpcomingPrintingRequest,
-  ) => Promise<CatalogUpcomingPrintingPageType>;
-};
-
-type SpoilersApi = {
-  onChanged: (callback: (state: SpoilerStateType) => void) => () => void;
-  protectAll: () => Promise<SpoilerStateType>;
-  protectPrinting: (printingId: string) => Promise<SpoilerStateType>;
-  protectRelease: (setId: string) => Promise<SpoilerStateType>;
-  read: () => Promise<SpoilerStateType>;
-  revealPrinting: (printingId: string) => Promise<SpoilerStateType>;
-  revealRelease: (setId: string) => Promise<SpoilerStateType>;
-  setPolicy: (policy: SpoilerPolicyType) => Promise<SpoilerStateType>;
-};
-
-type PreferencesApi = {
-  onChanged: (callback: (preferences: PreferencesType) => void) => () => void;
-  read: () => Promise<PreferencesType>;
-  update: (update: PreferencesUpdate) => Promise<PreferencesType>;
-};
-
-type PreferenceSyncApi = {
-  onChanged: (callback: (snapshot: PreferenceSyncSnapshotType) => void) => () => void;
-  read: () => Promise<PreferenceSyncSnapshotType>;
-  retry: () => Promise<PreferenceSyncSnapshotType>;
-};
-
-type WorkspaceApi = {
-  exportBackup: () => Promise<"cancelled" | "exported">;
-  importBackup: () => Promise<"cancelled" | "imported">;
-};
-
-type AuthApi = {
-  onChanged: (callback: (snapshot: AuthSnapshotType) => void) => () => void;
-  onError: (callback: (message: string) => void) => () => void;
-  read: () => Promise<AuthSnapshotType>;
-  refresh: () => Promise<AuthSnapshotType>;
-  signIn: () => Promise<AuthSnapshotType>;
-  signOut: () => Promise<AuthSnapshotType>;
-};
 
 declare global {
   type CatalogProgress = CatalogProgressType;
@@ -102,12 +48,5 @@ declare global {
   type SpoilerRevealSummaries = SpoilerRevealSummariesType;
   type SpoilerState = SpoilerStateType;
 
-  interface Window {
-    auth: AuthApi;
-    catalog: CatalogApi;
-    preferenceSync: PreferenceSyncApi;
-    preferences: PreferencesApi;
-    spoilers: SpoilersApi;
-    workspace: WorkspaceApi;
-  }
+  interface Window extends DesktopApi {}
 }

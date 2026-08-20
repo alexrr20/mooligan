@@ -13,7 +13,8 @@
     "./decks": "./src/decks.ts",
     "./lists": "./src/lists.ts",
     "./market": "./src/market.ts",
-    "./spoilers": "./src/spoilers.ts"
+    "./spoilers": "./src/spoilers.ts",
+    "./workspace-sync": "./src/workspace-sync.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",

@@ -14,7 +14,7 @@ import {
   shell,
   type OpenDialogOptions,
 } from "electron";
-import { SpoilerPolicySchema } from "@mooligan/domain/spoilers";
+import { SpoilerPolicySchema, SpoilerTargetIdSchema } from "@mooligan/domain/spoilers";
 import * as z from "zod";
 import type { JSONType } from "zod";
 
@@ -47,7 +47,7 @@ import {
   type PreferenceSyncSnapshot,
 } from "./workspace/preference-sync";
 import { validatePreferencesUpdate } from "./workspace/preferences";
-import { parseWorkspaceBackup } from "./workspace/backup";
+import { parseWorkspaceBackup, type WorkspaceBackup } from "./workspace/backup";
 import {
   assertSelectedWorkspace,
   canUseCurrentWorkspace,
@@ -463,14 +463,13 @@ if (!authStartup.isPrimary) {
           return "cancelled" as const;
         }
 
-        let backup: string;
+        let backup: WorkspaceBackup;
         try {
           const info = await stat(result.filePaths[0]);
           if (!info.isFile() || info.size > MAX_WORKSPACE_BACKUP_BYTES) {
             throw new Error("invalid backup");
           }
-          backup = await readFile(result.filePaths[0], "utf8");
-          parseWorkspaceBackup(backup);
+          backup = parseWorkspaceBackup(await readFile(result.filePaths[0], "utf8"));
         } catch {
           throw new Error("The selected file is not a valid Mooligan workspace backup.");
         }
@@ -600,10 +599,8 @@ function publicAuthError(cause: unknown) {
   return "Account sign-in could not be completed. Return to Settings and try again.";
 }
 
-const SpoilerTargetSchema = z.string().trim().min(1).max(128);
-
 function validateSpoilerTarget(value: JSONType) {
-  return SpoilerTargetSchema.parse(value);
+  return SpoilerTargetIdSchema.parse(value);
 }
 
 async function requireCatalogRootSetId(targetId: string) {

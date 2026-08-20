@@ -1,7 +1,4 @@
-import {
-  SpoilerVisibilitySnapshotSchema,
-  type SpoilerVisibilitySnapshot,
-} from "@mooligan/domain/spoilers";
+import type { SpoilerVisibilitySnapshot } from "@mooligan/domain/spoilers";
 
 export const effectiveReleaseDateSql = "cards.effective_released_at";
 
@@ -31,9 +28,8 @@ export type CatalogVisibilityFacts = {
 };
 
 export function catalogVisibilityArguments(
-  input: SpoilerVisibilitySnapshot,
+  snapshot: SpoilerVisibilitySnapshot,
 ): readonly [string, string, string, string] {
-  const snapshot = SpoilerVisibilitySnapshotSchema.parse(input);
   return [
     snapshot.currentDate,
     snapshot.policy,
@@ -43,11 +39,9 @@ export function catalogVisibilityArguments(
 }
 
 export function catalogVisibilityReason(
-  input: SpoilerVisibilitySnapshot,
+  snapshot: SpoilerVisibilitySnapshot,
   facts: CatalogVisibilityFacts,
 ): "global" | "printing" | "release" | "released" | null {
-  const snapshot = SpoilerVisibilitySnapshotSchema.parse(input);
-
   if (facts.releasedOn === null || facts.releasedOn <= snapshot.currentDate) {
     return "released";
   }

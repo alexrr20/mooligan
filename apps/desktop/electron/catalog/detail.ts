@@ -1,7 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
 import {
-  CatalogImageDescriptorSchema,
   normalizeScryfallCardDetail,
   type CatalogImageDescriptor,
 } from "@mooligan/domain/catalog-detail";
@@ -10,8 +9,6 @@ import {
   type ScryfallCardDownload,
 } from "@mooligan/domain/catalog-sync";
 import {
-  CatalogPrintingResultSchema,
-  CatalogSetSymbolDescriptorSchema,
   type CatalogPrintingResult,
   type CatalogSetSymbolDescriptor,
   type SpoilerVisibilitySnapshot,
@@ -75,13 +72,8 @@ export function createCatalogDetailQuery(database: DatabaseSync) {
     printingId: string,
     visibility: SpoilerVisibilitySnapshot,
   ): CatalogPrintingResult | null => {
-    const validPrintingId = validateCatalogPrintingId(printingId);
-    if (!validPrintingId) {
-      return null;
-    }
-
     const visibilityArguments = catalogVisibilityArguments(visibility);
-    const selectedValue = selectVisiblePrinting.get(validPrintingId, ...visibilityArguments);
+    const selectedValue = selectVisiblePrinting.get(printingId, ...visibilityArguments);
     const selectedRow = CatalogVisibleRecordRowSchema.safeParse(selectedValue);
 
     if (!selectedRow.success) {
@@ -89,7 +81,7 @@ export function createCatalogDetailQuery(database: DatabaseSync) {
         throw new Error("The local card catalog contains an invalid card row.");
       }
 
-      const protectedValue = selectProtectedPrinting.get(validPrintingId);
+      const protectedValue = selectProtectedPrinting.get(printingId);
       if (protectedValue === undefined) {
         return null;
       }
@@ -102,12 +94,12 @@ export function createCatalogDetailQuery(database: DatabaseSync) {
         throw new Error("The local card catalog returned inconsistent preview visibility.");
       }
 
-      return CatalogPrintingResultSchema.parse({
+      return {
         printingId: protectedRow.data.printingId,
         release: queryReleaseSummary(protectedRow.data.rootSetId, visibility.currentDate),
         releasedOn: protectedRow.data.releasedOn,
         status: "protected",
-      });
+      };
     }
 
     const selected = parseCatalogRecord(selectedRow.data.json);
@@ -124,7 +116,7 @@ export function createCatalogDetailQuery(database: DatabaseSync) {
       throw new Error("The local card catalog returned inconsistent preview visibility.");
     }
 
-    return CatalogPrintingResultSchema.parse({
+    return {
       detail,
       status: "visible",
       visibility:
@@ -134,7 +126,7 @@ export function createCatalogDetailQuery(database: DatabaseSync) {
               reason,
               release: queryReleaseSummary(selectedRow.data.rootSetId, visibility.currentDate),
             },
-    });
+    };
   };
 }
 
@@ -146,13 +138,7 @@ export function createCatalogImageSourceQuery(database: DatabaseSync) {
   );
 
   return (input: CatalogImageDescriptor, visibility: SpoilerVisibilitySnapshot): string | null => {
-    const image = CatalogImageDescriptorSchema.parse(input);
-    const validPrintingId = validateCatalogPrintingId(image.printingId);
-    if (!validPrintingId) {
-      return null;
-    }
-
-    const value = selectPrinting.get(validPrintingId, ...catalogVisibilityArguments(visibility));
+    const value = selectPrinting.get(input.printingId, ...catalogVisibilityArguments(visibility));
     if (value === undefined) {
       return null;
     }
@@ -165,10 +151,10 @@ export function createCatalogImageSourceQuery(database: DatabaseSync) {
     const usesFaceImages = card.card_faces?.some((face) => face.image_uris) === true;
 
     if (usesFaceImages) {
-      return card.card_faces?.[image.faceIndex]?.image_uris?.[image.size] ?? null;
+      return card.card_faces?.[input.faceIndex]?.image_uris?.[input.size] ?? null;
     }
 
-    return image.faceIndex === 0 ? (card.image_uris?.[image.size] ?? null) : null;
+    return input.faceIndex === 0 ? (card.image_uris?.[input.size] ?? null) : null;
   };
 }
 
@@ -176,8 +162,7 @@ export function createCatalogSetSymbolSourceQuery(database: DatabaseSync) {
   const selectSymbol = database.prepare("SELECT symbol_uri AS sourceUrl FROM sets WHERE id = ?");
 
   return (input: CatalogSetSymbolDescriptor): string | null => {
-    const symbol = CatalogSetSymbolDescriptorSchema.parse(input);
-    const value = selectSymbol.get(symbol.setId);
+    const value = selectSymbol.get(input.setId);
     if (value === undefined) {
       return null;
     }

@@ -13,6 +13,8 @@ import {
 import { extname, join } from "node:path";
 import * as z from "zod";
 
+import { isFileNotFound } from "./files.ts";
+
 export const CATALOG_IMAGE_CACHE_MAX_BYTES = 512 * 1024 * 1024;
 export const CATALOG_IMAGE_MAX_RESPONSE_BYTES = 15 * 1024 * 1024;
 
@@ -205,7 +207,7 @@ async function prepareCacheDirectory(cacheDirectory: string) {
       try {
         await unlink(join(cacheDirectory, entry.name));
       } catch (error) {
-        if (!isMissingFileError(error)) {
+        if (!isFileNotFound(error)) {
           throw error;
         }
       }
@@ -234,7 +236,7 @@ async function readCacheHit(
       source: "cache",
     };
   } catch (error) {
-    if (isMissingFileError(error)) {
+    if (isFileNotFound(error)) {
       return null;
     }
 
@@ -303,7 +305,7 @@ async function downloadAndCache({
     try {
       await stat(destination);
     } catch (error) {
-      if (isMissingFileError(error)) {
+      if (isFileNotFound(error)) {
         throw new Error("Catalog image exceeds the cache capacity");
       }
       throw error;
@@ -400,7 +402,7 @@ async function evictLeastRecentlyUsed(
       await unlink(entry.path);
       totalBytes -= entry.size;
     } catch (error) {
-      if (!isMissingFileError(error)) {
+      if (!isFileNotFound(error)) {
         throw error;
       }
     }
@@ -431,16 +433,11 @@ async function listCacheEntries(cacheDirectory: string) {
         size: file.size,
       });
     } catch (error) {
-      if (!isMissingFileError(error)) {
+      if (!isFileNotFound(error)) {
         throw error;
       }
     }
   }
 
   return cacheEntries;
-}
-
-function isMissingFileError(cause: unknown) {
-  const error = z.object({ code: z.string().optional() }).safeParse(cause);
-  return error.success && error.data.code === "ENOENT";
 }

@@ -792,7 +792,7 @@ function sanitizeUser(value: JSONType): AuthUser {
 
 async function readJson(response: Response): Promise<JSONType> {
   try {
-    return z.json().parse(await response.json());
+    return await response.json();
   } catch (error) {
     throw new AuthRequestError("The authentication service returned invalid data.", {
       cause: error,

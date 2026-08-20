@@ -65,8 +65,6 @@ const LegacyProtectedAuthStateSchema = z.strictObject({
   pendingAuth: PendingAuthSchema.nullable(),
   version: z.literal(1),
 });
-const FileSystemErrorSchema = z.object({ code: z.string().optional() });
-
 export interface AuthStateStorage {
   load(): Promise<ProtectedAuthState>;
   save(state: ProtectedAuthState): Promise<void>;
@@ -233,6 +231,5 @@ function validateProtectedAuthState(value: ProtectedAuthState | JSONType): Prote
 }
 
 function isFileNotFound(cause: unknown) {
-  const error = FileSystemErrorSchema.safeParse(cause);
-  return error.success && error.data.code === "ENOENT";
+  return cause instanceof Error && "code" in cause && cause.code === "ENOENT";
 }

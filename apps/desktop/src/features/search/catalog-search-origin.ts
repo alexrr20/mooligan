@@ -1,14 +1,12 @@
 import type { HistoryState } from "@tanstack/react-router";
-import * as z from "zod";
 import type { JSONType } from "zod";
 
 import {
-  CatalogSearchStateSchema,
+  isCatalogSearchState,
   type CatalogSearchState,
   validateCatalogSearch,
-} from "../search/search-state.ts";
+} from "./search-state.ts";
 
-export const PRINTING_GALLERY_BATCH_SIZE = 24;
 export const CATALOG_SEARCH_ORIGIN_STATE_KEY = "catalogSearchOrigin";
 
 export type CatalogSearchOrigin = Readonly<{
@@ -21,14 +19,10 @@ export type CatalogSearchHistoryState = HistoryState &
   }>;
 
 type CatalogSearchHistoryInput = HistoryState | Readonly<Record<string, JSONType>>;
+type CatalogSearchNavigationValue = CatalogSearchHistoryInput | CatalogSearchOrigin | JSONType;
 export type CatalogSearchHistoryStateUpdater = (
   current: CatalogSearchHistoryInput,
 ) => CatalogSearchHistoryState;
-
-const CatalogSearchOriginSchema = z.strictObject({ search: CatalogSearchStateSchema });
-const CatalogSearchHistoryEnvelopeSchema = z.object({
-  catalogSearchOrigin: z.json().optional(),
-});
 
 export function createCatalogSearchOrigin(search: CatalogSearchState): CatalogSearchOrigin {
   return { search: validateCatalogSearch({ ...search }) };
@@ -37,8 +31,13 @@ export function createCatalogSearchOrigin(search: CatalogSearchState): CatalogSe
 export function validateCatalogSearchOrigin(
   value: CatalogSearchOrigin | JSONType,
 ): CatalogSearchOrigin | null {
-  const origin = CatalogSearchOriginSchema.safeParse(value);
-  return origin.success ? origin.data : null;
+  if (!isJsonObject(value)) return null;
+
+  const keys = Object.keys(value);
+  if (keys.length !== 1 || keys[0] !== "search" || !isCatalogSearchState(value.search)) {
+    return null;
+  }
+  return { search: value.search };
 }
 
 export function withCatalogSearchOrigin(
@@ -57,23 +56,12 @@ export function withCatalogSearchOrigin(
 export function readCatalogSearchOrigin(
   state: HistoryState | JSONType,
 ): CatalogSearchOrigin | null {
-  const envelope = CatalogSearchHistoryEnvelopeSchema.safeParse(state);
-  return envelope.success && envelope.data.catalogSearchOrigin !== undefined
-    ? validateCatalogSearchOrigin(envelope.data.catalogSearchOrigin)
-    : null;
+  if (!isJsonObject(state) || state.catalogSearchOrigin === undefined) return null;
+  return validateCatalogSearchOrigin(state.catalogSearchOrigin);
 }
 
-export function getInitialGalleryVisibleCount(itemCount: number, selectedIndex: number): number {
-  const minimum = Math.min(PRINTING_GALLERY_BATCH_SIZE, itemCount);
-  if (selectedIndex < 0 || selectedIndex >= itemCount) {
-    return minimum;
-  }
-
-  const selectedBatchEnd =
-    Math.ceil((selectedIndex + 1) / PRINTING_GALLERY_BATCH_SIZE) * PRINTING_GALLERY_BATCH_SIZE;
-  return Math.min(itemCount, Math.max(minimum, selectedBatchEnd));
-}
-
-export function getNextGalleryVisibleCount(itemCount: number, visibleCount: number): number {
-  return Math.min(itemCount, visibleCount + PRINTING_GALLERY_BATCH_SIZE);
+function isJsonObject(
+  value: CatalogSearchNavigationValue,
+): value is Readonly<Record<string, JSONType>> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

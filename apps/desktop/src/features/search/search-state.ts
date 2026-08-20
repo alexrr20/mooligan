@@ -12,33 +12,8 @@ export type CatalogSearchState = {
   universe?: UniverseFilter;
 };
 
-export const CatalogSearchStateSchema = z.strictObject({
-  adCards: z.literal(true).optional(),
-  artSeries: z.literal(true).optional(),
-  digital: z.literal(true).optional(),
-  grid: z.literal(true).optional(),
-  mode: z.literal("upcoming").optional(),
-  query: z
-    .string()
-    .min(1)
-    .max(100)
-    .refine((value) => value === value.trim())
-    .optional(),
-  tokens: z.literal(true).optional(),
-  uniqueCards: z.literal(true).optional(),
-  universe: z.enum(["beyond", "within"]).optional(),
-});
-const CatalogSearchInputSchema = z.object({
-  adCards: z.json().optional(),
-  artSeries: z.json().optional(),
-  digital: z.json().optional(),
-  grid: z.json().optional(),
-  mode: z.json().optional(),
-  query: z.json().optional(),
-  tokens: z.json().optional(),
-  uniqueCards: z.json().optional(),
-  universe: z.json().optional(),
-});
+type CatalogSearchInput = CatalogSearchState | JSONType;
+type JsonObject = Readonly<Record<string, JSONType>>;
 
 export function reconcileCatalogSearchDraft(
   draft: string,
@@ -48,10 +23,9 @@ export function reconcileCatalogSearchDraft(
   return draft.trim() === previousActiveQuery ? activeQuery : draft;
 }
 
-export function validateCatalogSearch(search: CatalogSearchState | JSONType): CatalogSearchState {
-  const input = CatalogSearchInputSchema.parse(search);
-  const queryValue = z.string().safeParse(input.query);
-  const query = queryValue.success ? queryValue.data.trim().slice(0, 100) : "";
+export function validateCatalogSearch(search: CatalogSearchInput): CatalogSearchState {
+  const input = isJsonObject(search) ? search : {};
+  const query = isString(input.query) ? input.query.trim().slice(0, 100) : "";
 
   return {
     ...(input.adCards === true && { adCards: true as const }),
@@ -67,5 +41,26 @@ export function validateCatalogSearch(search: CatalogSearchState | JSONType): Ca
     }),
   };
 }
-import * as z from "zod";
+
+export function isCatalogSearchState(value: CatalogSearchInput): value is CatalogSearchState {
+  if (!isJsonObject(value)) return false;
+
+  const search = validateCatalogSearch(value);
+  const entries = Object.entries(value);
+  return (
+    entries.length === Object.keys(search).length &&
+    Object.entries(search).every(([key, entry]) =>
+      entries.some(([candidateKey, candidate]) => candidateKey === key && candidate === entry),
+    )
+  );
+}
+
+function isJsonObject(value: CatalogSearchInput): value is CatalogSearchInput & JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isString(value: JSONType | undefined): value is string {
+  return typeof value === "string";
+}
+
 import type { JSONType } from "zod";

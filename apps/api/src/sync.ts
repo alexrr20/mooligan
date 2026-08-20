@@ -2,7 +2,17 @@ import {
   SpoilerDecisionStateSchema,
   SpoilerPolicySchema,
   SpoilerRevealScopeSchema,
+  SpoilerTargetIdSchema,
 } from "@mooligan/domain/spoilers";
+import {
+  MotionPreferenceSchema,
+  SPOILER_SYNC_BATCH_SIZE,
+  type BindResponse,
+  type MotionPreference,
+  type PreferencesResponse,
+  type SpoilerPageResponse,
+  type SpoilerUpdateResponse,
+} from "@mooligan/domain/workspace-sync";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { v7 as uuidv7 } from "uuid";
@@ -10,16 +20,6 @@ import * as z from "zod";
 import type { JSONType } from "zod";
 
 import { createAuth } from "./auth.js";
-
-const SPOILER_SYNC_BATCH_SIZE = 25;
-const MotionPreferenceSchema = z.enum(["full", "reduced", "system"]);
-type MotionPreference = z.infer<typeof MotionPreferenceSchema>;
-
-type PreferenceEntry = {
-  updatedAt: string;
-  value: MotionPreference;
-  version: number;
-};
 
 type PreferenceRow = {
   key: "motion";
@@ -69,7 +69,6 @@ type SpoilerBatchRow =
   | SpoilerDecisionBatchRow
   | SpoilerOperationReceiptBatchRow;
 
-const TargetIdSchema = z.string().trim().min(1).max(128);
 const BaseVersionSchema = z.number().int().positive().nullable();
 const MotionPreferencesSchema = z.strictObject({ motion: MotionPreferenceSchema });
 const InitialSpoilerStateSchema = z.strictObject({
@@ -92,7 +91,7 @@ const SpoilerDecisionMutationSchema = z.strictObject({
   generation: z.number().int().nonnegative(),
   scope: SpoilerRevealScopeSchema,
   state: SpoilerDecisionStateSchema,
-  targetId: TargetIdSchema,
+  targetId: SpoilerTargetIdSchema,
 });
 const SpoilerUpdateRequestSchema = z
   .strictObject({
@@ -113,7 +112,7 @@ const SpoilerUpdateRequestSchema = z
 type SpoilerUpdateRequest = z.infer<typeof SpoilerUpdateRequestSchema>;
 const CursorSchema = z.strictObject({
   scope: SpoilerRevealScopeSchema,
-  targetId: TargetIdSchema,
+  targetId: SpoilerTargetIdSchema,
 });
 const SpoilerQuerySchema = z.strictObject({ cursor: z.string().min(1).max(512).optional() });
 
@@ -226,7 +225,7 @@ syncApi.post("/workspace/bind", async (context) => {
       localWorkspaceId,
     ),
     workspaceId: workspace.id,
-  });
+  } satisfies BindResponse);
 });
 
 syncApi.get("/preferences", async (context) => {
@@ -236,7 +235,9 @@ syncApi.get("/preferences", async (context) => {
     return context.json({ error: "workspace_not_bound" as const }, 404);
   }
 
-  return context.json({ preferences: await readPreferences(context.env.DB, workspace.id) });
+  return context.json({
+    preferences: await readPreferences(context.env.DB, workspace.id),
+  } satisfies PreferencesResponse);
 });
 
 syncApi.post("/preferences", async (context) => {
@@ -270,7 +271,7 @@ syncApi.post("/preferences", async (context) => {
     throw new Error("D1 did not return the updated preference.");
   }
 
-  return context.json({ preferences: toPreferences([row]) });
+  return context.json({ preferences: toPreferences([row]) } satisfies PreferencesResponse);
 });
 
 syncApi.get("/spoilers", async (context) => {
@@ -305,7 +306,7 @@ syncApi.get("/spoilers", async (context) => {
     nextCursor: hasMore && last ? serializeCursor(last) : null,
     snapshotVersion: stateRow.sync_version,
     state,
-  });
+  } satisfies SpoilerPageResponse);
 });
 
 syncApi.post("/spoilers", async (context) => {
@@ -423,7 +424,7 @@ syncApi.post("/spoilers", async (context) => {
     operationId,
     snapshotVersion: requireReceiptNumber(receipt.snapshot_version),
     state: toSpoilerReceiptState(receipt),
-  });
+  } satisfies SpoilerUpdateResponse);
 });
 
 function prepareSpoilerOperationReceiptClaim(
@@ -920,7 +921,7 @@ async function spoilerStateWasSeededBy(
   return row?.accepted === 1;
 }
 
-function toPreferences(rows: PreferenceRow[]): { motion?: PreferenceEntry } {
+function toPreferences(rows: PreferenceRow[]): PreferencesResponse["preferences"] {
   const row = rows.find(({ key }) => key === "motion");
   return row
     ? {
@@ -998,7 +999,7 @@ async function spoilerUpdateRequestFingerprint(request: SpoilerUpdateRequest) {
 
 async function readJson(request: Request): Promise<JSONType> {
   try {
-    return z.json().parse(await request.json());
+    return await request.json();
   } catch {
     return null;
   }

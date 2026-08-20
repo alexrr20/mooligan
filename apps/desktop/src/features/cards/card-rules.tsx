@@ -1,13 +1,14 @@
 import type { CatalogCardIdentity, CatalogCardFace } from "@mooligan/domain/catalog-detail";
 import * as stylex from "@stylexjs/stylex";
 
+import { ManaCost } from "./mana-cost";
 import { OracleText } from "./oracle-text";
 
-type CardFacesProps = {
+type CardRulesProps = {
   card: CatalogCardIdentity;
 };
 
-export function CardFaces({ card }: CardFacesProps) {
+export function CardRules({ card }: CardRulesProps) {
   const multipleFaces = card.faces.length > 1;
 
   return (
@@ -76,14 +77,6 @@ function CardFace({
         {hasStats ? <FaceStats face={face} /> : null}
       </div>
     </article>
-  );
-}
-
-export function ManaCost({ value }: { value: string }) {
-  return (
-    <span {...stylex.props(styles.manaCost)} aria-label={`Mana cost ${value}`}>
-      <OracleText className={stylex.props(styles.manaSymbols).className} text={value} />
-    </span>
   );
 }
 
@@ -192,21 +185,6 @@ const styles = stylex.create({
     fontWeight: 400,
     letterSpacing: "-0.035em",
     lineHeight: 1,
-  },
-  manaCost: {
-    minHeight: "28px",
-    flex: "0 0 auto",
-    display: "flex",
-    alignItems: "center",
-    color: "#f4f1e8",
-    fontSize: "17px",
-    letterSpacing: "0.04em",
-    whiteSpace: "nowrap",
-  },
-  manaSymbols: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "3px",
   },
   typeLine: {
     margin: "13px 0 0",

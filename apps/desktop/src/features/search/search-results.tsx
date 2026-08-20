@@ -5,10 +5,10 @@ import { useMemo, useRef } from "react";
 
 import { colors } from "../../styles/tokens.stylex.js";
 import { useCatalogImageLoading } from "../catalog/catalog-image-loading";
-import { catalogImageUrl } from "../catalog/catalog-image";
 import { CatalogSetSymbol } from "../catalog/catalog-set-symbol";
-import { type CatalogSearchOrigin, withCatalogSearchOrigin } from "../cards/card-navigation";
+import { PrintingImage } from "../cards/printing-image";
 import { PrintingPrices } from "../cards/printing-prices";
+import { type CatalogSearchOrigin, withCatalogSearchOrigin } from "./catalog-search-origin";
 import { formatSpoilerReleaseDate } from "../spoilers/spoiler-ui-state";
 
 type CommonSearchResultsProps = {
@@ -167,8 +167,7 @@ function CatalogResults({
           const card = item.status === "visible" ? item.card : null;
           const printingId = item.status === "visible" ? item.card.id : item.printingId;
           const image = card ? (grid ? card.gridImage : card.image) : null;
-          const imageUrl = image ? catalogImageUrl(image) : null;
-          const imageActive = imageUrl && imageLoading.ids.has(printingId);
+          const imageActive = imageLoading.ids.has(printingId);
           const imageFailed = imageLoading.failed.has(printingId);
 
           return (
@@ -184,42 +183,31 @@ function CatalogResults({
                     {String(index + 1).padStart(3, "0")}
                   </span>
                 ) : null}
-                <div
-                  {...stylex.props(
-                    styles.cardImageFrame,
-                    grid && styles.tileImageFrame,
-                    item.status === "protected" && styles.protectedImageFrame,
-                  )}
-                  data-catalog-image-id={imageUrl ? printingId : undefined}
-                >
-                  {item.status === "protected" ? (
-                    <div {...stylex.props(styles.protectedArtwork)}>
-                      <CatalogSetSymbol
-                        code={item.release.code}
-                        size={grid ? "large" : "small"}
-                        symbol={item.release.symbol}
-                      />
-                      {grid ? (
-                        <span {...stylex.props(styles.protectedArtworkLabel)}>Protected</span>
-                      ) : null}
-                    </div>
-                  ) : imageActive && !imageFailed ? (
-                    <img
-                      {...stylex.props(styles.cardImage)}
-                      key={`${imageLoading.generation}:${printingId}`}
-                      alt={`${item.card.name}, ${item.card.setName ?? item.card.setCode} printing`}
-                      decoding="async"
-                      loading="eager"
-                      src={imageUrl}
-                      onError={() => imageLoading.settle(printingId, true)}
-                      onLoad={() => imageLoading.settle(printingId)}
-                    />
-                  ) : imageUrl && !imageFailed ? null : (
-                    <span {...stylex.props(styles.cardImageFallback)}>
-                      {imageFailed ? "Art offline" : "No art"}
-                    </span>
-                  )}
-                </div>
+                <PrintingImage
+                  alt={card ? `${card.name}, ${card.setName ?? card.setCode} printing` : ""}
+                  compact={!grid}
+                  concealed={item.status === "protected"}
+                  failed={imageFailed}
+                  image={image}
+                  imageActive={imageActive}
+                  imageKey={`${imageLoading.generation}:${printingId}`}
+                  placeholder={
+                    item.status === "protected" ? (
+                      <div {...stylex.props(styles.protectedArtwork)}>
+                        <CatalogSetSymbol
+                          code={item.release.code}
+                          size={grid ? "large" : "small"}
+                          symbol={item.release.symbol}
+                        />
+                        {grid ? (
+                          <span {...stylex.props(styles.protectedArtworkLabel)}>Protected</span>
+                        ) : null}
+                      </div>
+                    ) : undefined
+                  }
+                  onImageError={() => imageLoading.settle(printingId, true)}
+                  onImageLoad={() => imageLoading.settle(printingId)}
+                />
                 {grid && item.status === "visible" ? (
                   <div {...stylex.props(styles.tilePrices)}>
                     <PrintingPrices />
@@ -360,38 +348,6 @@ const styles = stylex.create({
       },
     },
   },
-  cardImageFrame: {
-    width: {
-      default: "46px",
-      "@media (max-width: 820px)": "40px",
-    },
-    aspectRatio: "5 / 7",
-    overflow: "hidden",
-    display: "grid",
-    placeItems: "center",
-    border: "1px solid #34362f",
-    borderRadius: "3.5% / 2.5%",
-    backgroundColor: "#1b1d19",
-    boxShadow: "3px 3px 0 rgba(0, 0, 0, 0.35)",
-  },
-  cardImage: {
-    width: "100%",
-    height: "100%",
-    display: "block",
-    objectFit: "cover",
-  },
-  cardImageFallback: {
-    color: "#a6a89d",
-    fontSize: "6px",
-    letterSpacing: "0.08em",
-    textTransform: "uppercase",
-  },
-  protectedImageFrame: {
-    backgroundColor: "#171914",
-    backgroundImage:
-      "linear-gradient(135deg, rgba(199, 238, 0, 0.055) 0, rgba(199, 238, 0, 0.055) 1px, transparent 1px, transparent 12px)",
-    backgroundSize: "13px 13px",
-  },
   protectedArtwork: {
     display: "grid",
     placeItems: "center",
@@ -402,10 +358,6 @@ const styles = stylex.create({
     fontSize: "7px",
     letterSpacing: "0.14em",
     textTransform: "uppercase",
-  },
-  tileImageFrame: {
-    width: "100%",
-    boxShadow: "6px 6px 0 rgba(0, 0, 0, 0.4)",
   },
   cardIdentity: {
     minWidth: 0,

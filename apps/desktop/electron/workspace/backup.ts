@@ -10,6 +10,7 @@ import { MoneySchema } from "@mooligan/domain/market";
 import {
   SpoilerDecisionStateSchema,
   SpoilerRevealScopeSchema,
+  SpoilerTargetIdSchema,
   type SpoilerDecisionState,
   type SpoilerRevealScope,
 } from "@mooligan/domain/spoilers";
@@ -83,7 +84,7 @@ const BackupCardListSchema = z
 const BackupSpoilerDecisionSchema = z.strictObject({
   scope: SpoilerRevealScopeSchema,
   state: SpoilerDecisionStateSchema,
-  targetId: z.string().trim().min(1).max(128),
+  targetId: SpoilerTargetIdSchema,
 });
 
 const BackupCollections = {
@@ -160,7 +161,7 @@ export function parseWorkspaceBackup(serialized: string): WorkspaceBackup {
 export function serializeWorkspaceBackup(
   value: Omit<WorkspaceBackup, "format" | "version">,
 ): string {
-  const serialized = `${JSON.stringify(
+  return `${JSON.stringify(
     {
       ...value,
       format: BACKUP_FORMAT,
@@ -169,8 +170,6 @@ export function serializeWorkspaceBackup(
     null,
     2,
   )}\n`;
-
-  return JSON.stringify(parseWorkspaceBackup(serialized), null, 2) + "\n";
 }
 
 export function validateCollectionLot(value: CollectionLot | JSONType): CollectionLot {

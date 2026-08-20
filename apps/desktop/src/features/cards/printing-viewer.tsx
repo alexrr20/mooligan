@@ -9,13 +9,14 @@ import { useMemo, useState } from "react";
 
 import { catalogImageUrl } from "../catalog/catalog-image";
 import { colors } from "../../styles/tokens.stylex.js";
+import { PrintingImage } from "./printing-image";
 
-type CardArtworkProps = {
+type PrintingViewerProps = {
   faces: readonly CatalogCardFace[];
   printing: CatalogSelectedPrinting;
 };
 
-export function CardArtwork({ faces, printing }: CardArtworkProps) {
+export function PrintingViewer({ faces, printing }: PrintingViewerProps) {
   const images = useMemo(() => preferredFaceImages(printing.images), [printing.images]);
   const [activeFaceIndex, setActiveFaceIndex] = useState(images[0]?.faceIndex ?? 0);
   const [readyImage, setReadyImage] = useState<CatalogImageDescriptor>();
@@ -39,7 +40,7 @@ export function CardArtwork({ faces, printing }: CardArtworkProps) {
 
   return (
     <figure {...stylex.props(styles.figure)}>
-      <div {...stylex.props(styles.frame)}>
+      <PrintingImage variant="detail">
         <AnimatePresence initial={false}>
           {readyImage ? (
             <motion.img
@@ -96,7 +97,7 @@ export function CardArtwork({ faces, printing }: CardArtworkProps) {
             </strong>
           </div>
         ) : null}
-      </div>
+      </PrintingImage>
 
       {images.length > 1 ? (
         <div {...stylex.props(styles.faceControls)} role="group" aria-label="Artwork face">
@@ -146,21 +147,6 @@ const styles = stylex.create({
   figure: {
     width: "100%",
     margin: 0,
-  },
-  frame: {
-    width: "100%",
-    aspectRatio: "5 / 7",
-    position: "relative",
-    overflow: "hidden",
-    display: "grid",
-    placeItems: "center",
-    border: "1px solid #55584f",
-    borderRadius: "3.5% / 2.5%",
-    backgroundColor: "#141512",
-    backgroundImage:
-      "linear-gradient(135deg, transparent 0 49.7%, rgba(244, 241, 232, 0.055) 49.8% 50.2%, transparent 50.3%), linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px)",
-    backgroundSize: "auto, 24px 24px, 24px 24px",
-    boxShadow: "10px 12px 0 rgba(0, 0, 0, 0.38)",
   },
   image: {
     width: "100%",

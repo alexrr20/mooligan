@@ -6,12 +6,14 @@ import type { Ref } from "react";
 
 import { Button } from "../../components/button";
 import { colors } from "../../styles/tokens.stylex.js";
-import { CardArtwork } from "./card-artwork";
-import { CardFaces, ManaCost } from "./card-faces";
+import { CardRules } from "./card-rules";
+import { ManaCost } from "./mana-cost";
 import { CardLegalities } from "./card-legalities";
-import type { CatalogSearchOrigin } from "./card-navigation";
+import type { CatalogSearchOrigin } from "../search/catalog-search-origin";
 import { PrintingDetails } from "./printing-details";
 import { PrintingGallery } from "./printing-gallery";
+import { PrintingImage } from "./printing-image";
+import { PrintingViewer } from "./printing-viewer";
 import { PrintingSpoilerControl } from "../spoilers/printing-spoiler-control";
 
 type CardDetailProps = {
@@ -43,7 +45,7 @@ export function CardDetail({ detail, headingRef, origin, visibility }: CardDetai
       <div {...stylex.props(styles.detailGrid)}>
         <aside {...stylex.props(styles.artworkRail)} aria-label="Selected printing artwork">
           <div {...stylex.props(styles.artworkSizer)}>
-            <CardArtwork
+            <PrintingViewer
               key={detail.selectedPrinting.id}
               faces={detail.card.faces}
               printing={detail.selectedPrinting}
@@ -71,7 +73,7 @@ export function CardDetail({ detail, headingRef, origin, visibility }: CardDetai
             ) : null}
           </header>
 
-          <CardFaces card={detail.card} />
+          <CardRules card={detail.card} />
           <PrintingDetails printing={detail.selectedPrinting} />
           <PrintingSpoilerControl printingId={detail.selectedPrinting.id} visibility={visibility} />
           <CardLegalities legalities={detail.legalities} />
@@ -95,7 +97,9 @@ export function CardDetailSkeleton({ origin }: CardDetailSkeletonProps) {
     <div {...stylex.props(styles.page)} aria-busy="true" aria-label="Loading card details">
       <ReturnNavigation origin={origin} />
       <div {...stylex.props(styles.detailGrid)}>
-        <div {...stylex.props(styles.skeletonArtwork)} aria-hidden="true" />
+        <div {...stylex.props(styles.skeletonArtwork)} aria-hidden="true">
+          <PrintingImage placeholder={false} variant="detail" />
+        </div>
         <div {...stylex.props(styles.skeletonInformation)} aria-hidden="true" />
       </div>
     </div>
@@ -278,11 +282,6 @@ const styles = stylex.create({
   skeletonArtwork: {
     width: "100%",
     maxWidth: "410px",
-    aspectRatio: "5 / 7",
-    border: "1px solid #34362f",
-    borderRadius: "6px",
-    backgroundColor: "#141512",
-    boxShadow: "10px 12px 0 rgba(0, 0, 0, 0.3)",
   },
   skeletonInformation: {
     minWidth: 0,

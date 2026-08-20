@@ -7,6 +7,15 @@ import { v7 as uuidv7, version as uuidVersion } from "uuid";
 // oxlint-disable-next-line vite-plus/prefer-vite-plus-imports -- Cloudflare's pool must share Vitest's runner instance.
 import { test } from "vitest";
 
+import type {
+  BindResponse,
+  PreferencesResponse,
+  RemoteMotionPreference,
+  RemoteSpoilerDecision,
+  RemoteSpoilerState,
+  SpoilerUpdateResponse,
+} from "@mooligan/domain/workspace-sync";
+
 import { createAuth } from "../src/auth.ts";
 
 const initialSpoilerState = { policy: "protect" as const, resetGeneration: 0 };
@@ -641,39 +650,6 @@ test("sync mutations require JSON from the exact desktop origin", async () => {
   assert.equal(oversized.status, 413);
 });
 
-type Preference = {
-  updatedAt: string;
-  value: "full" | "reduced" | "system";
-  version: number;
-};
-
-type PreferencesResponse = { preferences: { motion?: Preference } };
-type BindResponse = PreferencesResponse & {
-  spoilerState: RemoteSpoilerState;
-  spoilerStateAccepted: boolean;
-  workspaceId: string;
-};
-type RemoteSpoilerState = {
-  policy: "protect" | "show";
-  resetGeneration: number;
-  updatedAt: string;
-  version: number;
-};
-type RemoteSpoilerDecision = {
-  generation: number;
-  scope: "printing" | "release";
-  state: "protect" | "reveal";
-  targetId: string;
-  updatedAt: string;
-  version: number;
-};
-type SpoilerUpdateResponse = {
-  decisions: RemoteSpoilerDecision[];
-  operationId: string;
-  snapshotVersion: number;
-  state: RemoteSpoilerState;
-};
-
 function spoilerUpdate(
   localWorkspaceId: string,
   update: { decisions: unknown[]; state?: unknown },
@@ -683,8 +659,8 @@ function spoilerUpdate(
 }
 
 function assertPreference(
-  preference: Preference | undefined,
-  value: Preference["value"],
+  preference: RemoteMotionPreference | undefined,
+  value: RemoteMotionPreference["value"],
   version: number,
 ) {
   assert.ok(preference);

@@ -5,10 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { Worker } from "node:worker_threads";
 
 import { CatalogSnapshotSchema, type CatalogSnapshot } from "@mooligan/domain/catalog";
-import {
-  CatalogImageDescriptorSchema,
-  type CatalogImageDescriptor,
-} from "@mooligan/domain/catalog-detail";
+import type { CatalogImageDescriptor } from "@mooligan/domain/catalog-detail";
 import {
   CatalogReleaseSchema,
   ScryfallSetListSchema,
@@ -16,8 +13,6 @@ import {
   type ScryfallSetDownload,
 } from "@mooligan/domain/catalog-sync";
 import {
-  CatalogSetSymbolDescriptorSchema,
-  SpoilerVisibilitySnapshotSchema,
   type CatalogPrintingResult,
   type CatalogReleaseSummary,
   type CatalogSetSymbolDescriptor,
@@ -27,7 +22,7 @@ import {
 import { app, ipcMain, net, type IpcMainInvokeEvent } from "electron";
 import * as z from "zod";
 
-import { recoverInterruptedReplacement } from "./files";
+import { isFileNotFound, recoverInterruptedReplacement } from "./files";
 import { validateCatalogPrintingId } from "./detail";
 import { catalogSchemaVersion, importCatalog, readGzipJsonLines } from "./import";
 import { parseCatalogQueryWorkerResponse, validateCatalogListRequest } from "./query";
@@ -62,7 +57,6 @@ const scryfallRequestHeaders = {
   "User-Agent": "Mooligan/0.0.0 (https://github.com/alexrr20/mooligan)",
 };
 const CatalogMetadataSchema = CatalogSnapshotSchema.extend({ schemaVersion: z.number().int() });
-const FileSystemErrorSchema = z.object({ code: z.string().optional() });
 let activeDownload: Promise<CatalogStatus> | undefined;
 let catalogEpoch = 0;
 let catalogQueriesAvailable = Promise.resolve();
@@ -161,8 +155,7 @@ async function getCatalogStatus(): Promise<CatalogStatus> {
   try {
     await stat(path);
   } catch (error) {
-    const fileSystemError = FileSystemErrorSchema.safeParse(error);
-    if (fileSystemError.success && fileSystemError.data.code === "ENOENT") {
+    if (isFileNotFound(error)) {
       return { installed: false };
     }
 
@@ -338,8 +331,7 @@ async function replaceCatalog(partial: string, destination: string, backup: stri
   try {
     await rename(destination, backup);
   } catch (error) {
-    const fileSystemError = FileSystemErrorSchema.safeParse(error);
-    if (!fileSystemError.success || fileSystemError.data.code !== "ENOENT") {
+    if (!isFileNotFound(error)) {
       throw error;
     }
   }
@@ -368,23 +360,21 @@ function catalogUrl(path: string) {
 }
 
 export async function queryCatalogImageSource(image: CatalogImageDescriptor) {
-  const validImage = CatalogImageDescriptorSchema.parse(image);
   await catalogQueriesAvailable;
   try {
-    return await queryAuthorizedCatalogImageSource(validImage);
+    return await queryAuthorizedCatalogImageSource(image);
   } catch (error) {
     if (error instanceof CatalogVisibilityChangedError) {
       throw error;
     }
     await catalogQueriesAvailable;
-    return queryAuthorizedCatalogImageSource(validImage);
+    return queryAuthorizedCatalogImageSource(image);
   }
 }
 
 export async function queryCatalogSetSymbolSource(symbol: CatalogSetSymbolDescriptor) {
-  const validSymbol = CatalogSetSymbolDescriptorSchema.parse(symbol);
   await catalogQueriesAvailable;
-  return queryCatalog({ symbol: validSymbol, type: "set-symbol-source" });
+  return queryCatalog({ symbol, type: "set-symbol-source" });
 }
 
 export async function resolveCatalogRootSetId(targetId: string) {
@@ -471,7 +461,7 @@ function readCatalogVisibilitySnapshot() {
   if (!getCatalogVisibilitySnapshot) {
     throw new Error("Catalog spoiler protection has not been initialized.");
   }
-  return SpoilerVisibilitySnapshotSchema.parse(getCatalogVisibilitySnapshot());
+  return getCatalogVisibilitySnapshot();
 }
 
 function getCatalogQueryWorker() {

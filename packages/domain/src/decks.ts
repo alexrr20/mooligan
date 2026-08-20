@@ -33,23 +33,6 @@ export const DeckSchema = z.object({
 });
 export type Deck = z.infer<typeof DeckSchema>;
 
-export const DeckRevisionSchema = z.object({
-  createdAt: z.iso.datetime({ offset: true }),
-  deckId: z.string().min(1),
-  entries: z.array(DeckEntrySchema),
-  id: z.string().min(1),
-  message: z.string().optional(),
-});
-export type DeckRevision = z.infer<typeof DeckRevisionSchema>;
-
-/** Assigns owned copies to a deck without making ownership part of the decklist. */
-export const DeckAllocationSchema = z.object({
-  collectionLotId: z.string().min(1),
-  deckEntryId: z.string().min(1),
-  quantity: z.number().int().positive(),
-});
-export type DeckAllocation = z.infer<typeof DeckAllocationSchema>;
-
 /** Derived by deck validation rather than parsed from storage or transport. */
 export type DeckValidationIssue = {
   code: string;

@@ -319,7 +319,7 @@ function normalizeSelectedPrinting(card: ScryfallCardDownload): CatalogSelectedP
     images: normalizeImages(card),
     isDigital: card.digital ?? false,
     isPromo: card.promo ?? false,
-    rarity: RaritySchema.parse(card.rarity),
+    rarity: card.rarity,
     setCode: card.set,
     setName: card.set_name,
   };
@@ -339,7 +339,7 @@ function normalizeSiblingPrinting(card: ScryfallCardDownload): CatalogSiblingPri
     id: card.id,
     isDigital: card.digital ?? false,
     isPromo: card.promo ?? false,
-    rarity: RaritySchema.parse(card.rarity),
+    rarity: card.rarity,
     setCode: card.set,
     setName: card.set_name,
   };

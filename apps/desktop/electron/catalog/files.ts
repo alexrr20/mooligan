@@ -1,9 +1,5 @@
 import { rename, stat } from "node:fs/promises";
 
-import * as z from "zod";
-
-const FileSystemErrorSchema = z.object({ code: z.string().optional() });
-
 export async function recoverInterruptedReplacement(destination: string, backup: string) {
   if (await exists(destination)) {
     return;
@@ -31,7 +27,6 @@ async function exists(path: string) {
   }
 }
 
-function isFileNotFound(cause: unknown) {
-  const error = FileSystemErrorSchema.safeParse(cause);
-  return error.success && error.data.code === "ENOENT";
+export function isFileNotFound(cause: unknown) {
+  return cause instanceof Error && "code" in cause && cause.code === "ENOENT";
 }

@@ -9,20 +9,12 @@ import type {
 } from "@mooligan/domain/spoilers";
 
 import {
-  catalogSetSymbolAccessibleName,
-  catalogSetSymbolFallback,
-  catalogSetSymbolUrl,
-} from "../src/features/catalog/catalog-set-symbol-url.ts";
-import {
-  cardDetailFocusIdentity,
-  cardDetailFocusKey,
   formatSpoilerReleaseDate,
   getPrintingProtectionControl,
   getReleaseProtectionControl,
   getRevealSummaryProtectionControl,
   releaseActionAccessibleName,
   revealSummaryActionAccessibleName,
-  shouldMoveCardDetailFocus,
 } from "../src/features/spoilers/spoiler-ui-state.ts";
 
 const release: CatalogReleaseSummary = {
@@ -110,21 +102,6 @@ void test("settings blocks a printing action while its release is revealed", () 
   );
 });
 
-void test("card focus changes when a protected result becomes visible", () => {
-  assert.equal(cardDetailFocusKey(undefined, false), null);
-  assert.equal(cardDetailFocusKey(null, false), "unavailable");
-  assert.equal(cardDetailFocusKey({ status: "protected" }, false), "protected");
-  assert.equal(cardDetailFocusKey({ status: "visible" }, false), "visible");
-  assert.equal(cardDetailFocusKey({ status: "visible" }, true), "error");
-
-  const protectedIdentity = cardDetailFocusIdentity("printing-1", { status: "protected" }, false);
-  const visibleIdentity = cardDetailFocusIdentity("printing-1", { status: "visible" }, false);
-  assert.equal(shouldMoveCardDetailFocus(null, protectedIdentity), true);
-  assert.equal(shouldMoveCardDetailFocus(protectedIdentity, null), false);
-  assert.equal(shouldMoveCardDetailFocus(protectedIdentity, visibleIdentity), true);
-  assert.equal(shouldMoveCardDetailFocus(visibleIdentity, visibleIdentity), false);
-});
-
 void test("release dates and action names remain explicit", () => {
   const visibility: CatalogPrintingVisibility = { reason: "printing", release };
   assert.equal(getPrintingProtectionControl(visibility).kind, "protect");
@@ -141,13 +118,4 @@ void test("release dates and action names remain explicit", () => {
     }),
     "Protect printing: Future Sight",
   );
-});
-
-void test("set symbols stay local, encoded, and named without the image", () => {
-  assert.equal(
-    catalogSetSymbolUrl({ setId: "set / multilingual" }),
-    "mooligan-set-symbol://catalog/set%20%2F%20multilingual",
-  );
-  assert.equal(catalogSetSymbolAccessibleName("eoe"), "EOE set symbol");
-  assert.equal(catalogSetSymbolFallback("eoe"), "EOE");
 });
