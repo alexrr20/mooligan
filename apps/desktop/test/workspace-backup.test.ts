@@ -66,6 +66,8 @@ void test("workspace backups round-trip user data while preserving local metadat
     source.putCollectionLot(collectionLot);
     source.putDeck(deck);
     source.putCardList(cardList);
+    source.revealSpoilerPrinting("preview-printing");
+    source.protectSpoilerRelease("preview-release");
     const backup = source.createBackup();
     source.close();
 
@@ -76,13 +78,18 @@ void test("workspace backups round-trip user data while preserving local metadat
       "decks",
       "format",
       "preferences",
+      "spoilerDecisions",
       "version",
     ]);
     assert.equal(exported.format, "mooligan-workspace");
-    assert.equal(exported.version, 1);
+    assert.equal(exported.version, 2);
     assert.equal(Object.hasOwn(exported, "workspaceId"), false);
     assert.equal(Object.hasOwn(exported, "boundUserId"), false);
     assert.equal(Object.hasOwn(exported, "remoteWorkspaceId"), false);
+    assert.deepEqual(exported.spoilerDecisions, [
+      { scope: "printing", state: "reveal", targetId: "preview-printing" },
+      { scope: "release", state: "protect", targetId: "preview-release" },
+    ]);
 
     const target = new WorkspaceManager(targetDirectory);
     target.selectForUser("target-user");
@@ -100,7 +107,7 @@ void test("workspace backups round-trip user data while preserving local metadat
     assert.equal(target.workspaceId, targetWorkspaceId);
     assert.equal(target.boundUserId, "target-user");
     assert.equal(target.remoteWorkspaceId, "target-remote");
-    assert.deepEqual(target.readPreferences(), { motion: "reduced" });
+    assert.deepEqual(target.readPreferences(), { motion: "reduced", spoilerPolicy: "protect" });
     assert.deepEqual(target.readPreferenceSyncState(), {
       motion: { conflict: null, pending: true, remoteVersion: 8 },
     });
@@ -109,8 +116,112 @@ void test("workspace backups round-trip user data while preserving local metadat
     assert.deepEqual(target.readCardLists(), [cardList]);
     assert.equal(target.readDecks()[0]?.entries[0]?.id, "deck-entry-stable-id");
     assert.equal(target.readCardLists()[0]?.entries[0]?.id, "list-entry-stable-id");
+    assert.deepEqual(target.readSpoilerState().activePrintingIds, ["preview-printing"]);
+    assert.deepEqual(
+      target.readSpoilerSyncState().decisions.map(({ decision, pending, remoteVersion }) => ({
+        generation: decision.generation,
+        pending,
+        remoteVersion,
+        scope: decision.scope,
+        state: decision.state,
+        targetId: decision.targetId,
+      })),
+      [
+        {
+          generation: 1,
+          pending: true,
+          remoteVersion: null,
+          scope: "printing",
+          state: "reveal",
+          targetId: "preview-printing",
+        },
+        {
+          generation: 1,
+          pending: true,
+          remoteVersion: null,
+          scope: "release",
+          state: "protect",
+          targetId: "preview-release",
+        },
+      ],
+    );
+    assert.equal(target.readSpoilerSyncState().global.resetGeneration, 1);
+    assert.equal(target.readSpoilerSyncState().global.pending, true);
     assert.deepEqual(JSON.parse(target.createBackup()), JSON.parse(backup));
     target.close();
+  } finally {
+    await Promise.all([
+      rm(sourceDirectory, { force: true, recursive: true }),
+      rm(targetDirectory, { force: true, recursive: true }),
+    ]);
+  }
+});
+
+void test("version 1 workspace backups import with spoiler protection enabled", () => {
+  const backup = parseWorkspaceBackup(
+    JSON.stringify({
+      cardLists: [{ id: cardList.id, value: cardList }],
+      collectionLots: [{ id: collectionLot.id, value: collectionLot }],
+      decks: [{ id: deck.id, value: deck }],
+      format: "mooligan-workspace",
+      preferences: { motion: "reduced" },
+      version: 1,
+    }),
+  );
+
+  assert.equal(backup.version, 2);
+  assert.deepEqual(backup.preferences, { motion: "reduced", spoilerPolicy: "protect" });
+  assert.deepEqual(backup.spoilerDecisions, []);
+  assert.deepEqual(backup.collectionLots, [{ id: collectionLot.id, value: collectionLot }]);
+  assert.deepEqual(backup.decks, [{ id: deck.id, value: deck }]);
+  assert.deepEqual(backup.cardLists, [{ id: cardList.id, value: cardList }]);
+});
+
+void test("remote resets supersede imported reveal consent", async () => {
+  const sourceDirectory = await mkdtemp(join(tmpdir(), "mooligan-backup-spoiler-source-"));
+  const targetDirectory = await mkdtemp(join(tmpdir(), "mooligan-backup-spoiler-target-"));
+
+  try {
+    const source = new WorkspaceStore(join(sourceDirectory, "workspace.sqlite"));
+    source.setSpoilerPolicy("show");
+    source.revealSpoilerPrinting("preview-printing");
+    const backup = source.createBackup();
+    source.close();
+
+    const scenarios = [
+      { expectedGeneration: 2, expectedPolicy: "protect", name: "equal", remoteGeneration: 1 },
+      { expectedGeneration: 11, expectedPolicy: "protect", name: "higher", remoteGeneration: 10 },
+    ] as const;
+
+    for (const scenario of scenarios) {
+      const target = new WorkspaceStore(join(targetDirectory, `${scenario.name}.sqlite`));
+      target.importBackup(backup);
+      target.applyRemoteSpoilerState({
+        policy: scenario.expectedPolicy,
+        resetGeneration: scenario.remoteGeneration,
+        updatedAt: "2026-08-04T10:00:00.000Z",
+        version: 1,
+      });
+
+      const sync = target.readSpoilerSyncState();
+      assert.equal(sync.global.policy, scenario.expectedPolicy);
+      assert.equal(sync.global.resetGeneration, scenario.expectedGeneration);
+      assert.equal(sync.global.pending, true);
+      assert.deepEqual(target.readSpoilerState().activePrintingIds, []);
+      assert.deepEqual(sync.decisions, []);
+
+      assert.equal(
+        target.markSpoilerStateSynced(sync.global, {
+          policy: scenario.expectedPolicy,
+          resetGeneration: scenario.expectedGeneration,
+          updatedAt: "2026-08-04T10:01:00.000Z",
+          version: 2,
+        }),
+        true,
+      );
+      assert.equal(target.readSpoilerSyncState().global.pending, false);
+      target.close();
+    }
   } finally {
     await Promise.all([
       rm(sourceDirectory, { force: true, recursive: true }),
@@ -138,8 +249,9 @@ void test("invalid backups are fully rejected before any workspace data changes"
         collectionLots: [{ id: collectionLot.id, value: collectionLot }],
         decks: [{ id: deck.id, value: deck }],
         format: "mooligan-workspace",
-        preferences: { motion: "reduced" },
-        version: 1,
+        preferences: { motion: "reduced", spoilerPolicy: "protect" },
+        spoilerDecisions: [],
+        version: 2,
       }),
     );
 

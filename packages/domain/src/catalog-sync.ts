@@ -5,6 +5,7 @@ import { FinishSchema } from "./catalog.ts";
 const httpsUrlSchema = z.url().refine((value) => new URL(value).protocol === "https:", {
   message: "Expected an HTTPS URL",
 });
+const nonemptyTextSchema = z.string().min(1);
 
 export const CatalogReleaseSchema = z.object({
   compressedSize: z.number().int().positive(),
@@ -19,6 +20,38 @@ export const ScryfallBulkDataSchema = z.object({
   type: z.literal("default_cards"),
   updated_at: z.iso.datetime({ offset: true }),
 });
+
+export const ScryfallSetDownloadSchema = z.strictObject({
+  arena_code: nonemptyTextSchema.optional(),
+  block: nonemptyTextSchema.optional(),
+  block_code: nonemptyTextSchema.optional(),
+  card_count: z.number().int().nonnegative(),
+  code: nonemptyTextSchema,
+  digital: z.boolean(),
+  foil_only: z.boolean(),
+  icon_svg_uri: httpsUrlSchema,
+  id: nonemptyTextSchema,
+  mtgo_code: nonemptyTextSchema.optional(),
+  name: nonemptyTextSchema,
+  nonfoil_only: z.boolean(),
+  object: z.literal("set"),
+  parent_set_code: nonemptyTextSchema.optional(),
+  printed_size: z.number().int().nonnegative().nullish(),
+  released_at: z.iso.date().nullish(),
+  scryfall_uri: httpsUrlSchema,
+  search_uri: httpsUrlSchema,
+  set_type: nonemptyTextSchema,
+  tcgplayer_id: z.number().int().positive().optional(),
+  uri: httpsUrlSchema,
+});
+export type ScryfallSetDownload = z.infer<typeof ScryfallSetDownloadSchema>;
+
+export const ScryfallSetListSchema = z.strictObject({
+  data: z.array(ScryfallSetDownloadSchema).min(1),
+  has_more: z.literal(false),
+  object: z.literal("list"),
+});
+export type ScryfallSetList = z.infer<typeof ScryfallSetListSchema>;
 
 const ScryfallImageUrisSchema = z.object({
   grid: z.url().nullish(),
@@ -68,6 +101,7 @@ export const ScryfallCardDownloadSchema = z
     rarity: z.string().min(1),
     released_at: z.iso.date().nullish(),
     set: z.string().min(1),
+    set_id: z.string().min(1),
     set_name: z.string().min(1),
     toughness: z.string().nullish(),
     type_line: z.string().min(1).optional(),

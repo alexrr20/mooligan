@@ -10,10 +10,15 @@ import type { CatalogImageCache } from "./image-cache";
 
 export const catalogImageScheme = "mooligan-image";
 
+export type AuthorizedCatalogImageSource = {
+  isCurrent: () => boolean;
+  sourceUrl: string;
+};
+
 export function registerCatalogImageProtocol(
-  targetSession: Session,
+  targetSession: { protocol: Pick<Session["protocol"], "handle"> },
   cache: CatalogImageCache,
-  resolveSource: (image: CatalogImageDescriptor) => Promise<string | null>,
+  resolveSource: (image: CatalogImageDescriptor) => Promise<AuthorizedCatalogImageSource | null>,
 ) {
   targetSession.protocol.handle(catalogImageScheme, async (request) => {
     const image = parseCatalogImageUrl(request.url);
@@ -22,24 +27,29 @@ export function registerCatalogImageProtocol(
       return unavailableResponse(400);
     }
 
-    let sourceUrl: string | null;
+    let source: AuthorizedCatalogImageSource | null;
     try {
-      sourceUrl = await resolveSource(image);
+      source = await resolveSource(image);
     } catch {
       return unavailableResponse(503);
     }
 
-    if (!sourceUrl) {
+    if (!source) {
       return unavailableResponse(404);
     }
 
-    const cached = await cache.get(sourceUrl);
+    const cached = await cache.get(source.sourceUrl);
     if (cached.status === "unavailable") {
       return unavailableResponse(503);
     }
 
     try {
-      return new Response(new Uint8Array(await readFile(cached.path)), {
+      const bytes = new Uint8Array(await readFile(cached.path));
+      if (!source.isCurrent()) {
+        return unavailableResponse(404);
+      }
+
+      return new Response(bytes, {
         headers: {
           "Cache-Control": "no-store",
           "Content-Type": cached.contentType,

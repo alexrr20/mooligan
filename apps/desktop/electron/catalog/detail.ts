@@ -1,78 +1,167 @@
-import type { DatabaseSync, StatementSync } from "node:sqlite";
+import type { DatabaseSync } from "node:sqlite";
 
 import {
   CatalogImageDescriptorSchema,
   normalizeScryfallCardDetail,
-  type CatalogCardDetail,
   type CatalogImageDescriptor,
 } from "@mooligan/domain/catalog-detail";
 import {
   ScryfallCardDownloadSchema,
   type ScryfallCardDownload,
 } from "@mooligan/domain/catalog-sync";
+import {
+  CatalogPrintingResultSchema,
+  CatalogSetSymbolDescriptorSchema,
+  type CatalogPrintingResult,
+  type CatalogSetSymbolDescriptor,
+  type SpoilerVisibilitySnapshot,
+} from "@mooligan/domain/spoilers";
 import * as z from "zod";
 import type { JSONType } from "zod";
+
+import { createCatalogReleaseSummaryQuery } from "./release.ts";
+import {
+  catalogVisibilityArguments,
+  catalogVisibilityReason,
+  catalogVisibilitySql,
+  effectiveReleaseDateSql,
+} from "./visibility.ts";
 
 export const maxCatalogPrintingIdLength = 128;
 
 const catalogOrder = new Intl.Collator("en", { numeric: true, sensitivity: "base" });
 
-const CatalogRecordRowSchema = z.object({
+const CatalogVisibleRecordRowSchema = z.object({
   json: z.string(),
   oracleId: z.string().nullable(),
+  printingId: z.string().min(1),
+  releasedOn: z.iso.date().nullable(),
+  rootSetId: z.string().min(1),
 });
+const CatalogRelatedRecordRowSchema = z.object({ json: z.string() });
+const CatalogProtectedRecordRowSchema = CatalogVisibleRecordRowSchema.omit({
+  json: true,
+  oracleId: true,
+});
+const CatalogImageRecordRowSchema = z.object({ json: z.string() });
+const CatalogSetSymbolSourceRowSchema = z.object({ sourceUrl: z.url() });
 const CatalogPrintingIdSchema = z.string().trim().min(1).max(maxCatalogPrintingIdLength);
 
 export function createCatalogDetailQuery(database: DatabaseSync) {
-  const selectPrinting = database.prepare(
-    "SELECT oracle_id AS oracleId, json FROM cards WHERE id = ?",
+  const selectVisiblePrinting = database.prepare(
+    `SELECT cards.oracle_id AS oracleId,
+            cards.json,
+            cards.id AS printingId,
+            ${effectiveReleaseDateSql} AS releasedOn,
+            cards.root_set_id AS rootSetId
+     FROM cards
+     WHERE cards.id = ? AND ${catalogVisibilitySql}`,
+  );
+  const selectProtectedPrinting = database.prepare(
+    `SELECT cards.id AS printingId,
+            ${effectiveReleaseDateSql} AS releasedOn,
+            cards.root_set_id AS rootSetId
+     FROM cards
+     WHERE cards.id = ?`,
   );
   const selectRelated = database.prepare(
-    "SELECT oracle_id AS oracleId, json FROM cards WHERE oracle_id = ?",
+    `SELECT cards.json
+     FROM cards
+     WHERE cards.oracle_id = ? AND ${catalogVisibilitySql}`,
   );
+  const queryReleaseSummary = createCatalogReleaseSummaryQuery(database);
 
-  return (printingId: string): CatalogCardDetail | null => {
+  return (
+    printingId: string,
+    visibility: SpoilerVisibilitySnapshot,
+  ): CatalogPrintingResult | null => {
     const validPrintingId = validateCatalogPrintingId(printingId);
     if (!validPrintingId) {
       return null;
     }
 
-    const selectedRow = readCatalogRow(selectPrinting, validPrintingId);
-    if (!selectedRow) {
-      return null;
+    const visibilityArguments = catalogVisibilityArguments(visibility);
+    const selectedValue = selectVisiblePrinting.get(validPrintingId, ...visibilityArguments);
+    const selectedRow = CatalogVisibleRecordRowSchema.safeParse(selectedValue);
+
+    if (!selectedRow.success) {
+      if (selectedValue !== undefined) {
+        throw new Error("The local card catalog contains an invalid card row.");
+      }
+
+      const protectedValue = selectProtectedPrinting.get(validPrintingId);
+      if (protectedValue === undefined) {
+        return null;
+      }
+      const protectedRow = CatalogProtectedRecordRowSchema.safeParse(protectedValue);
+      if (!protectedRow.success) {
+        throw new Error("The local card catalog contains an invalid card row.");
+      }
+      const reason = catalogVisibilityReason(visibility, protectedRow.data);
+      if (reason !== null || protectedRow.data.releasedOn === null) {
+        throw new Error("The local card catalog returned inconsistent preview visibility.");
+      }
+
+      return CatalogPrintingResultSchema.parse({
+        printingId: protectedRow.data.printingId,
+        release: queryReleaseSummary(protectedRow.data.rootSetId, visibility.currentDate),
+        releasedOn: protectedRow.data.releasedOn,
+        status: "protected",
+      });
     }
 
-    const selected = parseCatalogRecord(selectedRow.json);
-    const related = selectedRow.oracleId
+    const selected = parseCatalogRecord(selectedRow.data.json);
+    const related = selectedRow.data.oracleId
       ? z
-          .array(CatalogRecordRowSchema)
-          .parse(selectRelated.all(selectedRow.oracleId))
+          .array(CatalogRelatedRecordRowSchema)
+          .parse(selectRelated.all(selectedRow.data.oracleId, ...visibilityArguments))
           .map((row) => parseCatalogRecord(row.json))
           .sort(comparePrintings)
       : [];
+    const detail = normalizeScryfallCardDetail(selected, related);
+    const reason = catalogVisibilityReason(visibility, selectedRow.data);
+    if (reason === null) {
+      throw new Error("The local card catalog returned inconsistent preview visibility.");
+    }
 
-    return normalizeScryfallCardDetail(selected, related);
+    return CatalogPrintingResultSchema.parse({
+      detail,
+      status: "visible",
+      visibility:
+        reason === "released"
+          ? { reason }
+          : {
+              reason,
+              release: queryReleaseSummary(selectedRow.data.rootSetId, visibility.currentDate),
+            },
+    });
   };
 }
 
 export function createCatalogImageSourceQuery(database: DatabaseSync) {
   const selectPrinting = database.prepare(
-    "SELECT oracle_id AS oracleId, json FROM cards WHERE id = ?",
+    `SELECT cards.json
+     FROM cards
+     WHERE cards.id = ? AND ${catalogVisibilitySql}`,
   );
 
-  return (input: CatalogImageDescriptor): string | null => {
+  return (input: CatalogImageDescriptor, visibility: SpoilerVisibilitySnapshot): string | null => {
     const image = CatalogImageDescriptorSchema.parse(input);
     const validPrintingId = validateCatalogPrintingId(image.printingId);
     if (!validPrintingId) {
       return null;
     }
 
-    const row = readCatalogRow(selectPrinting, validPrintingId);
-    if (!row) {
+    const value = selectPrinting.get(validPrintingId, ...catalogVisibilityArguments(visibility));
+    if (value === undefined) {
       return null;
     }
+    const row = CatalogImageRecordRowSchema.safeParse(value);
+    if (!row.success) {
+      throw new Error("The local card catalog contains an invalid card row.");
+    }
 
-    const card = parseCatalogRecord(row.json);
+    const card = parseCatalogRecord(row.data.json);
     const usesFaceImages = card.card_faces?.some((face) => face.image_uris) === true;
 
     if (usesFaceImages) {
@@ -83,24 +172,26 @@ export function createCatalogImageSourceQuery(database: DatabaseSync) {
   };
 }
 
+export function createCatalogSetSymbolSourceQuery(database: DatabaseSync) {
+  const selectSymbol = database.prepare("SELECT symbol_uri AS sourceUrl FROM sets WHERE id = ?");
+
+  return (input: CatalogSetSymbolDescriptor): string | null => {
+    const symbol = CatalogSetSymbolDescriptorSchema.parse(input);
+    const value = selectSymbol.get(symbol.setId);
+    if (value === undefined) {
+      return null;
+    }
+    const row = CatalogSetSymbolSourceRowSchema.safeParse(value);
+    if (!row.success) {
+      throw new Error("The local card catalog contains an invalid set symbol row.");
+    }
+    return row.data.sourceUrl;
+  };
+}
+
 export function validateCatalogPrintingId(value: JSONType) {
   const printingId = CatalogPrintingIdSchema.safeParse(value);
   return printingId.success ? printingId.data : null;
-}
-
-function readCatalogRow(statement: StatementSync, printingId: string) {
-  const value = statement.get(printingId);
-
-  if (value === undefined) {
-    return null;
-  }
-
-  const row = CatalogRecordRowSchema.safeParse(value);
-  if (!row.success) {
-    throw new Error("The local card catalog contains an invalid card row.");
-  }
-
-  return row.data;
 }
 
 function parseCatalogRecord(value: string) {

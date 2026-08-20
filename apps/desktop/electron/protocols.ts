@@ -2,6 +2,7 @@ import type { Protocol } from "electron";
 
 import { AUTH_PROTOCOL } from "./auth/service.ts";
 import { catalogImageScheme } from "./catalog/image-protocol.ts";
+import { catalogSetSymbolScheme } from "./catalog/set-symbol-protocol.ts";
 
 export function registerDesktopSchemes(protocol: Pick<Protocol, "registerSchemesAsPrivileged">) {
   protocol.registerSchemesAsPrivileged([
@@ -16,6 +17,14 @@ export function registerDesktopSchemes(protocol: Pick<Protocol, "registerSchemes
         supportFetchAPI: true,
       },
       scheme: catalogImageScheme,
+    },
+    {
+      privileges: {
+        secure: true,
+        standard: true,
+        supportFetchAPI: true,
+      },
+      scheme: catalogSetSymbolScheme,
     },
   ]);
 }

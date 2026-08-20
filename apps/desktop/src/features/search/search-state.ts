@@ -5,6 +5,7 @@ export type CatalogSearchState = {
   artSeries?: true;
   digital?: true;
   grid?: true;
+  mode?: "upcoming";
   query?: string;
   tokens?: true;
   uniqueCards?: true;
@@ -16,6 +17,7 @@ export const CatalogSearchStateSchema = z.strictObject({
   artSeries: z.literal(true).optional(),
   digital: z.literal(true).optional(),
   grid: z.literal(true).optional(),
+  mode: z.literal("upcoming").optional(),
   query: z
     .string()
     .min(1)
@@ -31,6 +33,7 @@ const CatalogSearchInputSchema = z.object({
   artSeries: z.json().optional(),
   digital: z.json().optional(),
   grid: z.json().optional(),
+  mode: z.json().optional(),
   query: z.json().optional(),
   tokens: z.json().optional(),
   uniqueCards: z.json().optional(),
@@ -55,6 +58,7 @@ export function validateCatalogSearch(search: CatalogSearchState | JSONType): Ca
     ...(input.artSeries === true && { artSeries: true as const }),
     ...(input.digital === true && { digital: true as const }),
     ...(input.grid === true && { grid: true as const }),
+    ...(input.mode === "upcoming" && { mode: "upcoming" as const }),
     ...(query && { query }),
     ...(input.tokens === true && { tokens: true as const }),
     ...(input.uniqueCards === true && { uniqueCards: true as const }),

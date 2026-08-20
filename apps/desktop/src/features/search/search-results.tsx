@@ -6,11 +6,12 @@ import { useMemo, useRef } from "react";
 import { colors } from "../../styles/tokens.stylex.js";
 import { useCatalogImageLoading } from "../catalog/catalog-image-loading";
 import { catalogImageUrl } from "../catalog/catalog-image";
+import { CatalogSetSymbol } from "../catalog/catalog-set-symbol";
 import { type CatalogSearchOrigin, withCatalogSearchOrigin } from "../cards/card-navigation";
 import { PrintingPrices } from "../cards/printing-prices";
+import { formatSpoilerReleaseDate } from "../spoilers/spoiler-ui-state";
 
-type SearchResultsProps = {
-  cards: CatalogCardSummary[];
+type CommonSearchResultsProps = {
   error: string;
   grid: boolean;
   hasMore: boolean;
@@ -20,6 +21,22 @@ type SearchResultsProps = {
   origin: CatalogSearchOrigin;
   total: number | null;
 };
+
+type SearchResultsProps = CommonSearchResultsProps & {
+  cards: CatalogCardSummary[];
+};
+
+type UpcomingSearchResultsProps = CommonSearchResultsProps & {
+  printings: CatalogUpcomingPrinting[];
+};
+
+type CatalogResultItem =
+  | {
+      card: CatalogCardSummary;
+      releasedOn?: string;
+      status: "visible";
+    }
+  | Extract<CatalogUpcomingPrinting, { status: "protected" }>;
 
 export function SearchResults({
   cards,
@@ -32,10 +49,78 @@ export function SearchResults({
   origin,
   total,
 }: SearchResultsProps) {
+  return (
+    <CatalogResults
+      emptyCopy="Try a card name or a three-letter set code."
+      emptyTitle="No matching cards"
+      error={error}
+      grid={grid}
+      hasMore={hasMore}
+      imagesReady={imagesReady}
+      items={cards.map((card) => ({ card, status: "visible" as const }))}
+      loading={loading}
+      origin={origin}
+      total={total}
+      onLoadMore={onLoadMore}
+    />
+  );
+}
+
+export function UpcomingSearchResults({
+  error,
+  grid,
+  hasMore,
+  imagesReady,
+  loading,
+  onLoadMore,
+  origin,
+  printings,
+  total,
+}: UpcomingSearchResultsProps) {
+  return (
+    <CatalogResults
+      emptyCopy="The installed catalog has no future printings."
+      emptyTitle="No upcoming cards"
+      error={error}
+      grid={grid}
+      hasMore={hasMore}
+      imagesReady={imagesReady}
+      items={printings}
+      loading={loading}
+      origin={origin}
+      total={total}
+      onLoadMore={onLoadMore}
+    />
+  );
+}
+
+type CatalogResultsProps = CommonSearchResultsProps & {
+  emptyCopy: string;
+  emptyTitle: string;
+  items: CatalogResultItem[];
+};
+
+function CatalogResults({
+  emptyCopy,
+  emptyTitle,
+  error,
+  grid,
+  hasMore,
+  imagesReady,
+  items,
+  loading,
+  onLoadMore,
+  origin,
+  total,
+}: CatalogResultsProps) {
   const listRef = useRef<HTMLOListElement>(null);
   const imageIds = useMemo(
-    () => cards.flatMap((card) => ((grid ? card.gridImage : card.image) ? [card.id] : [])),
-    [cards, grid],
+    () =>
+      items.flatMap((item) => {
+        if (item.status === "protected") return [];
+        return (grid ? item.card.gridImage : item.card.image) ? [item.card.id] : [];
+      }),
+    [grid, items],
   );
   const imageLoading = useCatalogImageLoading(listRef, imageIds, grid, imagesReady, "240px 0px");
 
@@ -53,15 +138,15 @@ export function SearchResults({
     );
   }
 
-  if (cards.length === 0 && !loading) {
+  if (items.length === 0 && !loading) {
     return (
       <div {...stylex.props(styles.message)}>
         <span {...stylex.props(styles.messageMark)} aria-hidden="true">
           0
         </span>
         <div>
-          <strong {...stylex.props(styles.messageTitle)}>No matching cards</strong>
-          <p {...stylex.props(styles.messageCopy)}>Try a card name or a three-letter set code.</p>
+          <strong {...stylex.props(styles.messageTitle)}>{emptyTitle}</strong>
+          <p {...stylex.props(styles.messageCopy)}>{emptyCopy}</p>
         </div>
       </div>
     );
@@ -78,17 +163,19 @@ export function SearchResults({
         </div>
       ) : null}
       <ol ref={listRef} {...stylex.props(styles.cardList, grid && styles.cardGrid)} start={1}>
-        {cards.map((card, index) => {
-          const image = grid ? card.gridImage : card.image;
+        {items.map((item, index) => {
+          const card = item.status === "visible" ? item.card : null;
+          const printingId = item.status === "visible" ? item.card.id : item.printingId;
+          const image = card ? (grid ? card.gridImage : card.image) : null;
           const imageUrl = image ? catalogImageUrl(image) : null;
-          const imageActive = imageUrl && imageLoading.ids.has(card.id);
-          const imageFailed = imageLoading.failed.has(card.id);
+          const imageActive = imageUrl && imageLoading.ids.has(printingId);
+          const imageFailed = imageLoading.failed.has(printingId);
 
           return (
-            <li {...stylex.props(styles.cardItem)} key={card.id}>
+            <li {...stylex.props(styles.cardItem)} key={printingId}>
               <Link
                 {...stylex.props(styles.cardRow, grid && styles.cardTile)}
-                params={{ printingId: card.id }}
+                params={{ printingId }}
                 state={withCatalogSearchOrigin(origin)}
                 to="/cards/$printingId"
               >
@@ -98,19 +185,34 @@ export function SearchResults({
                   </span>
                 ) : null}
                 <div
-                  {...stylex.props(styles.cardImageFrame, grid && styles.tileImageFrame)}
-                  data-catalog-image-id={imageUrl ? card.id : undefined}
+                  {...stylex.props(
+                    styles.cardImageFrame,
+                    grid && styles.tileImageFrame,
+                    item.status === "protected" && styles.protectedImageFrame,
+                  )}
+                  data-catalog-image-id={imageUrl ? printingId : undefined}
                 >
-                  {imageActive && !imageFailed ? (
+                  {item.status === "protected" ? (
+                    <div {...stylex.props(styles.protectedArtwork)}>
+                      <CatalogSetSymbol
+                        code={item.release.code}
+                        size={grid ? "large" : "small"}
+                        symbol={item.release.symbol}
+                      />
+                      {grid ? (
+                        <span {...stylex.props(styles.protectedArtworkLabel)}>Protected</span>
+                      ) : null}
+                    </div>
+                  ) : imageActive && !imageFailed ? (
                     <img
                       {...stylex.props(styles.cardImage)}
-                      key={`${imageLoading.generation}:${card.id}`}
-                      alt={`${card.name}, ${card.setName ?? card.setCode} printing`}
+                      key={`${imageLoading.generation}:${printingId}`}
+                      alt={`${item.card.name}, ${item.card.setName ?? item.card.setCode} printing`}
                       decoding="async"
                       loading="eager"
                       src={imageUrl}
-                      onError={() => imageLoading.settle(card.id, true)}
-                      onLoad={() => imageLoading.settle(card.id)}
+                      onError={() => imageLoading.settle(printingId, true)}
+                      onLoad={() => imageLoading.settle(printingId)}
                     />
                   ) : imageUrl && !imageFailed ? null : (
                     <span {...stylex.props(styles.cardImageFallback)}>
@@ -118,24 +220,37 @@ export function SearchResults({
                     </span>
                   )}
                 </div>
-                {grid ? (
+                {grid && item.status === "visible" ? (
                   <div {...stylex.props(styles.tilePrices)}>
                     <PrintingPrices />
                   </div>
                 ) : null}
                 <div {...stylex.props(styles.cardIdentity, grid && styles.tileIdentity)}>
                   <strong {...stylex.props(styles.cardName, grid && styles.tileName)}>
-                    {card.name}
+                    {card?.name ?? "Protected preview"}
                   </strong>
+                  {item.status === "protected" ? (
+                    <span {...stylex.props(styles.protectedCopy)}>Spoiler protection</span>
+                  ) : null}
                 </div>
                 <div {...stylex.props(styles.printing, grid && styles.tilePrinting)}>
                   <span {...stylex.props(styles.printingCopy)}>
-                    {card.setName ?? "Unknown set"}
+                    {item.status === "visible" ? item.card.setName : item.release.name}
                   </span>
                   <span {...stylex.props(styles.printingCopy, styles.printingNumber)}>
-                    #{card.collectorNumber}
+                    {item.status === "visible"
+                      ? `#${item.card.collectorNumber}`
+                      : item.release.code}
                   </span>
-                  {!grid ? <PrintingPrices /> : null}
+                  {item.releasedOn ? (
+                    <time
+                      {...stylex.props(styles.printingCopy, styles.releaseDate)}
+                      dateTime={item.releasedOn}
+                    >
+                      {formatSpoilerReleaseDate(item.releasedOn)}
+                    </time>
+                  ) : null}
+                  {!grid && item.status === "visible" ? <PrintingPrices /> : null}
                 </div>
               </Link>
             </li>
@@ -151,7 +266,7 @@ export function SearchResults({
         >
           <span>{loading ? "Reading…" : "Show 100 more"}</span>
           <span {...stylex.props(styles.moreCount)}>
-            {cards.length.toLocaleString()}
+            {items.length.toLocaleString()}
             {total === null ? "+" : ` / ${total.toLocaleString()}`}
           </span>
         </Button>
@@ -271,6 +386,23 @@ const styles = stylex.create({
     letterSpacing: "0.08em",
     textTransform: "uppercase",
   },
+  protectedImageFrame: {
+    backgroundColor: "#171914",
+    backgroundImage:
+      "linear-gradient(135deg, rgba(199, 238, 0, 0.055) 0, rgba(199, 238, 0, 0.055) 1px, transparent 1px, transparent 12px)",
+    backgroundSize: "13px 13px",
+  },
+  protectedArtwork: {
+    display: "grid",
+    placeItems: "center",
+    gap: "14px",
+  },
+  protectedArtworkLabel: {
+    color: "#a6a89d",
+    fontSize: "7px",
+    letterSpacing: "0.14em",
+    textTransform: "uppercase",
+  },
   tileImageFrame: {
     width: "100%",
     boxShadow: "6px 6px 0 rgba(0, 0, 0, 0.4)",
@@ -301,6 +433,13 @@ const styles = stylex.create({
     textOverflow: "clip",
     whiteSpace: "normal",
   },
+  protectedCopy: {
+    color: colors.accent,
+    fontSize: "7px",
+    letterSpacing: "0.11em",
+    lineHeight: 1.4,
+    textTransform: "uppercase",
+  },
   printing: {
     minWidth: 0,
   },
@@ -320,6 +459,10 @@ const styles = stylex.create({
   },
   printingNumber: {
     marginTop: "2px",
+  },
+  releaseDate: {
+    marginTop: "6px",
+    color: "#c0c2b8",
   },
   tilePrices: {
     paddingInline: "4px",

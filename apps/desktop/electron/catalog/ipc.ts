@@ -7,10 +7,23 @@ import { Worker } from "node:worker_threads";
 import { CatalogSnapshotSchema, type CatalogSnapshot } from "@mooligan/domain/catalog";
 import {
   CatalogImageDescriptorSchema,
-  type CatalogCardDetail,
   type CatalogImageDescriptor,
 } from "@mooligan/domain/catalog-detail";
-import { CatalogReleaseSchema, type CatalogRelease } from "@mooligan/domain/catalog-sync";
+import {
+  CatalogReleaseSchema,
+  ScryfallSetListSchema,
+  type CatalogRelease,
+  type ScryfallSetDownload,
+} from "@mooligan/domain/catalog-sync";
+import {
+  CatalogSetSymbolDescriptorSchema,
+  SpoilerVisibilitySnapshotSchema,
+  type CatalogPrintingResult,
+  type CatalogReleaseSummary,
+  type CatalogSetSymbolDescriptor,
+  type SpoilerRevealSummaries,
+  type SpoilerVisibilitySnapshot,
+} from "@mooligan/domain/spoilers";
 import { app, ipcMain, net, type IpcMainInvokeEvent } from "electron";
 import * as z from "zod";
 
@@ -18,7 +31,18 @@ import { recoverInterruptedReplacement } from "./files";
 import { validateCatalogPrintingId } from "./detail";
 import { catalogSchemaVersion, importCatalog, readGzipJsonLines } from "./import";
 import { parseCatalogQueryWorkerResponse, validateCatalogListRequest } from "./query";
-import type { CatalogListPage, CatalogQueryOperation, CatalogQueryWorkerRequest } from "./query";
+import {
+  validateCatalogUpcomingPrintingRequest,
+  type CatalogListPage,
+  type CatalogQueryOperation,
+  type CatalogQueryWorkerRequest,
+  type CatalogUpcomingPrintingPage,
+} from "./query";
+import {
+  CatalogVisibilityChangedError,
+  catalogVisibilitySnapshotsEqual,
+  readWithStableCatalogVisibility,
+} from "./stable-visibility";
 import { assertTrustedSender } from "../ipc-security";
 
 export type CatalogProgress = {
@@ -32,13 +56,27 @@ export type CatalogStatus =
   | (CatalogSnapshot & { installed: true; updateAvailable: boolean });
 
 const apiBaseUrl = process.env.MOOLIGAN_API_URL ?? "http://127.0.0.1:3000";
+const scryfallSetsUrl = "https://api.scryfall.com/sets";
+const scryfallRequestHeaders = {
+  Accept: "application/json",
+  "User-Agent": "Mooligan/0.0.0 (https://github.com/alexrr20/mooligan)",
+};
 const CatalogMetadataSchema = CatalogSnapshotSchema.extend({ schemaVersion: z.number().int() });
 const FileSystemErrorSchema = z.object({ code: z.string().optional() });
 let activeDownload: Promise<CatalogStatus> | undefined;
+let catalogEpoch = 0;
 let catalogQueriesAvailable = Promise.resolve();
 let catalogQueryId = 0;
 let catalogQueryWorker: Worker | undefined;
-type CatalogQueryResult = CatalogCardDetail | CatalogListPage | string | null;
+let getCatalogVisibilitySnapshot: (() => SpoilerVisibilitySnapshot) | undefined;
+type CatalogQueryResult =
+  | CatalogListPage
+  | CatalogPrintingResult
+  | CatalogReleaseSummary[]
+  | CatalogUpcomingPrintingPage
+  | SpoilerRevealSummaries
+  | string
+  | null;
 const catalogQueries = new Map<
   number,
   {
@@ -48,7 +86,12 @@ const catalogQueries = new Map<
   }
 >();
 
-export function registerCatalogIpc() {
+export type CatalogIpcOptions = {
+  getVisibilitySnapshot: () => SpoilerVisibilitySnapshot;
+};
+
+export function registerCatalogIpc(options: CatalogIpcOptions) {
+  getCatalogVisibilitySnapshot = options.getVisibilitySnapshot;
   ipcMain.handle("catalog:status", (event) => {
     assertTrustedSender(event);
     return getCatalogStatus();
@@ -56,10 +99,10 @@ export function registerCatalogIpc() {
   ipcMain.handle("catalog:list", async (event, request) => {
     assertTrustedSender(event);
     await catalogQueriesAvailable;
-    return queryCatalog({
-      request: validateCatalogListRequest(request),
-      type: "list",
-    });
+    const validRequest = validateCatalogListRequest(request);
+    return queryCatalogWithStableVisibility((visibility) =>
+      queryCatalog({ request: validRequest, type: "list", visibility }),
+    );
   });
   ipcMain.handle("catalog:detail", async (event, printingId) => {
     assertTrustedSender(event);
@@ -70,10 +113,35 @@ export function registerCatalogIpc() {
     }
 
     await catalogQueriesAvailable;
-    return queryCatalog({
-      printingId: validPrintingId,
-      type: "detail",
-    });
+    return queryCatalogWithStableVisibility((visibility) =>
+      queryCatalog({ printingId: validPrintingId, type: "detail", visibility }),
+    );
+  });
+  ipcMain.handle("catalog:upcoming", async (event) => {
+    assertTrustedSender(event);
+    await catalogQueriesAvailable;
+    return queryCatalogWithStableVisibility((visibility) =>
+      queryCatalog({ type: "upcoming", visibility }),
+    );
+  });
+  ipcMain.handle("catalog:upcoming-printings", async (event, request) => {
+    assertTrustedSender(event);
+    await catalogQueriesAvailable;
+    const validRequest = validateCatalogUpcomingPrintingRequest(request);
+    return queryCatalogWithStableVisibility((visibility) =>
+      queryCatalog({ request: validRequest, type: "upcoming-printings", visibility }),
+    );
+  });
+  ipcMain.handle("catalog:spoiler-reveals", async (event) => {
+    assertTrustedSender(event);
+    await catalogQueriesAvailable;
+    return queryCatalogWithStableVisibility((visibility) =>
+      queryCatalog({
+        printingIds: visibility.revealedPrintingIds,
+        rootSetIds: visibility.revealedRootSetIds,
+        type: "spoiler-reveals",
+      }),
+    );
   });
   ipcMain.handle("catalog:download", (event) => {
     assertTrustedSender(event);
@@ -161,6 +229,7 @@ async function downloadCatalog(event: IpcMainInvokeEvent): Promise<CatalogStatus
   });
 
   try {
+    const sets = await fetchScryfallSets();
     const response = await net.fetch(release.downloadUrl, {
       headers: { Accept: "application/gzip,application/octet-stream;q=0.9,*/*;q=0.8" },
     });
@@ -197,7 +266,7 @@ async function downloadCatalog(event: IpcMainInvokeEvent): Promise<CatalogStatus
       }),
     );
     const lines = readGzipJsonLines(Readable.from(monitored));
-    const snapshot = await importCatalog(partial, release, lines, (count) => {
+    const snapshot = await importCatalog(partial, release, sets, lines, (count) => {
       completedCards = count;
       reportProgress();
     });
@@ -209,6 +278,7 @@ async function downloadCatalog(event: IpcMainInvokeEvent): Promise<CatalogStatus
     const resumeCatalogQueries = pauseCatalogQueries();
 
     try {
+      catalogEpoch += 1;
       await stopCatalogQueryWorker();
       await replaceCatalog(partial, destination, backup);
     } finally {
@@ -220,6 +290,25 @@ async function downloadCatalog(event: IpcMainInvokeEvent): Promise<CatalogStatus
     await rm(partial, { force: true });
     throw error;
   }
+}
+
+async function fetchScryfallSets(): Promise<ScryfallSetDownload[]> {
+  const response = await net.fetch(scryfallSetsUrl, { headers: scryfallRequestHeaders });
+  if (!response.ok) {
+    throw new Error(`The Scryfall set catalog returned HTTP ${response.status}.`);
+  }
+
+  let value: unknown;
+  try {
+    value = await response.json();
+  } catch {
+    throw new Error("The Scryfall set catalog returned invalid JSON.");
+  }
+  const sets = ScryfallSetListSchema.safeParse(value);
+  if (!sets.success) {
+    throw new Error("The Scryfall set catalog response was invalid.");
+  }
+  return sets.data.data;
 }
 
 async function fetchCatalogRelease(): Promise<CatalogRelease> {
@@ -282,22 +371,82 @@ export async function queryCatalogImageSource(image: CatalogImageDescriptor) {
   const validImage = CatalogImageDescriptorSchema.parse(image);
   await catalogQueriesAvailable;
   try {
-    return await queryCatalog({ image: validImage, type: "image-source" });
-  } catch {
+    return await queryAuthorizedCatalogImageSource(validImage);
+  } catch (error) {
+    if (error instanceof CatalogVisibilityChangedError) {
+      throw error;
+    }
     await catalogQueriesAvailable;
-    return queryCatalog({ image: validImage, type: "image-source" });
+    return queryAuthorizedCatalogImageSource(validImage);
   }
+}
+
+export async function queryCatalogSetSymbolSource(symbol: CatalogSetSymbolDescriptor) {
+  const validSymbol = CatalogSetSymbolDescriptorSchema.parse(symbol);
+  await catalogQueriesAvailable;
+  return queryCatalog({ symbol: validSymbol, type: "set-symbol-source" });
+}
+
+export async function resolveCatalogRootSetId(targetId: string) {
+  const validTargetId = validateCatalogPrintingId(targetId);
+  if (!validTargetId) {
+    return null;
+  }
+  await catalogQueriesAvailable;
+  return queryCatalog({ targetId: validTargetId, type: "root-set" });
+}
+
+async function queryAuthorizedCatalogImageSource(image: CatalogImageDescriptor) {
+  const authorizedCatalogEpoch = catalogEpoch;
+  const stable = await readWithStableCatalogVisibility(
+    readCatalogVisibilitySnapshot,
+    (visibility) => queryCatalog({ image, type: "image-source", visibility }),
+  );
+
+  if (authorizedCatalogEpoch !== catalogEpoch) {
+    throw new CatalogVisibilityChangedError();
+  }
+
+  return stable.result
+    ? {
+        isCurrent: () =>
+          authorizedCatalogEpoch === catalogEpoch &&
+          catalogVisibilitySnapshotsEqual(stable.visibility, readCatalogVisibilitySnapshot()),
+        sourceUrl: stable.result,
+      }
+    : null;
+}
+
+async function queryCatalogWithStableVisibility<Result>(
+  query: (visibility: SpoilerVisibilitySnapshot) => Promise<Result>,
+) {
+  return (await readWithStableCatalogVisibility(readCatalogVisibilitySnapshot, query)).result;
 }
 
 function queryCatalog(
   operation: Extract<CatalogQueryOperation, { type: "detail" }>,
-): Promise<CatalogCardDetail | null>;
+): Promise<CatalogPrintingResult | null>;
 function queryCatalog(
   operation: Extract<CatalogQueryOperation, { type: "image-source" }>,
 ): Promise<string | null>;
 function queryCatalog(
   operation: Extract<CatalogQueryOperation, { type: "list" }>,
 ): Promise<CatalogListPage>;
+function queryCatalog(
+  operation: Extract<CatalogQueryOperation, { type: "root-set" }>,
+): Promise<string | null>;
+function queryCatalog(
+  operation: Extract<CatalogQueryOperation, { type: "set-symbol-source" }>,
+): Promise<string | null>;
+function queryCatalog(
+  operation: Extract<CatalogQueryOperation, { type: "spoiler-reveals" }>,
+): Promise<SpoilerRevealSummaries>;
+function queryCatalog(
+  operation: Extract<CatalogQueryOperation, { type: "upcoming" }>,
+): Promise<CatalogReleaseSummary[]>;
+function queryCatalog(
+  operation: Extract<CatalogQueryOperation, { type: "upcoming-printings" }>,
+): Promise<CatalogUpcomingPrintingPage>;
 function queryCatalog(operation: CatalogQueryOperation): Promise<CatalogQueryResult> {
   const id = ++catalogQueryId;
 
@@ -316,6 +465,13 @@ function queryCatalog(operation: CatalogQueryOperation): Promise<CatalogQueryRes
       reject(catalogReadError());
     }
   });
+}
+
+function readCatalogVisibilitySnapshot() {
+  if (!getCatalogVisibilitySnapshot) {
+    throw new Error("Catalog spoiler protection has not been initialized.");
+  }
+  return SpoilerVisibilitySnapshotSchema.parse(getCatalogVisibilitySnapshot());
 }
 
 function getCatalogQueryWorker() {

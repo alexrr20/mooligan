@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 const preferencesQueryKey = ["preferences"] as const;
-const defaultPreferences: Preferences = { motion: "system" };
+const defaultPreferences: Preferences = { motion: "system", spoilerPolicy: "protect" };
 
 export function usePreferences() {
   const bridge = window.preferences;

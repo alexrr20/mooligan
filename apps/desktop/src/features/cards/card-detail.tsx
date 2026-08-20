@@ -1,4 +1,5 @@
 import type { CatalogCardDetail as CatalogCardDetailModel } from "@mooligan/domain/catalog-detail";
+import type { CatalogPrintingVisibility } from "@mooligan/domain/spoilers";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 import type { Ref } from "react";
@@ -11,11 +12,13 @@ import { CardLegalities } from "./card-legalities";
 import type { CatalogSearchOrigin } from "./card-navigation";
 import { PrintingDetails } from "./printing-details";
 import { PrintingGallery } from "./printing-gallery";
+import { PrintingSpoilerControl } from "../spoilers/printing-spoiler-control";
 
 type CardDetailProps = {
   detail: CatalogCardDetailModel;
   headingRef: Ref<HTMLHeadingElement>;
   origin: CatalogSearchOrigin | null;
+  visibility: CatalogPrintingVisibility;
 };
 
 type CardDetailSkeletonProps = {
@@ -29,7 +32,7 @@ type CardDetailProblemProps = {
   origin: CatalogSearchOrigin | null;
 };
 
-export function CardDetail({ detail, headingRef, origin }: CardDetailProps) {
+export function CardDetail({ detail, headingRef, origin, visibility }: CardDetailProps) {
   const firstFace = detail.card.faces[0];
   const multipleFaces = detail.card.faces.length > 1;
 
@@ -70,6 +73,7 @@ export function CardDetail({ detail, headingRef, origin }: CardDetailProps) {
 
           <CardFaces card={detail.card} />
           <PrintingDetails printing={detail.selectedPrinting} />
+          <PrintingSpoilerControl printingId={detail.selectedPrinting.id} visibility={visibility} />
           <CardLegalities legalities={detail.legalities} />
         </div>
       </div>
@@ -137,7 +141,7 @@ export function CardDetailProblem({ headingRef, kind, onRetry, origin }: CardDet
   );
 }
 
-function ReturnNavigation({ origin }: { origin: CatalogSearchOrigin | null }) {
+export function ReturnNavigation({ origin }: { origin: CatalogSearchOrigin | null }) {
   return (
     <nav {...stylex.props(styles.returnRow)} aria-label="Card detail return">
       <Link {...stylex.props(styles.returnLink)} search={origin?.search ?? {}} to="/search">

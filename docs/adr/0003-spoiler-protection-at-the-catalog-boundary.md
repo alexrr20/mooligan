@@ -80,7 +80,7 @@ bypass the policy.
 
 Enforcement occurs before data crosses the catalog boundary:
 
-- Browse and search omit protected printings entirely.
+- Ordinary Card index browse and text search omit protected printings entirely.
 - Unique-card queries filter protected printings before choosing the newest
   representative.
 - Search totals and pagination describe visible results only.
@@ -92,10 +92,15 @@ Enforcement occurs before data crosses the catalog boundary:
   bytes already exist in the device-local cache.
 - Upcoming-set queries expose only root release-family name, code, symbol, and
   the next future release date within that family before consent.
+- The search page's dedicated Upcoming query enumerates every future printing.
+  Its protected result variant contains only printing ID, root release-family
+  summary, and effective release date; its visible variant contains the normal
+  card summary. Protection is applied before either result crosses the boundary.
 
-Search may display a static “Spoiler protection on” status while previews exist
-in the catalog. It must not reveal whether protected cards match the current
-query, nor show names, placeholders, counts, or preview progress in results.
+Search must not reveal whether protected cards match the current Card index
+query, nor show names, placeholders, counts, or preview progress in ordinary
+Card index results. The intentional Upcoming tab may show its total and generic
+protected items, but never protected card characteristics.
 
 ### Reveal is explicit and reversible
 
@@ -147,8 +152,9 @@ stale offline device cannot restore exceptions from an older generation.
   visibility rule and require tests proving that no renderer input bypasses it.
 - The card-detail contract becomes a visible/protected result rather than
   returning full details for every valid printing ID.
-- The Sets page becomes the intentional discovery surface for upcoming release
-  families; ordinary search remains spoiler-safe.
+- The Sets page discovers upcoming release families, and the Search page's
+  Upcoming tab discovers individual future printings. Ordinary Card index
+  search remains spoiler-safe.
 - Re-protecting content does not need to delete cached image bytes. The image
   protocol still refuses them while protection is effective.
 - Spoiler protection does not defend against a user inspecting the raw local

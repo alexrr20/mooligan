@@ -59,6 +59,10 @@ void test("the custom scheme is registered as secure before Electron readiness",
       privileges: { secure: true, standard: true, supportFetchAPI: true },
       scheme: "mooligan-image",
     },
+    {
+      privileges: { secure: true, standard: true, supportFetchAPI: true },
+      scheme: "mooligan-set-symbol",
+    },
   ]);
 });
 

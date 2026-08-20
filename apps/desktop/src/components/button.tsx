@@ -52,6 +52,11 @@ const styles = stylex.create({
     borderRadius: "12px",
     whiteSpace: "nowrap",
     cursor: "pointer",
+    transition: "opacity 140ms ease",
+    ":disabled": {
+      cursor: "not-allowed",
+      opacity: 0.42,
+    },
   },
   primary: {
     color: "#064E3B",

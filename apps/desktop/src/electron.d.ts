@@ -5,6 +5,13 @@ import type {
 } from "../electron/auth/service";
 import type { CatalogCardDetail as CatalogCardDetailType } from "@mooligan/domain/catalog-detail";
 import type {
+  CatalogPrintingResult as CatalogPrintingResultType,
+  CatalogReleaseSummary as CatalogReleaseSummaryType,
+  SpoilerPolicy as SpoilerPolicyType,
+  SpoilerRevealSummaries as SpoilerRevealSummariesType,
+  SpoilerState as SpoilerStateType,
+} from "@mooligan/domain/spoilers";
+import type {
   CatalogProgress as CatalogProgressType,
   CatalogStatus as CatalogStatusType,
 } from "../electron/catalog/ipc";
@@ -12,6 +19,9 @@ import type {
   CatalogCardSummary as CatalogCardSummaryType,
   CatalogListPage as CatalogListPageType,
   CatalogListRequest,
+  CatalogUpcomingPrinting as CatalogUpcomingPrintingType,
+  CatalogUpcomingPrintingPage as CatalogUpcomingPrintingPageType,
+  CatalogUpcomingPrintingRequest,
 } from "../electron/catalog/query";
 import type {
   PreferenceSyncSnapshot as PreferenceSyncSnapshotType,
@@ -24,11 +34,27 @@ import type {
 } from "../electron/workspace/preferences";
 
 type CatalogApi = {
-  detail: (printingId: string) => Promise<CatalogCardDetailType | null>;
+  detail: (printingId: string) => Promise<CatalogPrintingResultType | null>;
   download: () => Promise<CatalogStatusType>;
   list: (request?: CatalogListRequest) => Promise<CatalogListPageType>;
   onProgress: (callback: (progress: CatalogProgressType) => void) => () => void;
+  spoilerRevealSummaries: () => Promise<SpoilerRevealSummariesType>;
   status: () => Promise<CatalogStatusType>;
+  upcoming: () => Promise<CatalogReleaseSummaryType[]>;
+  upcomingPrintings: (
+    request?: CatalogUpcomingPrintingRequest,
+  ) => Promise<CatalogUpcomingPrintingPageType>;
+};
+
+type SpoilersApi = {
+  onChanged: (callback: (state: SpoilerStateType) => void) => () => void;
+  protectAll: () => Promise<SpoilerStateType>;
+  protectPrinting: (printingId: string) => Promise<SpoilerStateType>;
+  protectRelease: (setId: string) => Promise<SpoilerStateType>;
+  read: () => Promise<SpoilerStateType>;
+  revealPrinting: (printingId: string) => Promise<SpoilerStateType>;
+  revealRelease: (setId: string) => Promise<SpoilerStateType>;
+  setPolicy: (policy: SpoilerPolicyType) => Promise<SpoilerStateType>;
 };
 
 type PreferencesApi = {
@@ -62,6 +88,9 @@ declare global {
   type CatalogStatus = CatalogStatusType;
   type CatalogCardSummary = CatalogCardSummaryType;
   type CatalogCardDetail = CatalogCardDetailType;
+  type CatalogPrintingResult = CatalogPrintingResultType;
+  type CatalogUpcomingPrinting = CatalogUpcomingPrintingType;
+  type CatalogReleaseSummary = CatalogReleaseSummaryType;
   type AuthSnapshot = AuthSnapshotType;
   type AuthStatus = AuthStatusType;
   type AuthUser = AuthUserType;
@@ -69,12 +98,16 @@ declare global {
   type PreferenceSyncSnapshot = PreferenceSyncSnapshotType;
   type PreferenceSyncStatus = PreferenceSyncStatusType;
   type Preferences = PreferencesType;
+  type SpoilerPolicy = SpoilerPolicyType;
+  type SpoilerRevealSummaries = SpoilerRevealSummariesType;
+  type SpoilerState = SpoilerStateType;
 
   interface Window {
     auth: AuthApi;
     catalog: CatalogApi;
     preferenceSync: PreferenceSyncApi;
     preferences: PreferencesApi;
+    spoilers: SpoilersApi;
     workspace: WorkspaceApi;
   }
 }

@@ -16,6 +16,7 @@ import {
   type PendingAuth,
   type ProtectedAuthState,
   ProtectedStorageError,
+  type StoredAuthUser,
   type StoredAuthCookie,
 } from "./storage.ts";
 
@@ -60,12 +61,7 @@ export type AuthStatus =
   | "sync-paused"
   | "protected-storage-unavailable";
 
-export interface AuthUser {
-  id: string;
-  name: string;
-  email: string;
-  image: string | null;
-}
+export type AuthUser = StoredAuthUser;
 
 export interface AuthSnapshot {
   status: AuthStatus;
@@ -154,6 +150,20 @@ export class DesktopAuth {
     });
   }
 
+  restore(): Promise<AuthSnapshot> {
+    return this.#serialize(async () => {
+      try {
+        await this.#load();
+        return this.snapshot();
+      } catch (error) {
+        if (error instanceof ProtectedStorageError) {
+          return this.#setSnapshot("protected-storage-unavailable", null);
+        }
+        throw error;
+      }
+    });
+  }
+
   beginSignIn(): Promise<AuthSnapshot> {
     return this.#serialize(async () => {
       const state = await this.#requireState();
@@ -222,6 +232,7 @@ export class DesktopAuth {
 
       state.cookies = {};
       state.pendingAuth = null;
+      state.user = null;
       await this.#storage.save(state);
       const snapshot = this.#setSnapshot("signed-out", null);
       return snapshot;
@@ -236,9 +247,16 @@ export class DesktopAuth {
     };
   }
 
-  request(path: `/sync/${string}`, init: RequestInit = {}): Promise<Response> {
+  request(
+    expectedUserId: string,
+    path: `/sync/${string}`,
+    init: RequestInit = {},
+  ): Promise<Response> {
     return this.#serialize(async () => {
       await this.#requireState();
+      if (this.#current.user?.id !== expectedUserId) {
+        throw new AuthRequestError("The signed-in account changed during synchronization.");
+      }
       const url = new URL(path, this.#origin);
 
       if (
@@ -291,13 +309,18 @@ export class DesktopAuth {
       state.cookies = cookies;
       changed = true;
     }
+    if (Object.keys(cookies).length === 0 && state.user !== null) {
+      state.user = null;
+      changed = true;
+    }
 
     if (changed) {
       await this.#storage.save(state);
     }
 
     this.#state = state;
-    this.#setSnapshot("signed-out", null);
+    const hasCookies = Object.keys(state.cookies).length > 0;
+    this.#setSnapshot(hasCookies ? "sync-paused" : "signed-out", hasCookies ? state.user : null);
     return state;
   }
 
@@ -362,6 +385,7 @@ export class DesktopAuth {
 
     state.cookies = next;
     state.pendingAuth = null;
+    state.user = user;
     await this.#storage.save(state);
     return this.#setSnapshot("signed-in", user);
   }
@@ -378,6 +402,7 @@ export class DesktopAuth {
 
       if (response.status === 401 || response.status === 403) {
         state.cookies = {};
+        state.user = null;
         await this.#storage.save(state);
         return this.#setSnapshot("signed-out", null);
       }
@@ -389,12 +414,16 @@ export class DesktopAuth {
 
       if (data === null) {
         state.cookies = {};
+        state.user = null;
         await this.#storage.save(state);
         return this.#setSnapshot("signed-out", null);
       }
 
       const session = AuthUserEnvelopeSchema.parse(data);
-      return this.#setSnapshot("signed-in", sanitizeUser(session.user));
+      const user = sanitizeUser(session.user);
+      state.user = user;
+      await this.#storage.save(state);
+      return this.#setSnapshot("signed-in", user);
     } catch (error) {
       if (error instanceof ProtectedStorageError) {
         throw error;

@@ -1,15 +1,25 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 
-import type { CatalogCardDetail } from "@mooligan/domain/catalog-detail";
+import type {
+  CatalogPrintingResult,
+  CatalogReleaseSummary,
+  SpoilerPolicy,
+  SpoilerRevealSummaries,
+  SpoilerState,
+} from "@mooligan/domain/spoilers";
 
 import type { AuthSnapshot } from "./auth/service";
 import type { CatalogProgress, CatalogStatus } from "./catalog/ipc";
-import type { CatalogListRequest } from "./catalog/query";
+import type {
+  CatalogListRequest,
+  CatalogUpcomingPrintingPage,
+  CatalogUpcomingPrintingRequest,
+} from "./catalog/query";
 import type { PreferenceSyncSnapshot } from "./workspace/preference-sync";
 import type { Preferences, PreferencesUpdate } from "./workspace/preferences";
 
 contextBridge.exposeInMainWorld("catalog", {
-  detail: (printingId: string): Promise<CatalogCardDetail | null> =>
+  detail: (printingId: string): Promise<CatalogPrintingResult | null> =>
     ipcRenderer.invoke("catalog:detail", printingId),
   download: (): Promise<CatalogStatus> => ipcRenderer.invoke("catalog:download"),
   list: (request?: CatalogListRequest) => ipcRenderer.invoke("catalog:list", request),
@@ -19,7 +29,35 @@ contextBridge.exposeInMainWorld("catalog", {
     ipcRenderer.on("catalog:progress", listener);
     return () => ipcRenderer.off("catalog:progress", listener);
   },
+  spoilerRevealSummaries: (): Promise<SpoilerRevealSummaries> =>
+    ipcRenderer.invoke("catalog:spoiler-reveals"),
   status: (): Promise<CatalogStatus> => ipcRenderer.invoke("catalog:status"),
+  upcoming: (): Promise<CatalogReleaseSummary[]> => ipcRenderer.invoke("catalog:upcoming"),
+  upcomingPrintings: (
+    request?: CatalogUpcomingPrintingRequest,
+  ): Promise<CatalogUpcomingPrintingPage> =>
+    ipcRenderer.invoke("catalog:upcoming-printings", request),
+});
+
+contextBridge.exposeInMainWorld("spoilers", {
+  onChanged: (callback: (state: SpoilerState) => void) => {
+    const listener = (_event: IpcRendererEvent, state: SpoilerState) => callback(state);
+
+    ipcRenderer.on("spoilers:changed", listener);
+    return () => ipcRenderer.off("spoilers:changed", listener);
+  },
+  protectAll: (): Promise<SpoilerState> => ipcRenderer.invoke("spoilers:protect-all"),
+  protectPrinting: (printingId: string): Promise<SpoilerState> =>
+    ipcRenderer.invoke("spoilers:protect-printing", printingId),
+  protectRelease: (setId: string): Promise<SpoilerState> =>
+    ipcRenderer.invoke("spoilers:protect-release", setId),
+  read: (): Promise<SpoilerState> => ipcRenderer.invoke("spoilers:read"),
+  revealPrinting: (printingId: string): Promise<SpoilerState> =>
+    ipcRenderer.invoke("spoilers:reveal-printing", printingId),
+  revealRelease: (setId: string): Promise<SpoilerState> =>
+    ipcRenderer.invoke("spoilers:reveal-release", setId),
+  setPolicy: (policy: SpoilerPolicy): Promise<SpoilerState> =>
+    ipcRenderer.invoke("spoilers:set-policy", policy),
 });
 
 contextBridge.exposeInMainWorld("preferences", {
