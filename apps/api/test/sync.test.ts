@@ -389,7 +389,7 @@ test("a spoiler retry replays its historical response after another binding writ
   assert.deepEqual(current.decisions, newerBody.decisions);
 });
 
-test("reusing a spoiler operation ID with altered content is rejected", async () => {
+test("reusing a spoiler operation ID with altered content cannot change remote state", async () => {
   const headers = await sessionHeaders();
   const localWorkspaceId = randomUUID();
   const operationId = randomUUID();
@@ -433,6 +433,7 @@ test("reusing a spoiler operation ID with altered content is rejected", async ()
             targetId: "printing-a",
           },
         ],
+        state: { baseVersion: 1, policy: "show", resetGeneration: 0 },
       },
       operationId,
     ),
@@ -442,6 +443,16 @@ test("reusing a spoiler operation ID with altered content is rejected", async ()
 
   assert.equal(rejected.status, 409);
   assert.deepEqual(await rejected.json(), { error: "operation_id_reused" });
+
+  const read = await request("/sync/spoilers", { headers });
+  const current = await read.json<{
+    decisions: RemoteSpoilerDecision[];
+    snapshotVersion: number;
+    state: RemoteSpoilerState;
+  }>();
+  assert.equal(current.snapshotVersion, firstBody.snapshotVersion);
+  assert.deepEqual(current.state, firstBody.state);
+  assert.deepEqual(current.decisions, firstBody.decisions);
 
   const retry = await request("/sync/spoilers", {
     body: original,
