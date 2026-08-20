@@ -1,6 +1,6 @@
 # Spoiler Protection
 
-Status: ready for implementation
+Status: implemented (phases 1–5; Phase 6 remains deferred)
 
 ## Objective
 
@@ -56,13 +56,19 @@ advancing the reset generation.
 
 ### Protected search
 
-Protected printings are absent from browse, text search, totals, pagination,
-and unique-card representative selection. Search does not show protected
-placeholders, names, hidden-match counts, or query-sensitive notices.
+Protected printings are absent from the ordinary Card index browse, text
+search, totals, pagination, and unique-card representative selection. Card
+index search does not show protected placeholders, names, hidden-match counts,
+or query-sensitive notices.
 
-While the installed catalog contains preview printings and protection is
-enabled, the search controls may show a static “Spoiler protection on” label.
-It does not change based on the active query.
+The search page has a separate Upcoming tab that intentionally lists every
+future printing, independent of the Card index query and filters. A protected
+item contains only its printing ID, root release-family summary, and effective
+release date across the catalog boundary. It renders as “Protected preview”
+with release name, code/symbol, and date; it does not expose card name, art,
+collector number, type, rarity, or price. Selecting it opens the direct gate,
+where the user can reveal that exact printing. Visible upcoming printings render
+as ordinary card results.
 
 ### Direct links and artwork
 
@@ -287,9 +293,9 @@ apps/desktop/test/card-navigation.test.ts
 apps/desktop/test/spoiler-catalog.test.ts
 ```
 
-Phase outcome: a default-protected user cannot encounter an unreleased card
-through search, card routes, siblings, or artwork, and can durably reveal one
-printing end to end.
+Phase outcome: a default-protected user cannot encounter unreleased card
+characteristics through ordinary search, card routes, siblings, or artwork,
+and can durably reveal one printing end to end.
 
 ### Phase 4: Add Upcoming Releases, settings, and release reveals
 
@@ -304,9 +310,10 @@ printing end to end.
    URLs on `svgs.scryfall.io`, validate `image/svg+xml` and a small response-size
    limit, cache it outside the workspace, and serve it through an application
    protocol. Do not hotlink symbols or expose arbitrary URLs.
-4. Add the static “Spoiler protection on” label to search only while protection
-   is enabled and the catalog contains future printings. Do not make it depend
-   on the query or hidden-match count.
+4. Add an Upcoming tab to search backed by a dedicated paginated query over all
+   future printings. Return a visible card result when consent permits it and a
+   separate protected result containing only printing ID, release summary, and
+   date otherwise. Link protected rows to the direct printing gate.
 5. Add the Spoiler Protection section to Settings with global policy, active
    reveal management, scope explanations, and “Protect all previews.” Preserve
    the narrower records while global show is enabled.
@@ -328,14 +335,17 @@ apps/desktop/src/routes/sets.tsx
 apps/desktop/src/routes/search.tsx
 apps/desktop/src/routes/settings.tsx
 apps/desktop/src/features/search/search-controls.tsx
+apps/desktop/src/features/search/search-results.tsx
+apps/desktop/src/features/search/use-catalog-upcoming-printings.ts
 apps/desktop/src/features/preferences/use-preferences.ts
 apps/desktop/src/features/spoilers/*
 apps/desktop/test/spoiler-catalog.test.ts
 apps/desktop/test/spoiler-ui-state.test.ts
 ```
 
-Phase outcome: users can intentionally discover and manage preview visibility
-without ordinary search disclosing protected content.
+Phase outcome: users can intentionally discover every future printing and
+manage preview visibility without ordinary Card index search disclosing
+protected content.
 
 ### Phase 5: Synchronize spoiler choices without weakening protection
 
@@ -395,10 +405,14 @@ this feature. When each real workflow is implemented:
 
 ## Acceptance criteria
 
-- A fresh workspace cannot see a future printing through browse, text search,
-  unique-card search, direct detail, sibling galleries, or card-image URLs.
+- A fresh workspace cannot see future card characteristics through Card index
+  browse, text search, unique-card search, direct detail, sibling galleries, or
+  card-image URLs.
 - Searching for a protected exact name produces the same visible result shape
   as any other no-match query; no hidden-match fact is disclosed.
+- The Upcoming tab lists every future printing. Protected items expose only a
+  generic label, root release name/code/symbol, and printing release date, and
+  selecting one reaches the exact-printing reveal gate.
 - An unreleased reprint never displaces the newest released representative.
 - Revealing one printing persists across restart and reveals no sibling
   printing or treatment.

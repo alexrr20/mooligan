@@ -7,18 +7,31 @@ import {
   type CardList,
 } from "@mooligan/domain/lists";
 import { MoneySchema } from "@mooligan/domain/market";
+import {
+  SpoilerDecisionStateSchema,
+  SpoilerRevealScopeSchema,
+  type SpoilerDecisionState,
+  type SpoilerRevealScope,
+} from "@mooligan/domain/spoilers";
 import * as z from "zod";
 import type { JSONType } from "zod";
 
-import { PreferencesSchema, type Preferences } from "./preferences.ts";
+import { MotionPreferenceSchema, PreferencesSchema, type Preferences } from "./preferences.ts";
 
 const BACKUP_FORMAT = "mooligan-workspace";
-const BACKUP_VERSION = 1;
+const BACKUP_VERSION = 2;
 const MAX_BACKUP_BYTES = 50 * 1024 * 1024;
 const MAX_COLLECTION_LOTS = 100_000;
 const MAX_DECKS = 10_000;
 const MAX_CARD_LISTS = 10_000;
 const MAX_ENTRIES = 10_000;
+const MAX_SPOILER_DECISIONS = 100_000;
+
+export type WorkspaceBackupSpoilerDecision = {
+  scope: SpoilerRevealScope;
+  state: SpoilerDecisionState;
+  targetId: string;
+};
 
 type BackupEntity<Entity> = {
   id: string;
@@ -31,6 +44,7 @@ export type WorkspaceBackup = {
   decks: BackupEntity<Deck>[];
   format: typeof BACKUP_FORMAT;
   preferences: Preferences;
+  spoilerDecisions: WorkspaceBackupSpoilerDecision[];
   version: typeof BACKUP_VERSION;
 };
 
@@ -66,8 +80,13 @@ const BackupDeckSchema = z
 const BackupCardListSchema = z
   .strictObject({ id: z.string(), value: StrictCardListSchema })
   .refine(({ id, value }) => id === value.id, { message: "Card list ID mismatch." });
+const BackupSpoilerDecisionSchema = z.strictObject({
+  scope: SpoilerRevealScopeSchema,
+  state: SpoilerDecisionStateSchema,
+  targetId: z.string().trim().min(1).max(128),
+});
 
-const WorkspaceBackupSchema = z.strictObject({
+const BackupCollections = {
   cardLists: z
     .array(BackupCardListSchema)
     .max(MAX_CARD_LISTS)
@@ -81,8 +100,21 @@ const WorkspaceBackupSchema = z.strictObject({
     .max(MAX_DECKS)
     .refine(hasUniqueEntityIds, { message: "Deck IDs must be unique." }),
   format: z.literal(BACKUP_FORMAT),
+};
+
+const WorkspaceBackupSchema = z.strictObject({
+  ...BackupCollections,
   preferences: PreferencesSchema,
+  spoilerDecisions: z
+    .array(BackupSpoilerDecisionSchema)
+    .max(MAX_SPOILER_DECISIONS)
+    .refine(hasUniqueSpoilerTargets, { message: "Spoiler decision targets must be unique." }),
   version: z.literal(BACKUP_VERSION),
+});
+const LegacyWorkspaceBackupSchema = z.strictObject({
+  ...BackupCollections,
+  preferences: z.strictObject({ motion: MotionPreferenceSchema }),
+  version: z.literal(1),
 });
 
 export function parseWorkspaceBackup(serialized: string): WorkspaceBackup {
@@ -98,20 +130,31 @@ export function parseWorkspaceBackup(serialized: string): WorkspaceBackup {
   }
 
   const backup = WorkspaceBackupSchema.safeParse(value);
-  if (!backup.success) {
-    if (backup.error.issues.some(({ code }) => code === "unrecognized_keys")) {
-      throw new TypeError("The workspace backup contains invalid fields.");
-    }
-    if (backup.error.issues.some(({ message }) => message === "Deck ID mismatch.")) {
-      throw new TypeError("The workspace backup deck IDs are invalid.");
-    }
-    if (backup.error.issues.some(({ path }) => path[0] === "decks")) {
-      throw new TypeError("The workspace backup deck is invalid.");
-    }
-    throw new TypeError("The workspace backup is invalid or exceeds a limit.");
+  if (backup.success) {
+    return backup.data;
   }
 
-  return backup.data;
+  const legacy = LegacyWorkspaceBackupSchema.safeParse(value);
+  if (legacy.success) {
+    return {
+      ...legacy.data,
+      preferences: { ...legacy.data.preferences, spoilerPolicy: "protect" },
+      spoilerDecisions: [],
+      version: BACKUP_VERSION,
+    };
+  }
+
+  const issues = value?.version === 1 ? legacy.error.issues : backup.error.issues;
+  if (issues.some(({ code }) => code === "unrecognized_keys")) {
+    throw new TypeError("The workspace backup contains invalid fields.");
+  }
+  if (issues.some(({ message }) => message === "Deck ID mismatch.")) {
+    throw new TypeError("The workspace backup deck IDs are invalid.");
+  }
+  if (issues.some(({ path }) => path[0] === "decks")) {
+    throw new TypeError("The workspace backup deck is invalid.");
+  }
+  throw new TypeError("The workspace backup is invalid or exceeds a limit.");
 }
 
 export function serializeWorkspaceBackup(
@@ -150,4 +193,11 @@ export function validateCardList(value: CardList | JSONType): CardList {
 
 function hasUniqueEntityIds(entities: readonly { id: string }[]) {
   return new Set(entities.map(({ id }) => id)).size === entities.length;
+}
+
+function hasUniqueSpoilerTargets(decisions: readonly WorkspaceBackupSpoilerDecision[]) {
+  return (
+    new Set(decisions.map(({ scope, targetId }) => `${scope}\0${targetId}`)).size ===
+    decisions.length
+  );
 }

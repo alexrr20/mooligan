@@ -6,6 +6,41 @@ import { useEffect, useState } from "react";
 import { colors, letterSpacings } from "../../styles/tokens.stylex.js";
 import { reconcileCatalogSearchDraft, type UniverseFilter } from "./search-state";
 
+type SearchModeTabsProps = {
+  mode: "cards" | "upcoming";
+  onChange: (mode: "cards" | "upcoming") => void;
+};
+
+export function SearchModeTabs({ mode, onChange }: SearchModeTabsProps) {
+  return (
+    <div {...stylex.props(styles.modeTabs)} aria-label="Catalog section" role="tablist">
+      <button
+        {...stylex.props(styles.modeTab, mode === "cards" && styles.modeTabActive)}
+        aria-controls="card-index-panel"
+        aria-selected={mode === "cards"}
+        id="card-index-tab"
+        role="tab"
+        type="button"
+        onClick={() => onChange("cards")}
+      >
+        Card index
+      </button>
+      <button
+        {...stylex.props(styles.modeTab, mode === "upcoming" && styles.modeTabActive)}
+        aria-controls="upcoming-card-panel"
+        aria-selected={mode === "upcoming"}
+        id="upcoming-card-tab"
+        role="tab"
+        type="button"
+        onClick={() => onChange("upcoming")}
+      >
+        Upcoming
+        <span {...stylex.props(styles.modeTabMark)} aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
 type SearchFormProps = {
   activeQuery: string;
   onSearch: (query: string) => void;
@@ -158,6 +193,49 @@ export function SearchViewToggle({ grid, onChange }: SearchViewToggleProps) {
 }
 
 const styles = stylex.create({
+  modeTabs: {
+    minHeight: "48px",
+    display: "flex",
+    alignItems: "stretch",
+    gap: "30px",
+    borderBottom: "1px solid #34362f",
+  },
+  modeTab: {
+    padding: "0 2px",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "8px",
+    borderWidth: 0,
+    borderStyle: "solid",
+    borderColor: "transparent",
+    color: "#85887e",
+    backgroundColor: "transparent",
+    boxShadow: "inset 0 -2px 0 transparent",
+    fontSize: "9px",
+    letterSpacing: "0.12em",
+    textTransform: "uppercase",
+    cursor: "pointer",
+    transition: "color 140ms ease, box-shadow 140ms ease",
+    ":hover": {
+      color: "#f4f1e8",
+    },
+    ":focus-visible": {
+      outlineWidth: "2px",
+      outlineStyle: "solid",
+      outlineColor: colors.accent,
+      outlineOffset: "4px",
+    },
+  },
+  modeTabActive: {
+    color: "#f4f1e8",
+    boxShadow: `inset 0 -2px 0 ${colors.accent}`,
+  },
+  modeTabMark: {
+    width: "5px",
+    height: "5px",
+    borderRadius: "50%",
+    backgroundColor: colors.accent,
+  },
   searchBar: {
     width: "100%",
     height: "52px",

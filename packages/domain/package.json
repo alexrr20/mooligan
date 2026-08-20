@@ -12,7 +12,8 @@
     "./collection": "./src/collection.ts",
     "./decks": "./src/decks.ts",
     "./lists": "./src/lists.ts",
-    "./market": "./src/market.ts"
+    "./market": "./src/market.ts",
+    "./spoilers": "./src/spoilers.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",

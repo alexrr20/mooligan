@@ -8,6 +8,23 @@ export function resolveCatalogImageCacheDirectory(
   platform: NodeJS.Platform = process.platform,
   environment: Readonly<NodeJS.ProcessEnv> = process.env,
 ) {
+  return resolveCatalogCacheDirectory(homeDirectory, "catalog-images", platform, environment);
+}
+
+export function resolveCatalogSetSymbolCacheDirectory(
+  homeDirectory: string,
+  platform: NodeJS.Platform = process.platform,
+  environment: Readonly<NodeJS.ProcessEnv> = process.env,
+) {
+  return resolveCatalogCacheDirectory(homeDirectory, "catalog-set-symbols", platform, environment);
+}
+
+function resolveCatalogCacheDirectory(
+  homeDirectory: string,
+  leafDirectory: string,
+  platform: NodeJS.Platform,
+  environment: Readonly<NodeJS.ProcessEnv>,
+) {
   const paths = platform === "win32" ? win32 : posix;
   let cacheRoot: string;
 
@@ -32,6 +49,6 @@ export function resolveCatalogImageCacheDirectory(
     platform === "darwin" || platform === "win32"
       ? applicationDirectory
       : applicationDirectory.toLowerCase(),
-    "catalog-images",
+    leafDirectory,
   );
 }

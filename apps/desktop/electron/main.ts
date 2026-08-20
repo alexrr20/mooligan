@@ -14,22 +14,47 @@ import {
   shell,
   type OpenDialogOptions,
 } from "electron";
+import { SpoilerPolicySchema } from "@mooligan/domain/spoilers";
 import * as z from "zod";
+import type { JSONType } from "zod";
 
 import { type AuthSnapshot, DesktopAuth, resolveAuthOrigin } from "./auth/service";
 import { registerAuthColdStart } from "./auth/startup";
 import { createCatalogImageCache } from "./catalog/image-cache";
-import { resolveCatalogImageCacheDirectory } from "./catalog/image-cache-directory";
+import {
+  resolveCatalogImageCacheDirectory,
+  resolveCatalogSetSymbolCacheDirectory,
+} from "./catalog/image-cache-directory";
 import { registerCatalogImageProtocol } from "./catalog/image-protocol";
-import { queryCatalogImageSource, registerCatalogIpc } from "./catalog/ipc";
+import {
+  queryCatalogImageSource,
+  queryCatalogSetSymbolSource,
+  registerCatalogIpc,
+  resolveCatalogRootSetId,
+} from "./catalog/ipc";
+import { createCatalogSetSymbolCache } from "./catalog/set-symbol-cache";
+import { registerCatalogSetSymbolProtocol } from "./catalog/set-symbol-protocol";
 import { assertTrustedSender, developmentRendererUrl } from "./ipc-security";
 import { registerDesktopSchemes } from "./protocols";
+import {
+  protectSpoilerState,
+  protectSpoilerVisibility,
+  releaseProtectionTarget,
+  SpoilerService,
+} from "./spoilers/service";
 import {
   PreferenceSyncCoordinator,
   type PreferenceSyncSnapshot,
 } from "./workspace/preference-sync";
 import { validatePreferencesUpdate } from "./workspace/preferences";
 import { parseWorkspaceBackup } from "./workspace/backup";
+import {
+  assertSelectedWorkspace,
+  canUseCurrentWorkspace,
+  runForSelectedWorkspace,
+  runForUnchangedRevision,
+  WorkspaceMutationQueue,
+} from "./workspace/selection";
 import { WorkspaceManager } from "./workspace/store";
 
 app.enableSandbox();
@@ -48,8 +73,6 @@ const authStartup = registerAuthColdStart({
   setAsDefaultProtocolClient: (scheme, path, args) =>
     app.setAsDefaultProtocolClient(scheme, path, args),
 });
-registerCatalogIpc();
-
 const MAX_WORKSPACE_BACKUP_BYTES = 50 * 1024 * 1024;
 
 async function createWindow() {
@@ -95,11 +118,57 @@ if (!authStartup.isPrimary) {
     .whenReady()
     .then(async () => {
       const workspace = new WorkspaceManager(app.getPath("userData"));
+      const spoilers = new SpoilerService(workspace);
+      const spoilerMutations = new WorkspaceMutationQueue(workspace);
+      let spoilerWorkspaceReady = false;
+
+      function readSpoilerStateForRenderer(state = spoilers.snapshot()) {
+        return spoilerWorkspaceReady ? state : protectSpoilerState(state);
+      }
+
+      function readSpoilerVisibility() {
+        const visibility = spoilers.visibilitySnapshot();
+        return spoilerWorkspaceReady ? visibility : protectSpoilerVisibility(visibility);
+      }
+
+      function readPreferencesForRenderer() {
+        const preferences = workspace.readPreferences();
+        return spoilerWorkspaceReady ? preferences : { ...preferences, spoilerPolicy: "protect" };
+      }
+
+      function requireSpoilerWorkspace() {
+        if (!spoilerWorkspaceReady) {
+          throw new Error("The local account workspace is not ready.");
+        }
+      }
+
+      function runSpoilerMutation<Result>(operation: () => Result | PromiseLike<Result>) {
+        requireSpoilerWorkspace();
+        return spoilerMutations.run(() => {
+          requireSpoilerWorkspace();
+          return operation();
+        });
+      }
+
+      registerCatalogIpc({
+        getVisibilitySnapshot: readSpoilerVisibility,
+      });
       const imageCache = createCatalogImageCache({
         cacheDirectory: resolveCatalogImageCacheDirectory(app.getPath("home")),
       });
-      await imageCache.initialize().catch(() => undefined);
+      const setSymbolCache = createCatalogSetSymbolCache({
+        cacheDirectory: resolveCatalogSetSymbolCacheDirectory(app.getPath("home")),
+      });
+      await Promise.all([
+        imageCache.initialize().catch(() => undefined),
+        setSymbolCache.initialize().catch(() => undefined),
+      ]);
       registerCatalogImageProtocol(session.defaultSession, imageCache, queryCatalogImageSource);
+      registerCatalogSetSymbolProtocol(
+        session.defaultSession,
+        setSymbolCache,
+        queryCatalogSetSymbolSource,
+      );
       const authOrigin = resolveAuthOrigin();
 
       const auth = new DesktopAuth({
@@ -111,32 +180,44 @@ if (!authStartup.isPrimary) {
         origin: authOrigin,
         safeStorage,
       });
-      const preferenceSync = new PreferenceSyncCoordinator(auth, workspace);
+      const unsubscribeSpoilers = spoilers.subscribe((state) => {
+        publish("spoilers:changed", readSpoilerStateForRenderer(state));
+      });
+      const preferenceSync = new PreferenceSyncCoordinator(auth, workspace, {
+        onSpoilersApplied() {
+          spoilers.refresh();
+        },
+        onWorkspaceSelected() {
+          spoilerWorkspaceReady = true;
+          publish("preferences:changed", readPreferencesForRenderer());
+          spoilers.refresh();
+        },
+      });
 
       let lastAuthError: string | null = null;
 
       async function applyAuthSnapshot(snapshot: AuthSnapshot) {
         lastAuthError = null;
+        spoilerWorkspaceReady = false;
+        publish("preferences:changed", readPreferencesForRenderer());
+        publish("spoilers:changed", readSpoilerStateForRenderer());
         publish("auth:changed", snapshot);
-        const previousPreferences = workspace.readPreferences();
-        const previousWorkspaceId = workspace.workspaceId;
         let syncSnapshot: PreferenceSyncSnapshot;
 
         if (snapshot.status === "signed-in" && snapshot.user) {
           syncSnapshot = await preferenceSync.connect(snapshot.user.id);
         } else if (snapshot.status === "sync-paused") {
-          syncSnapshot = preferenceSync.pause();
+          syncSnapshot = await preferenceSync.pause(snapshot.user?.id ?? null);
         } else {
           syncSnapshot = await preferenceSync.disconnect();
         }
 
-        const currentPreferences = workspace.readPreferences();
-        if (
-          workspace.workspaceId !== previousWorkspaceId ||
-          currentPreferences.motion !== previousPreferences.motion
-        ) {
-          publish("preferences:changed", currentPreferences);
+        if (canUseCurrentWorkspace(snapshot)) {
+          spoilerWorkspaceReady = true;
         }
+
+        spoilers.refresh();
+        publish("preferences:changed", readPreferencesForRenderer());
 
         const currentAuth = auth.snapshot();
         publish("auth:changed", currentAuth);
@@ -153,26 +234,22 @@ if (!authStartup.isPrimary) {
         }
       }
 
-      function queuePreferenceSync() {
-        const operation = preferenceSync.preferenceChanged();
+      function queueWorkspaceSync() {
+        const operation = preferenceSync.workspaceChanged();
         publish("sync:changed", preferenceSync.snapshot());
         void operation
           .then((snapshot) => {
+            publish("preferences:changed", readPreferencesForRenderer());
+            spoilers.refresh();
             publish("auth:changed", auth.snapshot());
             publish("sync:changed", snapshot);
           })
           .catch(() => {
-            process.stderr.write("Preference synchronization failed.\n");
+            process.stderr.write("Workspace synchronization failed.\n");
           });
       }
 
-      void auth
-        .initialize()
-        .then(applyAuthSnapshot)
-        .catch((cause: unknown) => {
-          lastAuthError = publicAuthError(cause);
-          publish("auth:error", lastAuthError);
-        });
+      await applyAuthSnapshot(await auth.restore());
 
       ipcMain.handle("auth:read", (event) => {
         assertTrustedSender(event);
@@ -197,7 +274,8 @@ if (!authStartup.isPrimary) {
       ipcMain.handle("sync:retry", async (event) => {
         assertTrustedSender(event);
         const snapshot = await preferenceSync.sync();
-        publish("preferences:changed", workspace.readPreferences());
+        publish("preferences:changed", readPreferencesForRenderer());
+        spoilers.refresh();
         publish("auth:changed", auth.snapshot());
         publish("sync:changed", snapshot);
         return snapshot;
@@ -205,18 +283,141 @@ if (!authStartup.isPrimary) {
 
       ipcMain.handle("preferences:read", (event) => {
         assertTrustedSender(event);
-        return workspace.readPreferences();
+        return readPreferencesForRenderer();
       });
       ipcMain.handle("preferences:update", (event, update) => {
         assertTrustedSender(event);
-        const preferences = workspace.updatePreferences(validatePreferencesUpdate(update));
-        publish("preferences:changed", preferences);
-        queuePreferenceSync();
-        return preferences;
+        const validated = validatePreferencesUpdate(update);
+        const applyUpdate = () => {
+          if (validated.spoilerPolicy !== undefined) {
+            spoilers.setPolicy(validated.spoilerPolicy);
+          }
+          workspace.updatePreferences(
+            validated.motion === undefined ? {} : { motion: validated.motion },
+          );
+          const publicPreferences = readPreferencesForRenderer();
+          publish("preferences:changed", publicPreferences);
+          queueWorkspaceSync();
+          return publicPreferences;
+        };
+
+        return validated.spoilerPolicy === undefined
+          ? applyUpdate()
+          : runSpoilerMutation(applyUpdate);
+      });
+
+      ipcMain.handle("spoilers:read", (event) => {
+        assertTrustedSender(event);
+        return readSpoilerStateForRenderer();
+      });
+      ipcMain.handle("spoilers:set-policy", (event, value) => {
+        assertTrustedSender(event);
+        const policy = SpoilerPolicySchema.parse(value);
+        return runSpoilerMutation(() => {
+          const state = spoilers.setPolicy(policy);
+          publish("preferences:changed", readPreferencesForRenderer());
+          queueWorkspaceSync();
+          return state;
+        });
+      });
+      ipcMain.handle("spoilers:reveal-printing", (event, value) => {
+        assertTrustedSender(event);
+        const printingId = validateSpoilerTarget(value);
+        return runSpoilerMutation(async () => {
+          const rootSetId = await runForSelectedWorkspace(workspace, () =>
+            runForUnchangedRevision(
+              () => workspace.readSpoilerState().revision,
+              () => resolveCatalogRootSetId(printingId),
+            ),
+          );
+
+          if (!rootSetId) {
+            throw new Error("This printing is not present in the installed catalog.");
+          }
+
+          const state = spoilers.revealPrinting(printingId);
+          queueWorkspaceSync();
+          return state;
+        });
+      });
+      ipcMain.handle("spoilers:protect-printing", (event, value) => {
+        assertTrustedSender(event);
+        const printingId = validateSpoilerTarget(value);
+        return runSpoilerMutation(async () => {
+          const rootSetId = await runForSelectedWorkspace(workspace, () =>
+            resolveOptionalCatalogRootSetId(printingId),
+          );
+          const current = workspace.readSpoilerState();
+          const active = current.activePrintingIds.includes(printingId);
+
+          if (current.policy === "show") {
+            throw new Error('Turn off "Always show previews" before protecting one printing.');
+          }
+
+          if (!active && !rootSetId) {
+            throw new Error("This printing is not present in the installed catalog.");
+          }
+          if (rootSetId && current.activeRootSetIds.includes(rootSetId)) {
+            throw new Error("Protect this release before protecting one printing from it.");
+          }
+
+          const state = spoilers.protectPrinting(printingId);
+          queueWorkspaceSync();
+          return state;
+        });
+      });
+      ipcMain.handle("spoilers:reveal-release", (event, value) => {
+        assertTrustedSender(event);
+        const targetId = validateSpoilerTarget(value);
+        return runSpoilerMutation(async () => {
+          const rootSetId = await runForSelectedWorkspace(workspace, () =>
+            runForUnchangedRevision(
+              () => workspace.readSpoilerState().revision,
+              () => requireCatalogRootSetId(targetId),
+            ),
+          );
+          const state = spoilers.revealRelease(rootSetId);
+          queueWorkspaceSync();
+          return state;
+        });
+      });
+      ipcMain.handle("spoilers:protect-release", (event, value) => {
+        assertTrustedSender(event);
+        const targetId = validateSpoilerTarget(value);
+        return runSpoilerMutation(async () => {
+          const rootSetId = await runForSelectedWorkspace(workspace, () =>
+            resolveOptionalCatalogRootSetId(targetId),
+          );
+          const current = workspace.readSpoilerState();
+
+          if (current.policy === "show") {
+            throw new Error('Turn off "Always show previews" before protecting one release.');
+          }
+
+          const protectionTarget = releaseProtectionTarget(current, targetId, rootSetId);
+          if (!protectionTarget) {
+            throw new Error("This release is not present in the installed catalog.");
+          }
+
+          const state = spoilers.protectRelease(protectionTarget);
+          queueWorkspaceSync();
+          return state;
+        });
+      });
+      ipcMain.handle("spoilers:protect-all", (event) => {
+        assertTrustedSender(event);
+        return runSpoilerMutation(() => {
+          const state = spoilers.protectAll();
+          publish("preferences:changed", readPreferencesForRenderer());
+          queueWorkspaceSync();
+          return state;
+        });
       });
 
       ipcMain.handle("workspace:export", async (event) => {
         assertTrustedSender(event);
+        requireSpoilerWorkspace();
+        const workspaceId = workspace.workspaceId;
         const owner = BrowserWindow.fromWebContents(event.sender);
         const options = {
           defaultPath: join(
@@ -234,8 +435,10 @@ if (!authStartup.isPrimary) {
           return "cancelled" as const;
         }
 
+        assertSelectedWorkspace(workspace, workspaceId);
+        const backup = workspace.createBackup();
         try {
-          await writeFile(result.filePath, workspace.createBackup(), "utf8");
+          await writeFile(result.filePath, backup, "utf8");
           return "exported" as const;
         } catch {
           throw new Error("The workspace backup could not be exported.");
@@ -244,6 +447,8 @@ if (!authStartup.isPrimary) {
 
       ipcMain.handle("workspace:import", async (event) => {
         assertTrustedSender(event);
+        requireSpoilerWorkspace();
+        const workspaceId = workspace.workspaceId;
         const owner = BrowserWindow.fromWebContents(event.sender);
         const options: OpenDialogOptions = {
           filters: [{ extensions: ["json"], name: "Mooligan workspace" }],
@@ -275,7 +480,7 @@ if (!authStartup.isPrimary) {
           cancelId: 0,
           defaultId: 0,
           detail:
-            "Preferences, collection lots, decks, and lists in this workspace will be replaced. Your local workspace and account binding will stay the same.",
+            "Preferences, spoiler choices, collection lots, decks, and lists in this workspace will be replaced. Your local workspace and account binding will stay the same.",
           message: "Import this backup?",
           noLink: true,
           type: "warning" as const,
@@ -288,10 +493,14 @@ if (!authStartup.isPrimary) {
           return "cancelled" as const;
         }
 
-        workspace.importBackup(backup);
-        publish("preferences:changed", workspace.readPreferences());
-        queuePreferenceSync();
-        return "imported" as const;
+        return spoilerMutations.runFor(workspaceId, () => {
+          requireSpoilerWorkspace();
+          workspace.importBackup(backup);
+          publish("preferences:changed", readPreferencesForRenderer());
+          spoilers.refresh();
+          queueWorkspaceSync();
+          return "imported" as const;
+        });
       });
 
       void authStartup.start(
@@ -305,7 +514,11 @@ if (!authStartup.isPrimary) {
         },
       );
 
-      app.once("will-quit", () => workspace.close());
+      app.once("will-quit", () => {
+        unsubscribeSpoilers();
+        spoilers.close();
+        workspace.close();
+      });
 
       session.defaultSession.setPermissionCheckHandler(() => false);
       session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
@@ -314,10 +527,27 @@ if (!authStartup.isPrimary) {
 
       await createWindow();
       publish("auth:changed", auth.snapshot());
+      publish("preferences:changed", readPreferencesForRenderer());
+      publish("spoilers:changed", readSpoilerStateForRenderer());
       publish("sync:changed", preferenceSync.snapshot());
       if (lastAuthError) {
         publish("auth:error", lastAuthError);
       }
+
+      void auth
+        .refresh()
+        .then(applyAuthSnapshot)
+        .catch(async (cause: unknown) => {
+          const authError = publicAuthError(cause);
+          await applyAuthSnapshot(auth.snapshot()).catch(() => {
+            spoilerWorkspaceReady = false;
+            publish("preferences:changed", readPreferencesForRenderer());
+            publish("spoilers:changed", readSpoilerStateForRenderer());
+            publish("auth:changed", auth.snapshot());
+          });
+          lastAuthError = authError;
+          publish("auth:error", lastAuthError);
+        });
 
       app.on("activate", () => {
         if (BrowserWindow.getAllWindows().length === 0) {
@@ -368,4 +598,28 @@ function publicAuthError(cause: unknown) {
   }
 
   return "Account sign-in could not be completed. Return to Settings and try again.";
+}
+
+const SpoilerTargetSchema = z.string().trim().min(1).max(128);
+
+function validateSpoilerTarget(value: JSONType) {
+  return SpoilerTargetSchema.parse(value);
+}
+
+async function requireCatalogRootSetId(targetId: string) {
+  const rootSetId = await resolveCatalogRootSetId(targetId);
+
+  if (!rootSetId) {
+    throw new Error("This release is not present in the installed catalog.");
+  }
+
+  return rootSetId;
+}
+
+async function resolveOptionalCatalogRootSetId(targetId: string) {
+  try {
+    return await resolveCatalogRootSetId(targetId);
+  } catch {
+    return null;
+  }
 }

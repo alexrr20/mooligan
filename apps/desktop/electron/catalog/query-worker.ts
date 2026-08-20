@@ -5,10 +5,18 @@ import * as z from "zod";
 
 import {
   createCatalogQuery,
+  createCatalogRootSetQuery,
+  createCatalogSpoilerRevealSummariesQuery,
+  createCatalogUpcomingPrintingsQuery,
+  createCatalogUpcomingQuery,
   parseCatalogQueryWorkerRequest,
   type CatalogQueryWorkerResponse,
 } from "./query.ts";
-import { createCatalogDetailQuery, createCatalogImageSourceQuery } from "./detail.ts";
+import {
+  createCatalogDetailQuery,
+  createCatalogImageSourceQuery,
+  createCatalogSetSymbolSourceQuery,
+} from "./detail.ts";
 
 const port = parentPort;
 const catalogPath = z.string().safeParse(workerData);
@@ -21,6 +29,11 @@ const database = new DatabaseSync(catalogPath.data, { readOnly: true });
 const listCatalog = createCatalogQuery(database);
 const queryDetail = createCatalogDetailQuery(database);
 const queryImageSource = createCatalogImageSourceQuery(database);
+const queryRootSet = createCatalogRootSetQuery(database);
+const querySetSymbolSource = createCatalogSetSymbolSourceQuery(database);
+const querySpoilerReveals = createCatalogSpoilerRevealSummariesQuery(database);
+const queryUpcoming = createCatalogUpcomingQuery(database);
+const queryUpcomingPrintings = createCatalogUpcomingPrintingsQuery(database);
 
 port.on("message", (message) => {
   const request = parseCatalogQueryWorkerRequest(message);
@@ -40,13 +53,60 @@ port.on("message", (message) => {
   try {
     switch (operation.type) {
       case "detail":
-        response = { id, operation: operation.type, result: queryDetail(operation.printingId) };
+        response = {
+          id,
+          operation: operation.type,
+          result: queryDetail(operation.printingId, operation.visibility),
+        };
         break;
       case "image-source":
-        response = { id, operation: operation.type, result: queryImageSource(operation.image) };
+        response = {
+          id,
+          operation: operation.type,
+          result: queryImageSource(operation.image, operation.visibility),
+        };
         break;
       case "list":
-        response = { id, operation: operation.type, result: listCatalog(operation.request) };
+        response = {
+          id,
+          operation: operation.type,
+          result: listCatalog(operation.request, operation.visibility),
+        };
+        break;
+      case "root-set":
+        response = {
+          id,
+          operation: operation.type,
+          result: queryRootSet(operation.targetId),
+        };
+        break;
+      case "set-symbol-source":
+        response = {
+          id,
+          operation: operation.type,
+          result: querySetSymbolSource(operation.symbol),
+        };
+        break;
+      case "spoiler-reveals":
+        response = {
+          id,
+          operation: operation.type,
+          result: querySpoilerReveals(operation.printingIds, operation.rootSetIds),
+        };
+        break;
+      case "upcoming":
+        response = {
+          id,
+          operation: operation.type,
+          result: queryUpcoming(operation.visibility),
+        };
+        break;
+      case "upcoming-printings":
+        response = {
+          id,
+          operation: operation.type,
+          result: queryUpcomingPrintings(operation.request, operation.visibility),
+        };
         break;
       default:
         operation satisfies never;

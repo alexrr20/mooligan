@@ -25,7 +25,13 @@ void test("authentication state is asynchronously encrypted, atomically replaced
       state: "state-secret",
       verifier: "verifier-secret",
     },
-    version: 1,
+    user: {
+      email: "molly@example.com",
+      id: "user-a",
+      image: null,
+      name: "Molly",
+    },
+    version: 2,
   };
 
   try {
@@ -45,6 +51,37 @@ void test("authentication state is asynchronously encrypted, atomically replaced
   }
 });
 
+void test("version 1 authentication state is upgraded without losing the session", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "mooligan-auth-storage-v1-"));
+  const path = join(directory, "auth-state");
+  const safeStorage = new FakeSafeStorage();
+  const legacyState = {
+    cookies: {
+      "better-auth.session_token": { expiresAt: 1_800_000, value: "session-secret" },
+    },
+    pendingAuth: null,
+    version: 1,
+  };
+
+  try {
+    await writeFile(path, await safeStorage.encryptStringAsync(JSON.stringify(legacyState)));
+    const encryptionsBeforeLoad = safeStorage.encryptions;
+
+    assert.deepEqual(await new EncryptedAuthStorage(path, safeStorage).load(), {
+      ...legacyState,
+      user: null,
+      version: 2,
+    });
+    assert.equal(safeStorage.encryptions, encryptionsBeforeLoad + 1);
+
+    const encryptionsBeforeReopen = safeStorage.encryptions;
+    assert.equal((await new EncryptedAuthStorage(path, safeStorage).load()).version, 2);
+    assert.equal(safeStorage.encryptions, encryptionsBeforeReopen);
+  } finally {
+    await rm(directory, { force: true, recursive: true });
+  }
+});
+
 void test("unavailable protected storage never creates a plaintext fallback", async () => {
   const directory = await mkdtemp(join(tmpdir(), "mooligan-auth-unavailable-"));
   const path = join(directory, "auth-state");
@@ -53,7 +90,7 @@ void test("unavailable protected storage never creates a plaintext fallback", as
   try {
     await assert.rejects(storage.load(), ProtectedStorageError);
     await assert.rejects(
-      storage.save({ cookies: {}, pendingAuth: null, version: 1 }),
+      storage.save({ cookies: {}, pendingAuth: null, user: null, version: 2 }),
       ProtectedStorageError,
     );
     await assert.rejects(readFile(path), { code: "ENOENT" });

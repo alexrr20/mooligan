@@ -5,6 +5,8 @@ import { CatalogCardDetailSchema, normalizeScryfallCardDetail } from "../src/cat
 import {
   CatalogReleaseSchema,
   ScryfallCardDownloadSchema,
+  ScryfallSetDownloadSchema,
+  ScryfallSetListSchema,
   type ScryfallCardDownload,
 } from "../src/catalog-sync.ts";
 import { DeckEntrySchema } from "../src/decks.ts";
@@ -17,6 +19,7 @@ function scryfallCard(overrides: Partial<ScryfallCardDownload> = {}) {
     object: "card",
     rarity: "common",
     set: "tst",
+    set_id: "set-tst",
     set_name: "Test Set",
     type_line: "Artifact",
     ...overrides,
@@ -35,6 +38,42 @@ void test("deck entries require an exact printing, finish, and positive quantity
   assert.deepEqual(DeckEntrySchema.parse(entry), entry);
   assert.equal(DeckEntrySchema.safeParse({ ...entry, printingId: "" }).success, false);
   assert.equal(DeckEntrySchema.safeParse({ ...entry, quantity: 0 }).success, false);
+});
+
+void test("Scryfall set lists preserve the stable family fields and reject pagination", () => {
+  const set = {
+    card_count: 271,
+    code: "tst",
+    digital: false,
+    foil_only: false,
+    icon_svg_uri: "https://svgs.scryfall.io/sets/tst.svg",
+    id: "set-tst",
+    name: "Test Set",
+    nonfoil_only: false,
+    object: "set",
+    parent_set_code: "root",
+    released_at: "2026-09-18",
+    scryfall_uri: "https://scryfall.com/sets/tst",
+    search_uri: "https://api.scryfall.com/cards/search?q=e%3Atst",
+    set_type: "expansion",
+    uri: "https://api.scryfall.com/sets/set-tst",
+  };
+
+  assert.deepEqual(ScryfallSetDownloadSchema.parse(set), set);
+  assert.deepEqual(ScryfallSetListSchema.parse({ data: [set], has_more: false, object: "list" }), {
+    data: [set],
+    has_more: false,
+    object: "list",
+  });
+  assert.equal(
+    ScryfallSetListSchema.safeParse({ data: [set], has_more: true, object: "list" }).success,
+    false,
+  );
+  assert.equal(
+    ScryfallSetDownloadSchema.safeParse({ ...set, icon_svg_uri: "http://example.com/tst.svg" })
+      .success,
+    false,
+  );
 });
 
 void test("catalog releases require an HTTPS archive and timestamp", () => {

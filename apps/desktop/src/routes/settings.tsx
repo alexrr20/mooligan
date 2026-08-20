@@ -7,6 +7,7 @@ import { useAuth } from "../features/auth/use-auth";
 import { usePreferenceSync } from "../features/preferences/use-preference-sync";
 import { usePreferences } from "../features/preferences/use-preferences";
 import { useWorkspaceBackup } from "../features/preferences/use-workspace-backup";
+import { SpoilerSettings } from "../features/spoilers/spoiler-settings";
 import { colors } from "../styles/tokens.stylex.js";
 import { typography } from "../styles/typography";
 
@@ -91,6 +92,8 @@ function SettingsPage() {
           </p>
         </div>
       </section>
+
+      <SpoilerSettings />
 
       <BackupSetting backup={backup} />
     </PageFrame>
@@ -209,8 +212,9 @@ function BackupSetting({ backup }: { backup: ReturnType<typeof useWorkspaceBacku
           </h2>
         </div>
         <p {...stylex.props(typography.body, styles.settingCopy)}>
-          Export a validated copy of this workspace, including preferences, collection lots, decks,
-          and lists. Backups never contain account sessions or cloud credentials.
+          Export a validated copy of this workspace, including preferences, spoiler choices,
+          collection lots, decks, and lists. Backups never contain account sessions or cloud
+          credentials.
         </p>
       </div>
 

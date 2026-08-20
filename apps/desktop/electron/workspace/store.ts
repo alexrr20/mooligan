@@ -6,6 +6,18 @@ import { DatabaseSync } from "node:sqlite";
 import type { CollectionLot } from "@mooligan/domain/collection";
 import type { Deck } from "@mooligan/domain/decks";
 import type { CardList } from "@mooligan/domain/lists";
+import {
+  SpoilerDecisionSchema,
+  SpoilerDecisionStateSchema,
+  SpoilerPolicySchema,
+  SpoilerRevealScopeSchema,
+  SpoilerStateSchema,
+  type SpoilerDecision,
+  type SpoilerDecisionState,
+  type SpoilerPolicy,
+  type SpoilerRevealScope,
+  type SpoilerState,
+} from "@mooligan/domain/spoilers";
 import * as z from "zod";
 import type { JSONType } from "zod";
 
@@ -23,6 +35,7 @@ import {
   validateCardList,
   validateCollectionLot,
   validateDeck,
+  type WorkspaceBackupSpoilerDecision,
 } from "./backup.ts";
 
 export type RemoteMotionPreference = {
@@ -37,6 +50,44 @@ export type PreferenceSyncState = {
     pending: boolean;
     remoteVersion: number | null;
   };
+};
+
+export type RemoteSpoilerState = {
+  policy: SpoilerPolicy;
+  resetGeneration: number;
+  updatedAt: string;
+  version: number;
+};
+
+export type RemoteSpoilerDecision = {
+  generation: number;
+  scope: SpoilerRevealScope;
+  state: SpoilerDecisionState;
+  targetId: string;
+  updatedAt: string;
+  version: number;
+};
+
+export type SpoilerSyncState = {
+  decisions: Array<{
+    decision: SpoilerDecision;
+    pending: boolean;
+    remoteVersion: number | null;
+  }>;
+  global: {
+    pending: boolean;
+    policy: SpoilerPolicy;
+    remoteVersion: number | null;
+    resetGeneration: number;
+    revision: number;
+    updatedAt: string;
+  };
+};
+
+export type SpoilerSyncBatch = {
+  decisions: SpoilerSyncState["decisions"];
+  global: SpoilerSyncState["global"] | null;
+  operationId: string;
 };
 
 type WorkspaceMetadata = {
@@ -60,9 +111,60 @@ const WorkspaceMetadataSchema = z.object({
 const WorkspaceIdSchema = z.uuidv4();
 const WorkspaceRegistryRowSchema = z.object({ workspaceId: WorkspaceIdSchema });
 const EntityRowSchema = z.object({ id: z.string(), payload: z.string() });
+const SpoilerTargetIdSchema = z.string().trim().min(1).max(128);
+const SpoilerStateRowSchema = z.object({
+  pending: z.union([z.literal(0), z.literal(1)]),
+  remoteVersion: z.number().int().positive().nullable(),
+  resetGeneration: z.number().int().nonnegative(),
+  resetPending: z.union([z.literal(0), z.literal(1)]),
+  revision: z.number().int().nonnegative(),
+  updatedAt: z.iso.datetime({ offset: true }),
+});
+const SpoilerGlobalSyncStateSchema = z.strictObject({
+  pending: z.boolean(),
+  policy: SpoilerPolicySchema,
+  remoteVersion: z.number().int().positive().nullable(),
+  resetGeneration: z.number().int().nonnegative(),
+  revision: z.number().int().nonnegative(),
+  updatedAt: z.iso.datetime({ offset: true }),
+});
+const SpoilerDecisionSyncStateSchema = z.strictObject({
+  decision: SpoilerDecisionSchema,
+  pending: z.boolean(),
+  remoteVersion: z.number().int().positive().nullable(),
+});
+const SpoilerSyncBatchSchema = z.strictObject({
+  decisions: z.array(SpoilerDecisionSyncStateSchema).max(25),
+  global: SpoilerGlobalSyncStateSchema.nullable(),
+  operationId: z.uuid(),
+});
+const SpoilerDecisionRowSchema = z.object({
+  generation: z.number().int().nonnegative(),
+  localRevision: z.number().int().positive(),
+  pending: z.union([z.literal(0), z.literal(1)]),
+  remoteVersion: z.number().int().positive().nullable(),
+  scope: SpoilerRevealScopeSchema,
+  state: SpoilerDecisionStateSchema,
+  targetId: SpoilerTargetIdSchema,
+  updatedAt: z.iso.datetime({ offset: true }),
+});
 export const RemoteMotionPreferenceSchema = z.strictObject({
   updatedAt: z.iso.datetime({ offset: true }),
   value: MotionPreferenceSchema,
+  version: z.number().int().positive(),
+});
+export const RemoteSpoilerStateSchema = z.strictObject({
+  policy: SpoilerPolicySchema,
+  resetGeneration: z.number().int().nonnegative(),
+  updatedAt: z.iso.datetime({ offset: true }),
+  version: z.number().int().positive(),
+});
+export const RemoteSpoilerDecisionSchema = z.strictObject({
+  generation: z.number().int().nonnegative(),
+  scope: SpoilerRevealScopeSchema,
+  state: SpoilerDecisionStateSchema,
+  targetId: SpoilerTargetIdSchema,
+  updatedAt: z.iso.datetime({ offset: true }),
   version: z.number().int().positive(),
 });
 
@@ -113,6 +215,39 @@ export class WorkspaceStore {
           CHECK ((remote_value IS NULL) = (remote_updated_at IS NULL))
         ) STRICT;
 
+        CREATE TABLE IF NOT EXISTS spoiler_state (
+          singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+          reset_generation INTEGER NOT NULL DEFAULT 0 CHECK (reset_generation >= 0),
+          revision INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0),
+          pending INTEGER NOT NULL DEFAULT 0 CHECK (pending IN (0, 1)),
+          reset_pending INTEGER NOT NULL DEFAULT 0 CHECK (reset_pending IN (0, 1)),
+          remote_version INTEGER CHECK (remote_version IS NULL OR remote_version > 0),
+          updated_at TEXT NOT NULL,
+          CHECK (reset_pending = 0 OR pending = 1)
+        ) STRICT;
+
+        CREATE TABLE IF NOT EXISTS spoiler_decisions (
+          scope TEXT NOT NULL CHECK (scope IN ('printing', 'release')),
+          target_id TEXT NOT NULL,
+          state TEXT NOT NULL CHECK (state IN ('protect', 'reveal')),
+          reset_generation INTEGER NOT NULL CHECK (reset_generation >= 0),
+          local_revision INTEGER NOT NULL CHECK (local_revision > 0),
+          pending INTEGER NOT NULL DEFAULT 1 CHECK (pending IN (0, 1)),
+          remote_version INTEGER CHECK (remote_version IS NULL OR remote_version > 0),
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY (scope, target_id)
+        ) STRICT;
+
+        CREATE INDEX IF NOT EXISTS spoiler_decisions_pending
+          ON spoiler_decisions (pending, scope, target_id);
+
+        CREATE TABLE IF NOT EXISTS spoiler_sync_outbox (
+          singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+          operation_id TEXT NOT NULL,
+          payload TEXT NOT NULL CHECK (json_valid(payload)),
+          created_at TEXT NOT NULL
+        ) STRICT;
+
         CREATE TABLE IF NOT EXISTS collection_lots (
           id TEXT PRIMARY KEY,
           payload TEXT NOT NULL CHECK (json_valid(payload))
@@ -144,6 +279,14 @@ export class WorkspaceStore {
       for (const [key, definition] of Object.entries(preferenceDefinitions)) {
         insertPreference.run(key, JSON.stringify(definition.defaultValue), now);
       }
+
+      this.#database
+        .prepare(
+          `INSERT OR IGNORE INTO spoiler_state
+           (singleton, reset_generation, revision, pending, reset_pending, updated_at)
+           VALUES (1, 0, 0, 0, 0, ?)`,
+        )
+        .run(now);
 
       this.#database
         .prepare(
@@ -211,6 +354,7 @@ export class WorkspaceStore {
       collectionLots,
       decks,
       preferences: this.readPreferences(),
+      spoilerDecisions: this.#readBackupSpoilerDecisions(),
     });
   }
 
@@ -235,15 +379,23 @@ export class WorkspaceStore {
         backup.cardLists.map(({ value }) => value),
       );
 
-      const result = this.#database
-        .prepare(
-          `UPDATE preferences
-           SET value = ?, updated_at = ?
-           WHERE key = 'motion'`,
-        )
-        .run(JSON.stringify(backup.preferences.motion), now);
+      const updatePreference = this.#database.prepare(
+        `UPDATE preferences
+         SET value = ?, updated_at = ?
+         WHERE key = ?`,
+      );
+      const motionResult = updatePreference.run(
+        JSON.stringify(backup.preferences.motion),
+        now,
+        "motion",
+      );
+      const spoilerPolicyResult = updatePreference.run(
+        JSON.stringify(backup.preferences.spoilerPolicy),
+        now,
+        "spoilerPolicy",
+      );
 
-      if (result.changes !== 1) {
+      if (motionResult.changes !== 1 || spoilerPolicyResult.changes !== 1) {
         throw new Error("The local preferences are invalid.");
       }
 
@@ -258,6 +410,8 @@ export class WorkspaceStore {
       if (syncResult.changes !== 1) {
         throw new Error("The local preference sync state is invalid.");
       }
+
+      this.#replaceSpoilerDecisionsFromBackup(backup.spoilerDecisions, now);
     });
   }
 
@@ -307,28 +461,291 @@ export class WorkspaceStore {
   }
 
   updatePreferences(update: PreferencesUpdate): Preferences {
-    if (update.motion === undefined) {
+    if (update.motion === undefined && update.spoilerPolicy === undefined) {
       return this.readPreferences();
     }
+
+    transact(this.#database, () => {
+      const now = new Date().toISOString();
+
+      if (update.motion !== undefined) {
+        this.#database
+          .prepare(
+            `UPDATE preferences
+             SET value = ?, updated_at = ?
+             WHERE key = 'motion'`,
+          )
+          .run(JSON.stringify(update.motion), now);
+        this.#database
+          .prepare(
+            `UPDATE preference_sync_state
+             SET pending = 1
+             WHERE key = 'motion'`,
+          )
+          .run();
+      }
+
+      if (
+        update.spoilerPolicy !== undefined &&
+        this.readPreferences().spoilerPolicy !== update.spoilerPolicy
+      ) {
+        this.#database
+          .prepare(
+            `UPDATE preferences
+             SET value = ?, updated_at = ?
+             WHERE key = 'spoilerPolicy'`,
+          )
+          .run(JSON.stringify(update.spoilerPolicy), now);
+        this.#advanceSpoilerRevision(now, true);
+      }
+    });
+
+    return this.readPreferences();
+  }
+
+  readSpoilerState(): SpoilerState {
+    const sync = this.readSpoilerSyncState();
+    const active = sync.decisions.filter(
+      ({ decision }) =>
+        decision.generation === sync.global.resetGeneration && decision.state === "reveal",
+    );
+
+    return SpoilerStateSchema.parse({
+      activePrintingIds: active
+        .filter(({ decision }) => decision.scope === "printing")
+        .map(({ decision }) => decision.targetId),
+      activeRootSetIds: active
+        .filter(({ decision }) => decision.scope === "release")
+        .map(({ decision }) => decision.targetId),
+      policy: sync.global.policy,
+      revision: sync.global.revision,
+    });
+  }
+
+  readSpoilerSyncState(): SpoilerSyncState {
+    const preferences = this.readPreferences();
+    const state = SpoilerStateRowSchema.parse(
+      this.#database
+        .prepare(
+          `SELECT reset_generation AS resetGeneration,
+                  revision,
+                  pending,
+                  reset_pending AS resetPending,
+                  remote_version AS remoteVersion,
+                  updated_at AS updatedAt
+           FROM spoiler_state
+           WHERE singleton = 1`,
+        )
+        .get(),
+    );
+    const decisions = z
+      .array(SpoilerDecisionRowSchema)
+      .parse(
+        this.#database
+          .prepare(
+            `SELECT scope,
+                    target_id AS targetId,
+                    state,
+                    reset_generation AS generation,
+                    local_revision AS localRevision,
+                    pending,
+                    remote_version AS remoteVersion,
+                    updated_at AS updatedAt
+             FROM spoiler_decisions
+             WHERE reset_generation = ?
+             ORDER BY scope, target_id`,
+          )
+          .all(state.resetGeneration),
+      )
+      .map((row) => ({
+        decision: SpoilerDecisionSchema.parse({
+          generation: row.generation,
+          revision: row.localRevision,
+          scope: row.scope,
+          state: row.state,
+          targetId: row.targetId,
+          updatedAt: row.updatedAt,
+        }),
+        pending: row.pending === 1,
+        remoteVersion: row.remoteVersion,
+      }));
+
+    return {
+      decisions,
+      global: {
+        pending: state.pending === 1,
+        policy: preferences.spoilerPolicy,
+        remoteVersion: state.remoteVersion,
+        resetGeneration: state.resetGeneration,
+        revision: state.revision,
+        updatedAt: state.updatedAt,
+      },
+    };
+  }
+
+  prepareSpoilerSyncBatch(limit: number): SpoilerSyncBatch | null {
+    const validLimit = z.number().int().min(1).max(25).parse(limit);
+
+    return transact(this.#database, () => {
+      const existing = this.#readSpoilerSyncBatch();
+      if (existing) {
+        return existing;
+      }
+
+      const sync = this.readSpoilerSyncState();
+      const decisions = sync.decisions.filter(({ pending }) => pending).slice(0, validLimit);
+      const global = sync.global.pending ? sync.global : null;
+      if (!global && decisions.length === 0) {
+        return null;
+      }
+
+      const batch = SpoilerSyncBatchSchema.parse({
+        decisions,
+        global,
+        operationId: randomUUID(),
+      });
+      this.#database
+        .prepare(
+          `INSERT INTO spoiler_sync_outbox
+           (singleton, operation_id, payload, created_at)
+           VALUES (1, ?, ?, ?)`,
+        )
+        .run(
+          batch.operationId,
+          JSON.stringify({ decisions: batch.decisions, global: batch.global }),
+          new Date().toISOString(),
+        );
+      return batch;
+    });
+  }
+
+  completeSpoilerSyncBatch(operationId: string) {
+    const validOperationId = z.uuid().parse(operationId);
+    const result = this.#database
+      .prepare("DELETE FROM spoiler_sync_outbox WHERE singleton = 1 AND operation_id = ?")
+      .run(validOperationId);
+
+    if (result.changes !== 1) {
+      throw new Error("The spoiler sync operation is no longer current.");
+    }
+  }
+
+  hasSpoilerSyncBatch() {
+    return (
+      this.#database.prepare("SELECT 1 FROM spoiler_sync_outbox WHERE singleton = 1").get() !==
+      undefined
+    );
+  }
+
+  setSpoilerPolicy(policy: SpoilerPolicy): SpoilerState {
+    const validPolicy = SpoilerPolicySchema.parse(policy);
+    this.updatePreferences({ spoilerPolicy: validPolicy });
+    return this.readSpoilerState();
+  }
+
+  revealSpoilerPrinting(printingId: string): SpoilerState {
+    return this.#setSpoilerDecision("printing", printingId, "reveal");
+  }
+
+  protectSpoilerPrinting(printingId: string): SpoilerState {
+    return this.#setSpoilerDecision("printing", printingId, "protect");
+  }
+
+  revealSpoilerRelease(rootSetId: string): SpoilerState {
+    return this.#setSpoilerDecision("release", rootSetId, "reveal");
+  }
+
+  protectSpoilerRelease(rootSetId: string): SpoilerState {
+    return this.#setSpoilerDecision("release", rootSetId, "protect");
+  }
+
+  protectAllSpoilers(): SpoilerState {
+    const now = new Date().toISOString();
 
     transact(this.#database, () => {
       this.#database
         .prepare(
           `UPDATE preferences
-           SET value = ?, updated_at = ?
-           WHERE key = 'motion'`,
+           SET value = '"protect"', updated_at = ?
+           WHERE key = 'spoilerPolicy'`,
         )
-        .run(JSON.stringify(update.motion), new Date().toISOString());
+        .run(now);
       this.#database
         .prepare(
-          `UPDATE preference_sync_state
-           SET pending = 1
-           WHERE key = 'motion'`,
+          `UPDATE spoiler_state
+           SET reset_generation = reset_generation + 1,
+               revision = revision + 1,
+               pending = 1,
+               reset_pending = 1,
+               updated_at = ?
+           WHERE singleton = 1`,
+        )
+        .run(now);
+      this.#database
+        .prepare(
+          `UPDATE spoiler_decisions
+           SET pending = 0
+           WHERE reset_generation < (
+             SELECT reset_generation FROM spoiler_state WHERE singleton = 1
+           )`,
         )
         .run();
     });
 
-    return this.readPreferences();
+    return this.readSpoilerState();
+  }
+
+  applyRemoteSpoilerState(state: RemoteSpoilerState): "applied" | "pending" {
+    return this.#applyRemoteSpoilerState(validateRemoteSpoilerState(state));
+  }
+
+  markSpoilerStateSynced(
+    pushedState: SpoilerSyncState["global"],
+    state: RemoteSpoilerState,
+  ): boolean {
+    const pushed = SpoilerGlobalSyncStateSchema.parse(pushedState);
+    return (
+      this.#applyRemoteSpoilerState(validateRemoteSpoilerState(state), pushed.revision, pushed) ===
+      "applied"
+    );
+  }
+
+  applyRemoteSpoilerDecisions(decisions: RemoteSpoilerDecision[]) {
+    const validated = decisions.map((decision) => validateRemoteSpoilerDecision(decision));
+    const seen = new Set<string>();
+
+    for (const decision of validated) {
+      const key = spoilerDecisionKey(decision.scope, decision.targetId);
+
+      if (seen.has(key)) {
+        throw new TypeError("Remote spoiler decisions must be unique.");
+      }
+      seen.add(key);
+    }
+
+    transact(this.#database, () => {
+      for (const decision of validated) {
+        this.#applyRemoteSpoilerDecisionInTransaction(decision);
+      }
+    });
+  }
+
+  markSpoilerDecisionSynced(
+    pushedDecision: SpoilerSyncState["decisions"][number],
+    decision: RemoteSpoilerDecision,
+  ): boolean {
+    const pushed = {
+      decision: SpoilerDecisionSchema.parse(pushedDecision.decision),
+      pending: z.boolean().parse(pushedDecision.pending),
+      remoteVersion: z.number().int().positive().nullable().parse(pushedDecision.remoteVersion),
+    };
+    const remote = validateRemoteSpoilerDecision(decision);
+
+    if (pushed.decision.scope !== remote.scope || pushed.decision.targetId !== remote.targetId) {
+      throw new TypeError("The synced spoiler decision does not match the pushed target.");
+    }
+
+    return this.#applyRemoteSpoilerDecision(remote, pushed) === "applied";
   }
 
   readPreferenceSyncState(): PreferenceSyncState {
@@ -408,7 +825,7 @@ export class WorkspaceStore {
   }
 
   markPreferenceSynced(pushedValue: MotionPreference, preference: RemoteMotionPreference): boolean {
-    validatePreferences({ motion: pushedValue });
+    MotionPreferenceSchema.parse(pushedValue);
     const remote = validateRemoteMotionPreference(preference);
 
     if (remote.value !== pushedValue) {
@@ -439,6 +856,482 @@ export class WorkspaceStore {
 
       return unchanged;
     });
+  }
+
+  #setSpoilerDecision(
+    scope: SpoilerRevealScope,
+    targetId: string,
+    state: SpoilerDecisionState,
+  ): SpoilerState {
+    const validScope = SpoilerRevealScopeSchema.parse(scope);
+    const validTargetId = SpoilerTargetIdSchema.parse(targetId);
+    const validState = SpoilerDecisionStateSchema.parse(state);
+    const now = new Date().toISOString();
+
+    transact(this.#database, () => {
+      const spoilerState = this.#readSpoilerStateRow();
+      const current = this.#readSpoilerDecisionRow(validScope, validTargetId);
+
+      if (current?.generation === spoilerState.resetGeneration && current.state === validState) {
+        return;
+      }
+
+      const revision = this.#nextSpoilerRevision();
+      this.#database
+        .prepare(
+          `INSERT INTO spoiler_decisions
+           (scope, target_id, state, reset_generation, local_revision, pending, updated_at)
+           VALUES (?, ?, ?, ?, ?, 1, ?)
+           ON CONFLICT(scope, target_id) DO UPDATE SET
+             state = excluded.state,
+             reset_generation = excluded.reset_generation,
+             local_revision = excluded.local_revision,
+             pending = 1,
+             updated_at = excluded.updated_at`,
+        )
+        .run(validScope, validTargetId, validState, spoilerState.resetGeneration, revision, now);
+    });
+
+    return this.readSpoilerState();
+  }
+
+  #applyRemoteSpoilerState(
+    remote: RemoteSpoilerState,
+    expectedLocalRevision?: number,
+    pushedState?: SpoilerSyncState["global"],
+  ): "applied" | "pending" {
+    return transact(this.#database, () => {
+      const current = this.readSpoilerSyncState().global;
+      const resetPending = this.#readSpoilerStateRow().resetPending === 1;
+
+      if (current.remoteVersion !== null && remote.version < current.remoteVersion) {
+        return current.pending ? "pending" : "applied";
+      }
+      if (
+        pushedState?.remoteVersion !== null &&
+        pushedState?.remoteVersion !== undefined &&
+        remote.version <= pushedState.remoteVersion
+      ) {
+        return current.pending ? "pending" : "applied";
+      }
+
+      const acknowledgesPushedState =
+        pushedState !== undefined &&
+        remote.policy === pushedState.policy &&
+        remote.resetGeneration === pushedState.resetGeneration &&
+        remote.version === (pushedState.remoteVersion ?? 0) + 1;
+
+      if (acknowledgesPushedState) {
+        const globalChanged =
+          current.policy !== pushedState.policy ||
+          current.resetGeneration !== pushedState.resetGeneration;
+        const keepResetPending =
+          resetPending && current.resetGeneration > pushedState.resetGeneration;
+        const updatedAt = globalChanged ? current.updatedAt : remote.updatedAt;
+
+        this.#database
+          .prepare(
+            `UPDATE preferences
+             SET value = ?, updated_at = ?
+             WHERE key = 'spoilerPolicy'`,
+          )
+          .run(JSON.stringify(current.policy), updatedAt);
+        this.#database
+          .prepare(
+            `UPDATE spoiler_state
+             SET pending = ?,
+                 reset_pending = ?,
+                 remote_version = ?,
+                 updated_at = ?
+             WHERE singleton = 1`,
+          )
+          .run(Number(globalChanged), Number(keepResetPending), remote.version, updatedAt);
+
+        return globalChanged ? "pending" : "applied";
+      }
+
+      const revisionChanged =
+        expectedLocalRevision !== undefined && current.revision !== expectedLocalRevision;
+      const resetAcknowledged =
+        resetPending &&
+        expectedLocalRevision !== undefined &&
+        !revisionChanged &&
+        remote.resetGeneration === current.resetGeneration &&
+        remote.policy === current.policy &&
+        current.remoteVersion !== null &&
+        remote.version === current.remoteVersion + 1;
+      const keepResetPending = resetPending && !resetAcknowledged;
+      let policy: SpoilerPolicy;
+      let resetGeneration: number;
+      let pending: boolean;
+      let updatedAt: string;
+
+      if (keepResetPending && remote.resetGeneration >= current.resetGeneration) {
+        policy = current.policy === "protect" || remote.policy === "protect" ? "protect" : "show";
+        resetGeneration = remote.resetGeneration + 1;
+        pending = true;
+        updatedAt = current.updatedAt;
+      } else if (
+        current.remoteVersion !== null &&
+        remote.version === current.remoteVersion &&
+        (remote.policy !== current.policy || remote.resetGeneration !== current.resetGeneration)
+      ) {
+        policy = "protect";
+        resetGeneration = Math.max(current.resetGeneration, remote.resetGeneration);
+        pending = true;
+        updatedAt = current.updatedAt;
+      } else if (!current.pending) {
+        ({ policy, resetGeneration, updatedAt } = remote);
+        pending = false;
+      } else if (current.policy !== remote.policy) {
+        policy = "protect";
+        resetGeneration = Math.max(current.resetGeneration, remote.resetGeneration);
+        pending = remote.policy !== "protect" || remote.resetGeneration !== resetGeneration;
+        updatedAt = pending ? current.updatedAt : remote.updatedAt;
+      } else if (current.resetGeneration > remote.resetGeneration) {
+        ({ policy, resetGeneration, updatedAt } = current);
+        pending = true;
+      } else if (remote.resetGeneration > current.resetGeneration) {
+        ({ policy, resetGeneration, updatedAt } = remote);
+        pending = false;
+      } else if (revisionChanged) {
+        ({ policy, resetGeneration, updatedAt } = current);
+        pending = true;
+      } else {
+        ({ policy, resetGeneration, updatedAt } = remote);
+        pending = false;
+      }
+
+      const changed = policy !== current.policy || resetGeneration !== current.resetGeneration;
+      const revision = current.revision + Number(changed);
+
+      this.#database
+        .prepare(
+          `UPDATE preferences
+           SET value = ?, updated_at = ?
+           WHERE key = 'spoilerPolicy'`,
+        )
+        .run(JSON.stringify(policy), updatedAt);
+      this.#database
+        .prepare(
+          `UPDATE spoiler_state
+           SET reset_generation = ?,
+               revision = ?,
+               pending = ?,
+               reset_pending = ?,
+               remote_version = ?,
+               updated_at = ?
+           WHERE singleton = 1`,
+        )
+        .run(
+          resetGeneration,
+          revision,
+          Number(pending),
+          Number(keepResetPending),
+          remote.version,
+          updatedAt,
+        );
+      if (keepResetPending && resetGeneration > current.resetGeneration) {
+        this.#database
+          .prepare(
+            `UPDATE spoiler_decisions
+             SET reset_generation = ?, pending = 1
+             WHERE reset_generation = ? AND pending = 1 AND state = 'protect'`,
+          )
+          .run(resetGeneration, current.resetGeneration);
+      }
+      this.#database
+        .prepare(
+          `UPDATE spoiler_decisions
+           SET pending = 0
+           WHERE reset_generation < ?`,
+        )
+        .run(resetGeneration);
+
+      return pending ? "pending" : "applied";
+    });
+  }
+
+  #applyRemoteSpoilerDecision(
+    remote: RemoteSpoilerDecision,
+    pushedDecision?: SpoilerSyncState["decisions"][number],
+  ): "applied" | "pending" {
+    return transact(this.#database, () =>
+      this.#applyRemoteSpoilerDecisionInTransaction(remote, pushedDecision),
+    );
+  }
+
+  #applyRemoteSpoilerDecisionInTransaction(
+    remote: RemoteSpoilerDecision,
+    pushedDecision?: SpoilerSyncState["decisions"][number],
+  ): "applied" | "pending" {
+    const global = this.#readSpoilerStateRow();
+    const current = this.#readSpoilerDecisionRow(remote.scope, remote.targetId);
+
+    if (remote.generation > global.resetGeneration) {
+      throw new TypeError("The remote spoiler decision uses an unknown reset generation.");
+    }
+    if (
+      current?.remoteVersion !== null &&
+      current?.remoteVersion !== undefined &&
+      remote.version < current.remoteVersion
+    ) {
+      return current.pending === 1 ? "pending" : "applied";
+    }
+    if (
+      pushedDecision?.remoteVersion !== null &&
+      pushedDecision?.remoteVersion !== undefined &&
+      remote.version <= pushedDecision.remoteVersion
+    ) {
+      return current?.pending === 1 && current.generation === global.resetGeneration
+        ? "pending"
+        : "applied";
+    }
+
+    const revisionChanged =
+      pushedDecision !== undefined &&
+      (current?.localRevision !== pushedDecision.decision.revision ||
+        current?.generation !== pushedDecision.decision.generation ||
+        current?.state !== pushedDecision.decision.state);
+    const acknowledgesPushedDecision =
+      pushedDecision !== undefined &&
+      remote.generation === pushedDecision.decision.generation &&
+      remote.state === pushedDecision.decision.state &&
+      remote.version === (pushedDecision.remoteVersion ?? 0) + 1;
+
+    if (acknowledgesPushedDecision && revisionChanged && current) {
+      const remainsPending = current.generation === global.resetGeneration;
+      this.#database
+        .prepare(
+          `UPDATE spoiler_decisions
+           SET pending = ?, remote_version = ?
+           WHERE scope = ? AND target_id = ?`,
+        )
+        .run(Number(remainsPending), remote.version, remote.scope, remote.targetId);
+      return remainsPending ? "pending" : "applied";
+    }
+
+    if (remote.generation < global.resetGeneration) {
+      if (acknowledgesPushedDecision && current) {
+        this.#database
+          .prepare(
+            `UPDATE spoiler_decisions
+             SET pending = 0, remote_version = ?
+             WHERE scope = ? AND target_id = ?`,
+          )
+          .run(remote.version, remote.scope, remote.targetId);
+      }
+      return current?.pending === 1 && current.generation === global.resetGeneration
+        ? "pending"
+        : "applied";
+    }
+
+    const sameVersionConflict =
+      current?.remoteVersion !== null &&
+      current?.remoteVersion !== undefined &&
+      remote.version === current.remoteVersion &&
+      (remote.generation !== current.generation || remote.state !== current.state);
+    let state: SpoilerDecisionState;
+    let pending: boolean;
+    let updatedAt: string;
+
+    if (sameVersionConflict) {
+      state = "protect";
+      pending = true;
+      updatedAt = current.updatedAt;
+    } else if (!current || current.generation < remote.generation || current.pending === 0) {
+      state = remote.state;
+      pending = false;
+      updatedAt = remote.updatedAt;
+    } else if (current.generation > remote.generation) {
+      state = current.state;
+      pending = true;
+      updatedAt = current.updatedAt;
+    } else if (current.state !== remote.state) {
+      state = "protect";
+      pending = remote.state !== "protect";
+      updatedAt = pending ? current.updatedAt : remote.updatedAt;
+    } else if (revisionChanged) {
+      state = current.state;
+      pending = true;
+      updatedAt = current.updatedAt;
+    } else {
+      state = remote.state;
+      pending = false;
+      updatedAt = remote.updatedAt;
+    }
+
+    const changed =
+      current === null || current.generation !== remote.generation || current.state !== state;
+    const localRevision = changed
+      ? this.#nextSpoilerRevision()
+      : (current?.localRevision ?? this.#nextSpoilerRevision());
+
+    this.#database
+      .prepare(
+        `INSERT INTO spoiler_decisions
+           (scope, target_id, state, reset_generation, local_revision, pending, remote_version, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(scope, target_id) DO UPDATE SET
+             state = excluded.state,
+             reset_generation = excluded.reset_generation,
+             local_revision = excluded.local_revision,
+             pending = excluded.pending,
+             remote_version = excluded.remote_version,
+             updated_at = excluded.updated_at`,
+      )
+      .run(
+        remote.scope,
+        remote.targetId,
+        state,
+        remote.generation,
+        localRevision,
+        Number(pending),
+        remote.version,
+        updatedAt,
+      );
+
+    return pending ? "pending" : "applied";
+  }
+
+  #readSpoilerStateRow() {
+    return SpoilerStateRowSchema.parse(
+      this.#database
+        .prepare(
+          `SELECT reset_generation AS resetGeneration,
+                  revision,
+                  pending,
+                  reset_pending AS resetPending,
+                  remote_version AS remoteVersion,
+                  updated_at AS updatedAt
+           FROM spoiler_state
+           WHERE singleton = 1`,
+        )
+        .get(),
+    );
+  }
+
+  #readSpoilerDecisionRow(scope: SpoilerRevealScope, targetId: string) {
+    const value = this.#database
+      .prepare(
+        `SELECT scope,
+                target_id AS targetId,
+                state,
+                reset_generation AS generation,
+                local_revision AS localRevision,
+                pending,
+                remote_version AS remoteVersion,
+                updated_at AS updatedAt
+         FROM spoiler_decisions
+         WHERE scope = ? AND target_id = ?`,
+      )
+      .get(scope, targetId);
+
+    return value === undefined ? null : SpoilerDecisionRowSchema.parse(value);
+  }
+
+  #nextSpoilerRevision() {
+    const row = z.object({ revision: z.number().int().positive() }).parse(
+      this.#database
+        .prepare(
+          `UPDATE spoiler_state
+             SET revision = revision + 1
+             WHERE singleton = 1
+             RETURNING revision`,
+        )
+        .get(),
+    );
+    return row.revision;
+  }
+
+  #advanceSpoilerRevision(updatedAt: string, pending: boolean) {
+    this.#database
+      .prepare(
+        `UPDATE spoiler_state
+         SET revision = revision + 1,
+             pending = ?,
+             updated_at = ?
+         WHERE singleton = 1`,
+      )
+      .run(Number(pending), updatedAt);
+  }
+
+  #readBackupSpoilerDecisions(): WorkspaceBackupSpoilerDecision[] {
+    return this.readSpoilerSyncState().decisions.map(({ decision }) => ({
+      scope: decision.scope,
+      state: decision.state,
+      targetId: decision.targetId,
+    }));
+  }
+
+  #readSpoilerSyncBatch(): SpoilerSyncBatch | null {
+    const row = z
+      .object({ operationId: z.uuid(), payload: z.string() })
+      .nullable()
+      .parse(
+        this.#database
+          .prepare(
+            `SELECT operation_id AS operationId, payload
+             FROM spoiler_sync_outbox
+             WHERE singleton = 1`,
+          )
+          .get() ?? null,
+      );
+    if (!row) {
+      return null;
+    }
+
+    try {
+      const payload = z
+        .strictObject({
+          decisions: z.array(SpoilerDecisionSyncStateSchema).max(25),
+          global: SpoilerGlobalSyncStateSchema.nullable(),
+        })
+        .parse(JSON.parse(row.payload));
+      return SpoilerSyncBatchSchema.parse({ ...payload, operationId: row.operationId });
+    } catch {
+      throw new Error("The local spoiler sync outbox is invalid.");
+    }
+  }
+
+  #replaceSpoilerDecisionsFromBackup(
+    decisions: WorkspaceBackupSpoilerDecision[],
+    updatedAt: string,
+  ) {
+    const current = this.#readSpoilerStateRow();
+    const resetGeneration = current.resetGeneration + 1;
+    let revision = current.revision + 1;
+
+    this.#database.prepare("DELETE FROM spoiler_decisions").run();
+    const insert = this.#database.prepare(
+      `INSERT INTO spoiler_decisions
+       (scope, target_id, state, reset_generation, local_revision, pending, updated_at)
+       VALUES (?, ?, ?, ?, ?, 1, ?)`,
+    );
+
+    for (const decision of decisions) {
+      revision += 1;
+      insert.run(
+        decision.scope,
+        decision.targetId,
+        decision.state,
+        resetGeneration,
+        revision,
+        updatedAt,
+      );
+    }
+
+    this.#database
+      .prepare(
+        `UPDATE spoiler_state
+         SET reset_generation = ?,
+             revision = ?,
+             pending = 1,
+             reset_pending = 1,
+             updated_at = ?
+         WHERE singleton = 1`,
+      )
+      .run(resetGeneration, revision, updatedAt);
   }
 
   #readMetadata(): WorkspaceMetadata {
@@ -561,6 +1454,50 @@ export class WorkspaceManager {
     return this.#active.updatePreferences(update);
   }
 
+  readSpoilerState() {
+    return this.#active.readSpoilerState();
+  }
+
+  readSpoilerSyncState() {
+    return this.#active.readSpoilerSyncState();
+  }
+
+  prepareSpoilerSyncBatch(limit: number) {
+    return this.#active.prepareSpoilerSyncBatch(limit);
+  }
+
+  completeSpoilerSyncBatch(operationId: string) {
+    this.#active.completeSpoilerSyncBatch(operationId);
+  }
+
+  hasSpoilerSyncBatch() {
+    return this.#active.hasSpoilerSyncBatch();
+  }
+
+  setSpoilerPolicy(policy: SpoilerPolicy) {
+    return this.#active.setSpoilerPolicy(policy);
+  }
+
+  revealSpoilerPrinting(printingId: string) {
+    return this.#active.revealSpoilerPrinting(printingId);
+  }
+
+  protectSpoilerPrinting(printingId: string) {
+    return this.#active.protectSpoilerPrinting(printingId);
+  }
+
+  revealSpoilerRelease(rootSetId: string) {
+    return this.#active.revealSpoilerRelease(rootSetId);
+  }
+
+  protectSpoilerRelease(rootSetId: string) {
+    return this.#active.protectSpoilerRelease(rootSetId);
+  }
+
+  protectAllSpoilers() {
+    return this.#active.protectAllSpoilers();
+  }
+
   readPreferenceSyncState() {
     return this.#active.readPreferenceSyncState();
   }
@@ -571,6 +1508,25 @@ export class WorkspaceManager {
 
   markPreferenceSynced(pushedValue: MotionPreference, preference: RemoteMotionPreference) {
     return this.#active.markPreferenceSynced(pushedValue, preference);
+  }
+
+  applyRemoteSpoilerState(state: RemoteSpoilerState) {
+    return this.#active.applyRemoteSpoilerState(state);
+  }
+
+  markSpoilerStateSynced(pushedState: SpoilerSyncState["global"], state: RemoteSpoilerState) {
+    return this.#active.markSpoilerStateSynced(pushedState, state);
+  }
+
+  applyRemoteSpoilerDecisions(decisions: RemoteSpoilerDecision[]) {
+    return this.#active.applyRemoteSpoilerDecisions(decisions);
+  }
+
+  markSpoilerDecisionSynced(
+    pushedDecision: SpoilerSyncState["decisions"][number],
+    decision: RemoteSpoilerDecision,
+  ) {
+    return this.#active.markSpoilerDecisionSynced(pushedDecision, decision);
   }
 
   selectForUser(userId: string): WorkspaceStore {
@@ -680,6 +1636,20 @@ function validateRemoteMotionPreference(
   value: RemoteMotionPreference | JSONType,
 ): RemoteMotionPreference {
   return RemoteMotionPreferenceSchema.parse(value);
+}
+
+function validateRemoteSpoilerState(value: RemoteSpoilerState | JSONType): RemoteSpoilerState {
+  return RemoteSpoilerStateSchema.parse(value);
+}
+
+function validateRemoteSpoilerDecision(
+  value: RemoteSpoilerDecision | JSONType,
+): RemoteSpoilerDecision {
+  return RemoteSpoilerDecisionSchema.parse(value);
+}
+
+function spoilerDecisionKey(scope: SpoilerRevealScope, targetId: string) {
+  return `${scope}\0${targetId}`;
 }
 
 function transact<Result>(database: DatabaseSync, callback: () => Result): Result {

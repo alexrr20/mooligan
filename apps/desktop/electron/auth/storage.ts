@@ -25,10 +25,18 @@ export interface PendingAuth {
   expiresAt: number;
 }
 
+export interface StoredAuthUser {
+  email: string;
+  id: string;
+  image: string | null;
+  name: string;
+}
+
 export interface ProtectedAuthState {
-  version: 1;
+  version: 2;
   cookies: Record<string, StoredAuthCookie>;
   pendingAuth: PendingAuth | null;
+  user: StoredAuthUser | null;
 }
 
 const StoredAuthCookieSchema = z.object({
@@ -40,7 +48,19 @@ const PendingAuthSchema = z.object({
   state: z.string(),
   verifier: z.string(),
 });
-export const ProtectedAuthStateSchema = z.object({
+const StoredAuthUserSchema = z.strictObject({
+  email: z.string().min(1).max(320),
+  id: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
+  image: z.string().max(2_048).nullable(),
+  name: z.string().min(1).max(200),
+});
+export const ProtectedAuthStateSchema = z.strictObject({
+  cookies: z.record(z.string(), StoredAuthCookieSchema),
+  pendingAuth: PendingAuthSchema.nullable(),
+  user: StoredAuthUserSchema.nullable(),
+  version: z.literal(2),
+});
+const LegacyProtectedAuthStateSchema = z.strictObject({
   cookies: z.record(z.string(), StoredAuthCookieSchema),
   pendingAuth: PendingAuthSchema.nullable(),
   version: z.literal(1),
@@ -98,9 +118,9 @@ export class EncryptedAuthStorage implements AuthStateStorage {
         throw new Error("Decrypted authentication state is too large.");
       }
 
-      const state = parseProtectedAuthState(decrypted.result);
+      const { state, upgraded } = parseProtectedAuthState(decrypted.result);
 
-      if (decrypted.shouldReEncrypt) {
+      if (decrypted.shouldReEncrypt || upgraded) {
         await this.save(state);
       }
 
@@ -169,7 +189,7 @@ export class EncryptedAuthStorage implements AuthStateStorage {
 }
 
 export function emptyAuthState(): ProtectedAuthState {
-  return { cookies: {}, pendingAuth: null, version: 1 };
+  return { cookies: {}, pendingAuth: null, user: null, version: 2 };
 }
 
 function parseProtectedAuthState(serialized: string) {
@@ -183,7 +203,25 @@ function parseProtectedAuthState(serialized: string) {
     });
   }
 
-  return validateProtectedAuthState(value);
+  const current = ProtectedAuthStateSchema.safeParse(value);
+  if (current.success) {
+    return { state: current.data, upgraded: false };
+  }
+
+  const legacy = LegacyProtectedAuthStateSchema.safeParse(value);
+  if (legacy.success) {
+    return {
+      state: {
+        cookies: legacy.data.cookies,
+        pendingAuth: legacy.data.pendingAuth,
+        user: null,
+        version: 2,
+      } satisfies ProtectedAuthState,
+      upgraded: true,
+    };
+  }
+
+  throw new ProtectedStorageError("Protected authentication state is invalid.");
 }
 
 function validateProtectedAuthState(value: ProtectedAuthState | JSONType): ProtectedAuthState {

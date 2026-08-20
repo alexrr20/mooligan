@@ -64,18 +64,6 @@ export const CardPrintingSchema = z.object({
 });
 export type CardPrinting = z.infer<typeof CardPrintingSchema>;
 
-export const CardSetSchema = z.object({
-  cardCount: z.number().int().nonnegative(),
-  code: textSchema,
-  id: idSchema,
-  isDigital: z.boolean(),
-  name: textSchema,
-  parentSetId: idSchema.optional(),
-  releasedOn: dateSchema.optional(),
-  type: textSchema,
-});
-export type CardSet = z.infer<typeof CardSetSchema>;
-
 export const CardRulingSchema = z.object({
   cardId: idSchema,
   comment: textSchema,

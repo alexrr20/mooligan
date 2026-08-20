@@ -10,6 +10,7 @@ import { type AsyncSafeStorage, ProtectedAuthStateSchema } from "../electron/aut
 import {
   AUTH_PROTOCOL,
   AuthInputError,
+  AuthRequestError,
   DesktopAuth,
   resolveAuthOrigin,
 } from "../electron/auth/service.ts";
@@ -22,6 +23,12 @@ const user = {
   image: "https://images.example.com/molly.png",
   name: "Molly",
   sessionToken: "must-not-reach-the-renderer",
+};
+const sanitizedUser = {
+  email: "molly@example.com",
+  id: "0198f089-41f2-7000-8000-000000000001",
+  image: "https://images.example.com/molly.png",
+  name: "Molly",
 };
 const TokenRequestSchema = z.object({
   code_verifier: z.string(),
@@ -42,6 +49,7 @@ void test("desktop sign-in persists PKCE first and keeps session material out of
   let syncUnauthorized = false;
   let signOutFails = false;
   let hangSessionRequest = false;
+  let sessionUnauthorized = false;
 
   const fetch = async (input: string | URL | Request, init?: RequestInit) => {
     const url = requestUrl(input);
@@ -86,6 +94,9 @@ void test("desktop sign-in persists PKCE first and keeps session material out of
     }
 
     if (url.pathname === "/api/auth/get-session") {
+      if (sessionUnauthorized) {
+        return new Response(null, { status: 401 });
+      }
       if (hangSessionRequest) {
         const signal = init?.signal;
         assert.ok(signal);
@@ -171,12 +182,7 @@ void test("desktop sign-in persists PKCE first and keeps session material out of
     assert.deepEqual(auth.snapshot(), {
       pendingAuth: false,
       status: "signed-in",
-      user: {
-        email: "molly@example.com",
-        id: "0198f089-41f2-7000-8000-000000000001",
-        image: "https://images.example.com/molly.png",
-        name: "Molly",
-      },
+      user: sanitizedUser,
     });
 
     hangSessionRequest = true;
@@ -185,7 +191,7 @@ void test("desktop sign-in persists PKCE first and keeps session material out of
     assert.equal((await auth.refresh()).status, "signed-in");
 
     syncUnauthorized = true;
-    assert.equal((await auth.request("/sync/workspace")).status, 401);
+    assert.equal((await auth.request(sanitizedUser.id, "/sync/workspace")).status, 401);
     assert.equal(auth.snapshot().status, "sync-paused");
     syncUnauthorized = false;
     assert.equal((await auth.refresh()).status, "signed-in");
@@ -194,8 +200,10 @@ void test("desktop sign-in persists PKCE first and keeps session material out of
     assert.deepEqual(Object.keys(protectedState.cookies), ["better-auth.session_token"]);
     assert.equal(protectedState.cookies["better-auth.session_token"]?.value, "session-one");
     assert.equal(protectedState.pendingAuth, null);
+    assert.deepEqual(protectedState.user, sanitizedUser);
 
-    const response = await auth.request("/sync/workspace", {
+    await assert.rejects(auth.request("different-user", "/sync/workspace"), AuthRequestError);
+    const response = await auth.request(sanitizedUser.id, "/sync/workspace", {
       headers: {
         authorization: "renderer-controlled bearer token",
         cookie: "renderer-controlled-cookie=value",
@@ -223,6 +231,7 @@ void test("desktop sign-in persists PKCE first and keeps session material out of
       user: null,
     });
     assert.deepEqual((await safeStorage.readState(path)).cookies, {});
+    assert.equal((await safeStorage.readState(path)).user, null);
 
     await auth.beginSignIn();
     const relaunched = new DesktopAuth({
@@ -246,8 +255,10 @@ void test("desktop sign-in persists PKCE first and keeps session material out of
     assert.equal(tokenCalls, 2);
 
     let online = false;
+    let offlineRequests = 0;
     const offlineRelaunch = new DesktopAuth({
       fetch: (input, init) => {
+        offlineRequests += 1;
         if (!online) {
           return Promise.reject(new Error("offline"));
         }
@@ -258,13 +269,28 @@ void test("desktop sign-in persists PKCE first and keeps session material out of
       openExternal: async () => undefined,
       safeStorage,
     });
+    assert.deepEqual(await offlineRelaunch.restore(), {
+      pendingAuth: false,
+      status: "sync-paused",
+      user: sanitizedUser,
+    });
+    assert.equal(offlineRequests, 0);
     assert.deepEqual(await offlineRelaunch.initialize(), {
       pendingAuth: false,
       status: "sync-paused",
-      user: null,
+      user: sanitizedUser,
     });
+    assert.equal(offlineRequests, 1);
     online = true;
     assert.equal((await offlineRelaunch.refresh()).status, "signed-in");
+    sessionUnauthorized = true;
+    assert.deepEqual(await offlineRelaunch.refresh(), {
+      pendingAuth: false,
+      status: "signed-out",
+      user: null,
+    });
+    assert.equal((await safeStorage.readState(path)).user, null);
+    sessionUnauthorized = false;
 
     now += 301_000;
     await relaunched.signOut();

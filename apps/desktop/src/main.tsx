@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import manaFontUrl from "mana-font/fonts/mana.woff2?url";
 
 import "./global.css";
+import { subscribeToSpoilerState } from "./features/spoilers/use-spoilers";
 import { routeTree } from "./routeTree.gen";
 
 document.fonts.add(
@@ -43,12 +44,14 @@ createRoot(rootElement).render(
 function App() {
   useEffect(() => {
     const refreshCatalog = () => {
-      void queryClient.invalidateQueries({ queryKey: ["catalog"] });
+      void queryClient.resetQueries({ queryKey: ["catalog"] });
     };
 
     window.addEventListener("catalogready", refreshCatalog);
     return () => window.removeEventListener("catalogready", refreshCatalog);
   }, []);
+
+  useEffect(() => subscribeToSpoilerState(queryClient), []);
 
   return (
     <QueryClientProvider client={queryClient}>
