@@ -51,10 +51,12 @@ void test("the spoiler service publishes named actions and refreshes at local mi
     service.refresh();
     assert.equal(published.length, 3);
 
+    const revisionBeforeMidnight = service.snapshot().revision;
     now = new Date(2026, 7, 20, 0, 0, 0);
     assert.ok(scheduled);
     scheduled();
     assert.equal(service.visibilitySnapshot().currentDate, localDate(now));
+    assert.equal(service.snapshot().revision, revisionBeforeMidnight + 1);
     assert.equal(published.at(-1), service.snapshot().revision);
     assert.equal(published.length, 4);
 
