@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-import { CatalogReleaseSummarySchema, type CatalogReleaseSummary } from "@mooligan/domain/spoilers";
+import type { CatalogReleaseSummary } from "@mooligan/domain/spoilers";
 import * as z from "zod";
 
 export const CatalogReleaseSummaryRowSchema = z.object({
@@ -34,8 +34,8 @@ export function createCatalogReleaseSummaryQuery(database: DatabaseSync) {
 }
 
 export function toCatalogReleaseSummary(row: CatalogReleaseSummaryRow): CatalogReleaseSummary {
-  return CatalogReleaseSummarySchema.parse({
+  return {
     ...row,
     symbol: { setId: row.rootSetId },
-  });
+  };
 }

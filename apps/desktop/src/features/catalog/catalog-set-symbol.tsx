@@ -6,7 +6,7 @@ import {
   catalogSetSymbolAccessibleName,
   catalogSetSymbolFallback,
   catalogSetSymbolUrl,
-} from "./catalog-set-symbol-url";
+} from "./catalog-set-symbol-display";
 
 type CatalogSetSymbolProps = {
   code: string;

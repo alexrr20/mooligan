@@ -2,7 +2,8 @@ import * as z from "zod";
 
 import { CatalogCardDetailSchema } from "./catalog-detail.ts";
 
-const idSchema = z.string().trim().min(1).max(128);
+export const SpoilerTargetIdSchema = z.string().trim().min(1).max(128);
+const idSchema = SpoilerTargetIdSchema;
 const uniqueIds = (ids: readonly string[]) => new Set(ids).size === ids.length;
 
 export const SpoilerPolicySchema = z.enum(["protect", "show"]);

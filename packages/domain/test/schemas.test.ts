@@ -91,6 +91,13 @@ void test("catalog releases require an HTTPS archive and timestamp", () => {
   );
 });
 
+void test("Scryfall cards reject unsupported rarities during ingestion", () => {
+  assert.equal(
+    ScryfallCardDownloadSchema.safeParse({ ...scryfallCard(), rarity: "unknown" }).success,
+    false,
+  );
+});
+
 void test("a single-face card normalizes card, printing, and sibling facts", () => {
   const selected = scryfallCard({
     artist: "Christopher Rush",

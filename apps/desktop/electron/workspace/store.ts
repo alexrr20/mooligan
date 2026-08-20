@@ -11,18 +11,25 @@ import {
   SpoilerDecisionStateSchema,
   SpoilerPolicySchema,
   SpoilerRevealScopeSchema,
-  SpoilerStateSchema,
+  SpoilerTargetIdSchema,
   type SpoilerDecision,
   type SpoilerDecisionState,
   type SpoilerPolicy,
   type SpoilerRevealScope,
   type SpoilerState,
 } from "@mooligan/domain/spoilers";
+import {
+  RemoteMotionPreferenceSchema,
+  RemoteSpoilerDecisionSchema,
+  SPOILER_SYNC_BATCH_SIZE,
+  type RemoteMotionPreference,
+  type RemoteSpoilerDecision,
+  type RemoteSpoilerState,
+} from "@mooligan/domain/workspace-sync";
 import * as z from "zod";
 import type { JSONType } from "zod";
 
 import {
-  MotionPreferenceSchema,
   preferenceDefinitions,
   type MotionPreference,
   type Preferences,
@@ -30,19 +37,13 @@ import {
   validatePreferences,
 } from "./preferences.ts";
 import {
-  parseWorkspaceBackup,
   serializeWorkspaceBackup,
   validateCardList,
   validateCollectionLot,
   validateDeck,
+  type WorkspaceBackup,
   type WorkspaceBackupSpoilerDecision,
 } from "./backup.ts";
-
-export type RemoteMotionPreference = {
-  updatedAt: string;
-  value: MotionPreference;
-  version: number;
-};
 
 export type PreferenceSyncState = {
   motion: {
@@ -50,22 +51,6 @@ export type PreferenceSyncState = {
     pending: boolean;
     remoteVersion: number | null;
   };
-};
-
-export type RemoteSpoilerState = {
-  policy: SpoilerPolicy;
-  resetGeneration: number;
-  updatedAt: string;
-  version: number;
-};
-
-export type RemoteSpoilerDecision = {
-  generation: number;
-  scope: SpoilerRevealScope;
-  state: SpoilerDecisionState;
-  targetId: string;
-  updatedAt: string;
-  version: number;
 };
 
 export type SpoilerSyncState = {
@@ -111,7 +96,6 @@ const WorkspaceMetadataSchema = z.object({
 const WorkspaceIdSchema = z.uuidv4();
 const WorkspaceRegistryRowSchema = z.object({ workspaceId: WorkspaceIdSchema });
 const EntityRowSchema = z.object({ id: z.string(), payload: z.string() });
-const SpoilerTargetIdSchema = z.string().trim().min(1).max(128);
 const SpoilerStateRowSchema = z.object({
   pending: z.union([z.literal(0), z.literal(1)]),
   remoteVersion: z.number().int().positive().nullable(),
@@ -134,7 +118,7 @@ const SpoilerDecisionSyncStateSchema = z.strictObject({
   remoteVersion: z.number().int().positive().nullable(),
 });
 const SpoilerSyncBatchSchema = z.strictObject({
-  decisions: z.array(SpoilerDecisionSyncStateSchema).max(25),
+  decisions: z.array(SpoilerDecisionSyncStateSchema).max(SPOILER_SYNC_BATCH_SIZE),
   global: SpoilerGlobalSyncStateSchema.nullable(),
   operationId: z.uuid(),
 });
@@ -147,25 +131,6 @@ const SpoilerDecisionRowSchema = z.object({
   state: SpoilerDecisionStateSchema,
   targetId: SpoilerTargetIdSchema,
   updatedAt: z.iso.datetime({ offset: true }),
-});
-export const RemoteMotionPreferenceSchema = z.strictObject({
-  updatedAt: z.iso.datetime({ offset: true }),
-  value: MotionPreferenceSchema,
-  version: z.number().int().positive(),
-});
-export const RemoteSpoilerStateSchema = z.strictObject({
-  policy: SpoilerPolicySchema,
-  resetGeneration: z.number().int().nonnegative(),
-  updatedAt: z.iso.datetime({ offset: true }),
-  version: z.number().int().positive(),
-});
-export const RemoteSpoilerDecisionSchema = z.strictObject({
-  generation: z.number().int().nonnegative(),
-  scope: SpoilerRevealScopeSchema,
-  state: SpoilerDecisionStateSchema,
-  targetId: SpoilerTargetIdSchema,
-  updatedAt: z.iso.datetime({ offset: true }),
-  version: z.number().int().positive(),
 });
 
 export class WorkspaceStore {
@@ -358,8 +323,7 @@ export class WorkspaceStore {
     });
   }
 
-  importBackup(serialized: string) {
-    const backup = parseWorkspaceBackup(serialized);
+  importBackup(backup: WorkspaceBackup) {
     const now = new Date().toISOString();
 
     transact(this.#database, () => {
@@ -510,7 +474,7 @@ export class WorkspaceStore {
         decision.generation === sync.global.resetGeneration && decision.state === "reveal",
     );
 
-    return SpoilerStateSchema.parse({
+    return {
       activePrintingIds: active
         .filter(({ decision }) => decision.scope === "printing")
         .map(({ decision }) => decision.targetId),
@@ -519,7 +483,7 @@ export class WorkspaceStore {
         .map(({ decision }) => decision.targetId),
       policy: sync.global.policy,
       revision: sync.global.revision,
-    });
+    };
   }
 
   readSpoilerSyncState(): SpoilerSyncState {
@@ -558,14 +522,14 @@ export class WorkspaceStore {
           .all(state.resetGeneration),
       )
       .map((row) => ({
-        decision: SpoilerDecisionSchema.parse({
+        decision: {
           generation: row.generation,
           revision: row.localRevision,
           scope: row.scope,
           state: row.state,
           targetId: row.targetId,
           updatedAt: row.updatedAt,
-        }),
+        },
         pending: row.pending === 1,
         remoteVersion: row.remoteVersion,
       }));
@@ -583,9 +547,7 @@ export class WorkspaceStore {
     };
   }
 
-  prepareSpoilerSyncBatch(limit: number): SpoilerSyncBatch | null {
-    const validLimit = z.number().int().min(1).max(25).parse(limit);
-
+  prepareSpoilerSyncBatch(): SpoilerSyncBatch | null {
     return transact(this.#database, () => {
       const existing = this.#readSpoilerSyncBatch();
       if (existing) {
@@ -593,17 +555,19 @@ export class WorkspaceStore {
       }
 
       const sync = this.readSpoilerSyncState();
-      const decisions = sync.decisions.filter(({ pending }) => pending).slice(0, validLimit);
+      const decisions = sync.decisions
+        .filter(({ pending }) => pending)
+        .slice(0, SPOILER_SYNC_BATCH_SIZE);
       const global = sync.global.pending ? sync.global : null;
       if (!global && decisions.length === 0) {
         return null;
       }
 
-      const batch = SpoilerSyncBatchSchema.parse({
+      const batch = {
         decisions,
         global,
         operationId: randomUUID(),
-      });
+      } satisfies SpoilerSyncBatch;
       this.#database
         .prepare(
           `INSERT INTO spoiler_sync_outbox
@@ -620,10 +584,9 @@ export class WorkspaceStore {
   }
 
   completeSpoilerSyncBatch(operationId: string) {
-    const validOperationId = z.uuid().parse(operationId);
     const result = this.#database
       .prepare("DELETE FROM spoiler_sync_outbox WHERE singleton = 1 AND operation_id = ?")
-      .run(validOperationId);
+      .run(operationId);
 
     if (result.changes !== 1) {
       throw new Error("The spoiler sync operation is no longer current.");
@@ -638,8 +601,7 @@ export class WorkspaceStore {
   }
 
   setSpoilerPolicy(policy: SpoilerPolicy): SpoilerState {
-    const validPolicy = SpoilerPolicySchema.parse(policy);
-    this.updatePreferences({ spoilerPolicy: validPolicy });
+    this.updatePreferences({ spoilerPolicy: policy });
     return this.readSpoilerState();
   }
 
@@ -696,22 +658,18 @@ export class WorkspaceStore {
   }
 
   applyRemoteSpoilerState(state: RemoteSpoilerState): "applied" | "pending" {
-    return this.#applyRemoteSpoilerState(validateRemoteSpoilerState(state));
+    return this.#applyRemoteSpoilerState(state);
   }
 
   markSpoilerStateSynced(
     pushedState: SpoilerSyncState["global"],
     state: RemoteSpoilerState,
   ): boolean {
-    const pushed = SpoilerGlobalSyncStateSchema.parse(pushedState);
-    return (
-      this.#applyRemoteSpoilerState(validateRemoteSpoilerState(state), pushed.revision, pushed) ===
-      "applied"
-    );
+    return this.#applyRemoteSpoilerState(state, pushedState.revision, pushedState) === "applied";
   }
 
   applyRemoteSpoilerDecisions(decisions: RemoteSpoilerDecision[]) {
-    const validated = decisions.map((decision) => validateRemoteSpoilerDecision(decision));
+    const validated = decisions.map((decision) => RemoteSpoilerDecisionSchema.parse(decision));
     const seen = new Set<string>();
 
     for (const decision of validated) {
@@ -732,20 +690,16 @@ export class WorkspaceStore {
 
   markSpoilerDecisionSynced(
     pushedDecision: SpoilerSyncState["decisions"][number],
-    decision: RemoteSpoilerDecision,
+    remote: RemoteSpoilerDecision,
   ): boolean {
-    const pushed = {
-      decision: SpoilerDecisionSchema.parse(pushedDecision.decision),
-      pending: z.boolean().parse(pushedDecision.pending),
-      remoteVersion: z.number().int().positive().nullable().parse(pushedDecision.remoteVersion),
-    };
-    const remote = validateRemoteSpoilerDecision(decision);
-
-    if (pushed.decision.scope !== remote.scope || pushed.decision.targetId !== remote.targetId) {
+    if (
+      pushedDecision.decision.scope !== remote.scope ||
+      pushedDecision.decision.targetId !== remote.targetId
+    ) {
       throw new TypeError("The synced spoiler decision does not match the pushed target.");
     }
 
-    return this.#applyRemoteSpoilerDecision(remote, pushed) === "applied";
+    return this.#applyRemoteSpoilerDecision(remote, pushedDecision) === "applied";
   }
 
   readPreferenceSyncState(): PreferenceSyncState {
@@ -766,7 +720,7 @@ export class WorkspaceStore {
 
     if (row.remoteValue !== null && row.remoteUpdatedAt !== null && row.remoteVersion !== null) {
       try {
-        conflict = validateRemoteMotionPreference({
+        conflict = RemoteMotionPreferenceSchema.parse({
           updatedAt: row.remoteUpdatedAt,
           value: JSON.parse(row.remoteValue),
           version: row.remoteVersion,
@@ -788,20 +742,18 @@ export class WorkspaceStore {
   }
 
   applyRemotePreference(preference: RemoteMotionPreference): "applied" | "conflict" {
-    const remote = validateRemoteMotionPreference(preference);
-
     return transact(this.#database, () => {
       const local = this.readPreferences().motion;
       const sync = this.readPreferenceSyncState().motion;
 
-      if (sync.pending && local !== remote.value) {
+      if (sync.pending && local !== preference.value) {
         this.#database
           .prepare(
             `UPDATE preference_sync_state
              SET remote_version = ?, remote_value = ?, remote_updated_at = ?
              WHERE key = 'motion'`,
           )
-          .run(remote.version, JSON.stringify(remote.value), remote.updatedAt);
+          .run(preference.version, JSON.stringify(preference.value), preference.updatedAt);
         return "conflict";
       }
 
@@ -811,7 +763,7 @@ export class WorkspaceStore {
            SET value = ?, updated_at = ?
            WHERE key = 'motion'`,
         )
-        .run(JSON.stringify(remote.value), remote.updatedAt);
+        .run(JSON.stringify(preference.value), preference.updatedAt);
       this.#database
         .prepare(
           `UPDATE preference_sync_state
@@ -819,16 +771,13 @@ export class WorkspaceStore {
                remote_value = NULL, remote_updated_at = NULL
            WHERE key = 'motion'`,
         )
-        .run(remote.version);
+        .run(preference.version);
       return "applied";
     });
   }
 
   markPreferenceSynced(pushedValue: MotionPreference, preference: RemoteMotionPreference): boolean {
-    MotionPreferenceSchema.parse(pushedValue);
-    const remote = validateRemoteMotionPreference(preference);
-
-    if (remote.value !== pushedValue) {
+    if (preference.value !== pushedValue) {
       throw new TypeError("The synced preference does not match the pushed value.");
     }
 
@@ -842,7 +791,7 @@ export class WorkspaceStore {
                remote_value = NULL, remote_updated_at = NULL
            WHERE key = 'motion'`,
         )
-        .run(remote.version, unchanged ? 0 : 1);
+        .run(preference.version, unchanged ? 0 : 1);
 
       if (unchanged) {
         this.#database
@@ -851,7 +800,7 @@ export class WorkspaceStore {
              SET updated_at = ?
              WHERE key = 'motion'`,
           )
-          .run(remote.updatedAt);
+          .run(preference.updatedAt);
       }
 
       return unchanged;
@@ -863,16 +812,13 @@ export class WorkspaceStore {
     targetId: string,
     state: SpoilerDecisionState,
   ): SpoilerState {
-    const validScope = SpoilerRevealScopeSchema.parse(scope);
-    const validTargetId = SpoilerTargetIdSchema.parse(targetId);
-    const validState = SpoilerDecisionStateSchema.parse(state);
     const now = new Date().toISOString();
 
     transact(this.#database, () => {
       const spoilerState = this.#readSpoilerStateRow();
-      const current = this.#readSpoilerDecisionRow(validScope, validTargetId);
+      const current = this.#readSpoilerDecisionRow(scope, targetId);
 
-      if (current?.generation === spoilerState.resetGeneration && current.state === validState) {
+      if (current?.generation === spoilerState.resetGeneration && current.state === state) {
         return;
       }
 
@@ -889,7 +835,7 @@ export class WorkspaceStore {
              pending = 1,
              updated_at = excluded.updated_at`,
         )
-        .run(validScope, validTargetId, validState, spoilerState.resetGeneration, revision, now);
+        .run(scope, targetId, state, spoilerState.resetGeneration, revision, now);
     });
 
     return this.readSpoilerState();
@@ -1284,7 +1230,7 @@ export class WorkspaceStore {
     try {
       const payload = z
         .strictObject({
-          decisions: z.array(SpoilerDecisionSyncStateSchema).max(25),
+          decisions: z.array(SpoilerDecisionSyncStateSchema).max(SPOILER_SYNC_BATCH_SIZE),
           global: SpoilerGlobalSyncStateSchema.nullable(),
         })
         .parse(JSON.parse(row.payload));
@@ -1418,8 +1364,8 @@ export class WorkspaceManager {
     return this.#active.createBackup();
   }
 
-  importBackup(serialized: string) {
-    this.#active.importBackup(serialized);
+  importBackup(backup: WorkspaceBackup) {
+    this.#active.importBackup(backup);
   }
 
   putCollectionLot(value: CollectionLot) {
@@ -1462,8 +1408,8 @@ export class WorkspaceManager {
     return this.#active.readSpoilerSyncState();
   }
 
-  prepareSpoilerSyncBatch(limit: number) {
-    return this.#active.prepareSpoilerSyncBatch(limit);
+  prepareSpoilerSyncBatch() {
+    return this.#active.prepareSpoilerSyncBatch();
   }
 
   completeSpoilerSyncBatch(operationId: string) {
@@ -1630,22 +1576,6 @@ export class WorkspaceManager {
   #workspacePath(workspaceId: string) {
     return join(this.#workspacesDirectory, `${workspaceId}.sqlite`);
   }
-}
-
-function validateRemoteMotionPreference(
-  value: RemoteMotionPreference | JSONType,
-): RemoteMotionPreference {
-  return RemoteMotionPreferenceSchema.parse(value);
-}
-
-function validateRemoteSpoilerState(value: RemoteSpoilerState | JSONType): RemoteSpoilerState {
-  return RemoteSpoilerStateSchema.parse(value);
-}
-
-function validateRemoteSpoilerDecision(
-  value: RemoteSpoilerDecision | JSONType,
-): RemoteSpoilerDecision {
-  return RemoteSpoilerDecisionSchema.parse(value);
 }
 
 function spoilerDecisionKey(scope: SpoilerRevealScope, targetId: string) {

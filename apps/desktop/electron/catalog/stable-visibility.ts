@@ -1,7 +1,4 @@
-import {
-  SpoilerVisibilitySnapshotSchema,
-  type SpoilerVisibilitySnapshot,
-} from "@mooligan/domain/spoilers";
+import type { SpoilerVisibilitySnapshot } from "@mooligan/domain/spoilers";
 
 const MAX_STABLE_VISIBILITY_ATTEMPTS = 2;
 
@@ -15,9 +12,9 @@ export async function readWithStableCatalogVisibility<Result>(
   read: (visibility: SpoilerVisibilitySnapshot) => Promise<Result>,
 ): Promise<StableCatalogRead<Result>> {
   for (let attempt = 0; attempt < MAX_STABLE_VISIBILITY_ATTEMPTS; attempt += 1) {
-    const before = SpoilerVisibilitySnapshotSchema.parse(readVisibility());
+    const before = readVisibility();
     const result = await read(before);
-    const after = SpoilerVisibilitySnapshotSchema.parse(readVisibility());
+    const after = readVisibility();
 
     if (catalogVisibilitySnapshotsEqual(before, after)) {
       return { result, visibility: after };

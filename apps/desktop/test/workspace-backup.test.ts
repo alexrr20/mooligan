@@ -102,7 +102,7 @@ void test("workspace backups round-trip user data while preserving local metadat
       version: 8,
     });
 
-    target.importBackup(backup);
+    target.importBackup(exported);
 
     assert.equal(target.workspaceId, targetWorkspaceId);
     assert.equal(target.boundUserId, "target-user");
@@ -195,7 +195,7 @@ void test("remote resets supersede imported reveal consent", async () => {
 
     for (const scenario of scenarios) {
       const target = new WorkspaceStore(join(targetDirectory, `${scenario.name}.sqlite`));
-      target.importBackup(backup);
+      target.importBackup(parseWorkspaceBackup(backup));
       target.applyRemoteSpoilerState({
         policy: scenario.expectedPolicy,
         resetGeneration: scenario.remoteGeneration,
@@ -256,17 +256,17 @@ void test("invalid backups are fully rejected before any workspace data changes"
     );
 
     replacement.decks[0].id = "does-not-match-payload";
-    assert.throws(() => store.importBackup(JSON.stringify(replacement)), /deck IDs are invalid/);
+    assert.throws(() => parseWorkspaceBackup(JSON.stringify(replacement)), /deck IDs are invalid/);
     assert.equal(store.createBackup(), before);
 
     replacement.decks[0].id = deck.id;
     replacement.decks[0].value.entries[0].quantity = 0;
-    assert.throws(() => store.importBackup(JSON.stringify(replacement)), /deck is invalid/);
+    assert.throws(() => parseWorkspaceBackup(JSON.stringify(replacement)), /deck is invalid/);
     assert.equal(store.createBackup(), before);
 
     replacement.decks[0].value.entries[0].quantity = 1;
     Object.assign(replacement.decks[0].value.entries[0], { unexpected: true });
-    assert.throws(() => store.importBackup(JSON.stringify(replacement)), /invalid fields/);
+    assert.throws(() => parseWorkspaceBackup(JSON.stringify(replacement)), /invalid fields/);
 
     assert.equal(store.createBackup(), before);
     assert.equal(store.workspaceId, workspaceId);

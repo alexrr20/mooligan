@@ -1,20 +1,19 @@
-import * as z from "zod";
 import type { JSONType } from "zod";
 
-import type { MotionPreference, Preferences } from "./preferences.ts";
 import {
-  RemoteMotionPreferenceSchema,
-  RemoteSpoilerDecisionSchema,
-  RemoteSpoilerStateSchema,
-  type PreferenceSyncState,
+  BindResponseSchema,
+  PreferencesResponseSchema,
+  SpoilerPageResponseSchema,
+  SpoilerUpdateResponseSchema,
   type RemoteMotionPreference,
   type RemoteSpoilerDecision,
   type RemoteSpoilerState,
-  type SpoilerSyncBatch,
-  type SpoilerSyncState,
-} from "./store.ts";
+  type SpoilerPageResponse,
+} from "@mooligan/domain/workspace-sync";
 
-export const spoilerSyncBatchSize = 25;
+import type { MotionPreference, Preferences } from "./preferences.ts";
+import { type PreferenceSyncState, type SpoilerSyncBatch, type SpoilerSyncState } from "./store.ts";
+
 const maxSpoilerPushBatchesPerAttempt = 100;
 const maxSpoilerSyncPagesPerAttempt = 4_000;
 
@@ -46,7 +45,7 @@ export interface PreferenceSyncWorkspace {
     pushedState: SpoilerSyncState["global"],
     state: RemoteSpoilerState,
   ): boolean;
-  prepareSpoilerSyncBatch(limit: number): SpoilerSyncBatch | null;
+  prepareSpoilerSyncBatch(): SpoilerSyncBatch | null;
   readPreferences(): Preferences;
   readPreferenceSyncState(): PreferenceSyncState;
   readSpoilerSyncState(): SpoilerSyncState;
@@ -253,7 +252,7 @@ export class PreferenceSyncCoordinator {
   }
 
   async #pushSpoilers() {
-    const batch = this.#workspace.prepareSpoilerSyncBatch(spoilerSyncBatchSize);
+    const batch = this.#workspace.prepareSpoilerSyncBatch();
     if (!batch) {
       return false;
     }
@@ -320,7 +319,7 @@ export class PreferenceSyncCoordinator {
     });
 
     try {
-      return parseBindResponse(value);
+      return BindResponseSchema.parse(value);
     } catch {
       throw new SyncUnavailableError();
     }
@@ -330,7 +329,7 @@ export class PreferenceSyncCoordinator {
     const value = await this.#request("/sync/preferences");
 
     try {
-      return parsePreferencesResponse(value).preferences;
+      return PreferencesResponseSchema.parse(value).preferences;
     } catch {
       throw new SyncUnavailableError();
     }
@@ -357,7 +356,7 @@ export class PreferenceSyncCoordinator {
       let page: SpoilerPageResponse;
 
       try {
-        page = parseSpoilerPageResponse(value);
+        page = SpoilerPageResponseSchema.parse(value);
       } catch {
         throw new SyncUnavailableError();
       }
@@ -396,7 +395,7 @@ export class PreferenceSyncCoordinator {
     });
 
     try {
-      return parsePreferencesResponse(value).preferences;
+      return PreferencesResponseSchema.parse(value).preferences;
     } catch {
       throw new SyncUnavailableError();
     }
@@ -436,7 +435,7 @@ export class PreferenceSyncCoordinator {
     });
 
     try {
-      return parseSpoilerUpdateResponse(value);
+      return SpoilerUpdateResponseSchema.parse(value);
     } catch {
       throw new SyncUnavailableError();
     }
@@ -464,7 +463,7 @@ export class PreferenceSyncCoordinator {
     }
 
     try {
-      return z.json().parse(await response.json());
+      return await response.json();
     } catch {
       throw new SyncUnavailableError();
     }
@@ -498,80 +497,8 @@ export class PreferenceSyncCoordinator {
 
 class SyncUnavailableError extends Error {}
 
-const RemotePreferencesSchema = z.strictObject({
-  motion: RemoteMotionPreferenceSchema.optional(),
-});
-const PreferencesResponseSchema = z.strictObject({ preferences: RemotePreferencesSchema });
-const BindResponseSchema = PreferencesResponseSchema.extend({
-  spoilerState: RemoteSpoilerStateSchema,
-  spoilerStateAccepted: z.boolean(),
-  workspaceId: z.uuid(),
-});
-const RemoteSpoilerDecisionBatchSchema = z
-  .array(RemoteSpoilerDecisionSchema)
-  .max(spoilerSyncBatchSize)
-  .refine(hasUniqueSpoilerDecisionTargets, {
-    message: "Spoiler decision targets must be unique.",
-  });
-const SpoilerPageResponseSchema = z
-  .strictObject({
-    decisions: RemoteSpoilerDecisionBatchSchema,
-    nextCursor: z.string().min(1).max(512).nullable(),
-    snapshotVersion: z.number().int().positive(),
-    state: RemoteSpoilerStateSchema,
-  })
-  .refine(hasKnownSpoilerDecisionGenerations, {
-    message: "Spoiler decision generations must not exceed the global reset generation.",
-  });
-const SpoilerUpdateResponseSchema = z
-  .strictObject({
-    decisions: RemoteSpoilerDecisionBatchSchema,
-    operationId: z.uuid(),
-    snapshotVersion: z.number().int().positive(),
-    state: RemoteSpoilerStateSchema,
-  })
-  .refine(hasKnownSpoilerDecisionGenerations, {
-    message: "Spoiler decision generations must not exceed the global reset generation.",
-  });
-type PreferencesResponse = z.infer<typeof PreferencesResponseSchema>;
-type SpoilerPageResponse = z.infer<typeof SpoilerPageResponseSchema>;
-
-function parseBindResponse(value: JSONType): PreferencesResponse & {
-  spoilerState: RemoteSpoilerState;
-  spoilerStateAccepted: boolean;
-  workspaceId: string;
-} {
-  return BindResponseSchema.parse(value);
-}
-
-function parsePreferencesResponse(value: JSONType): PreferencesResponse {
-  return PreferencesResponseSchema.parse(value);
-}
-
-function parseSpoilerPageResponse(value: JSONType): SpoilerPageResponse {
-  return SpoilerPageResponseSchema.parse(value);
-}
-
-function parseSpoilerUpdateResponse(value: JSONType) {
-  return SpoilerUpdateResponseSchema.parse(value);
-}
-
 function spoilerDecisionKey(scope: RemoteSpoilerDecision["scope"], targetId: string) {
   return `${scope}\0${targetId}`;
-}
-
-function hasUniqueSpoilerDecisionTargets(decisions: RemoteSpoilerDecision[]) {
-  return (
-    new Set(decisions.map(({ scope, targetId }) => spoilerDecisionKey(scope, targetId))).size ===
-    decisions.length
-  );
-}
-
-function hasKnownSpoilerDecisionGenerations(response: {
-  decisions: RemoteSpoilerDecision[];
-  state: RemoteSpoilerState;
-}) {
-  return response.decisions.every(({ generation }) => generation <= response.state.resetGeneration);
 }
 
 function sameRemoteSpoilerState(left: RemoteSpoilerState, right: RemoteSpoilerState) {

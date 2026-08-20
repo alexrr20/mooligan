@@ -12,13 +12,6 @@ export const CardConditionSchema = z.enum([
 ]);
 export type CardCondition = z.infer<typeof CardConditionSchema>;
 
-export const StorageLocationSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  parentId: z.string().min(1).optional(),
-});
-export type StorageLocation = z.infer<typeof StorageLocationSchema>;
-
 /** Copies of one printing that share the same physical properties. */
 export const CollectionLotSchema = z.object({
   acquiredAt: z.iso.datetime({ offset: true }).optional(),

@@ -7,6 +7,14 @@ import { test } from "node:test";
 import * as z from "zod";
 import type { JSONType } from "zod";
 
+import {
+  MotionPreferenceSchema,
+  SPOILER_SYNC_BATCH_SIZE,
+  type RemoteMotionPreference,
+  type RemoteSpoilerDecision,
+  type RemoteSpoilerState,
+} from "@mooligan/domain/workspace-sync";
+
 import { SpoilerService } from "../electron/spoilers/service.ts";
 import type { MotionPreference, Preferences } from "../electron/workspace/preferences.ts";
 import {
@@ -16,9 +24,6 @@ import {
 } from "../electron/workspace/preference-sync.ts";
 import type {
   PreferenceSyncState,
-  RemoteMotionPreference,
-  RemoteSpoilerDecision,
-  RemoteSpoilerState,
   SpoilerSyncBatch,
   SpoilerSyncState,
 } from "../electron/workspace/store.ts";
@@ -27,9 +32,7 @@ import { WorkspaceManager } from "../electron/workspace/store.ts";
 const REMOTE_A = "01989924-0000-7000-8000-000000000001";
 const REMOTE_B = "01989924-0000-7000-8000-000000000002";
 const UpdateRequestSchema = z.object({
-  updates: z.tuple([
-    z.object({ key: z.literal("motion"), value: z.enum(["full", "reduced", "system"]) }),
-  ]),
+  updates: z.tuple([z.object({ key: z.literal("motion"), value: MotionPreferenceSchema })]),
 });
 
 void test("first bind uploads local motion and an existing account downloads cloud motion", async () => {
@@ -1106,13 +1109,15 @@ class FakeWorkspace implements PreferenceSyncWorkspace {
     return true;
   }
 
-  prepareSpoilerSyncBatch(limit: number): SpoilerSyncBatch | null {
+  prepareSpoilerSyncBatch(): SpoilerSyncBatch | null {
     if (this.#active.spoilerSyncBatch) {
       return structuredClone(this.#active.spoilerSyncBatch);
     }
 
     const sync = this.readSpoilerSyncState();
-    const decisions = sync.decisions.filter(({ pending }) => pending).slice(0, limit);
+    const decisions = sync.decisions
+      .filter(({ pending }) => pending)
+      .slice(0, SPOILER_SYNC_BATCH_SIZE);
     const global = sync.global.pending ? sync.global : null;
     if (!global && decisions.length === 0) {
       return null;

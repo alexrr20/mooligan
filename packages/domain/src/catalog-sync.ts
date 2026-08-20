@@ -1,6 +1,6 @@
 import * as z from "zod";
 
-import { FinishSchema } from "./catalog.ts";
+import { FinishSchema, RaritySchema } from "./catalog.ts";
 
 const httpsUrlSchema = z.url().refine((value) => new URL(value).protocol === "https:", {
   message: "Expected an HTTPS URL",
@@ -98,7 +98,7 @@ export const ScryfallCardDownloadSchema = z
     oracle_id: z.string().min(1).nullable().optional(),
     power: z.string().nullish(),
     promo: z.boolean().optional(),
-    rarity: z.string().min(1),
+    rarity: RaritySchema,
     released_at: z.iso.date().nullish(),
     set: z.string().min(1),
     set_id: z.string().min(1),

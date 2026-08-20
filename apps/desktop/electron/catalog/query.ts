@@ -364,10 +364,9 @@ export function createCatalogQuery(database: DatabaseSync) {
   );
 
   return (
-    input: CatalogListRequest | undefined,
+    request: CatalogListRequest = {},
     visibility: SpoilerVisibilitySnapshot,
   ): CatalogListPage => {
-    const request = validateCatalogListRequest(input);
     const visibilityArguments = catalogVisibilityArguments(visibility);
     const limit =
       Number.isSafeInteger(request.limit) && request.limit! > 0
@@ -466,10 +465,9 @@ export function createCatalogUpcomingQuery(database: DatabaseSync) {
   );
 
   return (visibility: SpoilerVisibilitySnapshot): CatalogReleaseSummary[] => {
-    const snapshot = SpoilerVisibilitySnapshotSchema.parse(visibility);
     return z
       .array(CatalogReleaseSummaryRowSchema)
-      .parse(selectUpcoming.all(snapshot.currentDate))
+      .parse(selectUpcoming.all(visibility.currentDate))
       .map(toCatalogReleaseSummary);
   };
 }
@@ -518,24 +516,22 @@ export function createCatalogUpcomingPrintingsQuery(database: DatabaseSync) {
   );
 
   return (
-    input: CatalogUpcomingPrintingRequest | undefined,
+    request: CatalogUpcomingPrintingRequest = {},
     visibility: SpoilerVisibilitySnapshot,
   ): CatalogUpcomingPrintingPage => {
-    const request = validateCatalogUpcomingPrintingRequest(input);
-    const snapshot = SpoilerVisibilitySnapshotSchema.parse(visibility);
     const limit = request.limit ?? 100;
     const offset = request.offset ?? 0;
     const rows = z
       .array(CatalogUpcomingPrintingRowSchema)
       .parse(
         selectUpcoming.all(
-          ...catalogVisibilityArguments(snapshot),
-          snapshot.currentDate,
+          ...catalogVisibilityArguments(visibility),
+          visibility.currentDate,
           limit + 1,
           offset,
         ),
       );
-    const total = CatalogTotalRowSchema.parse(countUpcoming.get(snapshot.currentDate)).total;
+    const total = CatalogTotalRowSchema.parse(countUpcoming.get(visibility.currentDate)).total;
 
     return {
       hasMore: rows.length > limit,
@@ -562,8 +558,9 @@ export function createCatalogRootSetQuery(database: DatabaseSync) {
   );
 
   return (targetId: string): string | null => {
-    const id = catalogPrintingIdSchema.parse(targetId);
-    const row = z.object({ rootSetId: catalogPrintingIdSchema }).safeParse(selectRoot.get(id, id));
+    const row = z
+      .object({ rootSetId: catalogPrintingIdSchema })
+      .safeParse(selectRoot.get(targetId, targetId));
     return row.success ? row.data.rootSetId : null;
   };
 }
@@ -591,17 +588,19 @@ export function createCatalogSpoilerRevealSummariesQuery(database: DatabaseSync)
      ORDER BY label COLLATE NOCASE, targetId`,
   );
 
-  return (printingIds: readonly string[], rootSetIds: readonly string[]): SpoilerRevealSummaries =>
-    SpoilerRevealSummariesSchema.parse({
-      printings: z
-        .array(CatalogRevealSummaryRowSchema)
-        .parse(selectPrintings.all(JSON.stringify(printingIds)))
-        .map((row) => toRevealSummary(row, "printing")),
-      releases: z
-        .array(CatalogRevealSummaryRowSchema)
-        .parse(selectReleases.all(JSON.stringify(rootSetIds)))
-        .map((row) => toRevealSummary(row, "release")),
-    });
+  return (
+    printingIds: readonly string[],
+    rootSetIds: readonly string[],
+  ): SpoilerRevealSummaries => ({
+    printings: z
+      .array(CatalogRevealSummaryRowSchema)
+      .parse(selectPrintings.all(JSON.stringify(printingIds)))
+      .map((row) => toRevealSummary(row, "printing")),
+    releases: z
+      .array(CatalogRevealSummaryRowSchema)
+      .parse(selectReleases.all(JSON.stringify(rootSetIds)))
+      .map((row) => toRevealSummary(row, "release")),
+  });
 }
 
 const CatalogCardSummaryRowSchema = CatalogCardSummarySchema.omit({
@@ -672,18 +671,18 @@ function toCatalogCardSummary(row: CatalogCardSummaryRow): CatalogCardSummary {
   return {
     ...card,
     gridImage: hasGridImage
-      ? CatalogImageDescriptorSchema.parse({
+      ? {
           faceIndex: 0,
           printingId: row.id,
           size: "grid",
-        })
+        }
       : null,
     image: hasImage
-      ? CatalogImageDescriptorSchema.parse({
+      ? {
           faceIndex: 0,
           printingId: row.id,
           size: "thumb",
-        })
+        }
       : null,
   };
 }
@@ -697,20 +696,20 @@ function toCatalogUpcomingPrinting(row: CatalogUpcomingPrintingRow): CatalogUpco
   });
 
   if (row.isVisible === 0) {
-    return CatalogUpcomingPrintingSchema.parse({
+    return {
       printingId: row.id,
       release,
       releasedOn: row.releasedOn,
       status: "protected",
-    });
+    };
   }
 
-  return CatalogUpcomingPrintingSchema.parse({
-    card: toCatalogCardSummary(CatalogCardSummaryRowSchema.parse(row)),
+  return {
+    card: toCatalogCardSummary(row),
     release,
     releasedOn: row.releasedOn,
     status: "visible",
-  });
+  };
 }
 
 export function validateCatalogListRequest(

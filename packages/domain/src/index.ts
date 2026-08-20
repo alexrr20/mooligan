@@ -6,3 +6,4 @@ export * from "./decks.ts";
 export * from "./lists.ts";
 export * from "./market.ts";
 export * from "./spoilers.ts";
+export * from "./workspace-sync.ts";

@@ -11,7 +11,7 @@ import {
   SearchViewToggle,
 } from "../features/search/search-controls";
 import { SearchResults, UpcomingSearchResults } from "../features/search/search-results";
-import { createCatalogSearchOrigin } from "../features/cards/card-navigation";
+import { createCatalogSearchOrigin } from "../features/search/catalog-search-origin";
 import { type CatalogSearchState, validateCatalogSearch } from "../features/search/search-state";
 import { useCatalogSearch } from "../features/search/use-catalog-search";
 import { useCatalogUpcomingPrintings } from "../features/search/use-catalog-upcoming-printings";

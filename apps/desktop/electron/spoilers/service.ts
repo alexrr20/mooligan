@@ -1,7 +1,4 @@
 import {
-  SpoilerPolicySchema,
-  SpoilerStateSchema,
-  SpoilerVisibilitySnapshotSchema,
   type SpoilerPolicy,
   type SpoilerState,
   type SpoilerVisibilitySnapshot,
@@ -41,7 +38,7 @@ export class SpoilerService {
     this.#now = options.now ?? (() => new Date());
     this.#setTimer = options.setTimer ?? ((callback, delay) => setTimeout(callback, delay));
     this.#clearTimer = options.clearTimer ?? clearTimeout;
-    this.#storedState = SpoilerStateSchema.parse(workspace.readSpoilerState());
+    this.#storedState = workspace.readSpoilerState();
     this.#state = copyState(this.#storedState);
     this.#scheduleMidnightRefresh();
   }
@@ -51,14 +48,14 @@ export class SpoilerService {
   }
 
   visibilitySnapshot(): SpoilerVisibilitySnapshot {
-    const state = SpoilerStateSchema.parse(this.#workspace.readSpoilerState());
-    return SpoilerVisibilitySnapshotSchema.parse({
+    const state = this.#workspace.readSpoilerState();
+    return {
       currentDate: localDate(this.#readNow()),
       policy: state.policy,
       revealedPrintingIds: state.activePrintingIds,
       revealedRootSetIds: state.activeRootSetIds,
       revision: state.revision,
-    });
+    };
   }
 
   refresh(): SpoilerState {
@@ -71,7 +68,7 @@ export class SpoilerService {
   }
 
   setPolicy(policy: SpoilerPolicy): SpoilerState {
-    return this.#publish(this.#workspace.setSpoilerPolicy(SpoilerPolicySchema.parse(policy)));
+    return this.#publish(this.#workspace.setSpoilerPolicy(policy));
   }
 
   revealPrinting(printingId: string): SpoilerState {
@@ -103,16 +100,15 @@ export class SpoilerService {
   }
 
   #publish(value: SpoilerState, force = false) {
-    const stored = SpoilerStateSchema.parse(value);
-    if (!force && spoilerStatesEqual(stored, this.#storedState)) {
+    if (!force && spoilerStatesEqual(value, this.#storedState)) {
       return this.snapshot();
     }
 
-    this.#storedState = copyState(stored);
-    this.#state = SpoilerStateSchema.parse({
-      ...stored,
-      revision: Math.max(stored.revision, this.#state.revision + 1),
-    });
+    this.#storedState = copyState(value);
+    this.#state = {
+      ...value,
+      revision: Math.max(value.revision, this.#state.revision + 1),
+    };
 
     const snapshot = this.snapshot();
     for (const listener of this.#listeners) {
@@ -147,25 +143,23 @@ export class SpoilerService {
 }
 
 export function protectSpoilerState(value: SpoilerState): SpoilerState {
-  const state = SpoilerStateSchema.parse(value);
   return {
     activePrintingIds: [],
     activeRootSetIds: [],
     policy: "protect",
-    revision: state.revision,
+    revision: value.revision,
   };
 }
 
 export function protectSpoilerVisibility(
   value: SpoilerVisibilitySnapshot,
 ): SpoilerVisibilitySnapshot {
-  const snapshot = SpoilerVisibilitySnapshotSchema.parse(value);
   return {
-    currentDate: snapshot.currentDate,
+    currentDate: value.currentDate,
     policy: "protect",
     revealedPrintingIds: [],
     revealedRootSetIds: [],
-    revision: snapshot.revision,
+    revision: value.revision,
   };
 }
 
@@ -174,8 +168,7 @@ export function releaseProtectionTarget(
   targetId: string,
   resolvedRootSetId: string | null,
 ) {
-  const spoilers = SpoilerStateSchema.parse(state);
-  return resolvedRootSetId ?? (spoilers.activeRootSetIds.includes(targetId) ? targetId : null);
+  return resolvedRootSetId ?? (state.activeRootSetIds.includes(targetId) ? targetId : null);
 }
 
 function copyState(state: SpoilerState): SpoilerState {

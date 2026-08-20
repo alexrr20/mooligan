@@ -4,14 +4,13 @@ import { Link } from "@tanstack/react-router";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { colors } from "../../styles/tokens.stylex.js";
-import { catalogImageUrl } from "../catalog/catalog-image";
 import { useCatalogImageLoading } from "../catalog/catalog-image-loading";
+import { type CatalogSearchOrigin, withCatalogSearchOrigin } from "../search/catalog-search-origin";
+import { PrintingImage } from "./printing-image";
 import {
-  type CatalogSearchOrigin,
   getInitialGalleryVisibleCount,
   getNextGalleryVisibleCount,
-  withCatalogSearchOrigin,
-} from "./card-navigation";
+} from "./printing-gallery-pagination";
 import { PrintingPrices } from "./printing-prices";
 
 type PrintingGalleryProps = {
@@ -80,28 +79,18 @@ export function PrintingGallery({
                 state={withCatalogSearchOrigin(origin)}
                 to="/cards/$printingId"
               >
-                <div
-                  {...stylex.props(styles.imageFrame)}
-                  data-catalog-image-id={printing.image ? printing.id : undefined}
-                >
-                  {printing.image && imageActive && !imageFailed ? (
-                    <img
-                      {...stylex.props(styles.image)}
-                      key={`${imageLoading.generation}:${printing.id}`}
-                      alt={`${cardName}, ${printing.setName} (${printing.setCode.toUpperCase()}) number ${printing.collectorNumber}`}
-                      decoding="async"
-                      loading="eager"
-                      src={catalogImageUrl(printing.image)}
-                      onError={() => imageLoading.settle(printing.id, true)}
-                      onLoad={() => imageLoading.settle(printing.id)}
-                    />
-                  ) : !printing.image || imageFailed ? (
-                    <span {...stylex.props(styles.imageFallback)}>
-                      {imageFailed ? "Art offline" : "No art"}
-                    </span>
-                  ) : null}
-                  {selected ? <span {...stylex.props(styles.currentLabel)}>Selected</span> : null}
-                </div>
+                <PrintingImage
+                  alt={`${cardName}, ${printing.setName} (${printing.setCode.toUpperCase()}) number ${printing.collectorNumber}`}
+                  failed={imageFailed}
+                  image={printing.image}
+                  imageActive={imageActive}
+                  imageKey={`${imageLoading.generation}:${printing.id}`}
+                  overlay={
+                    selected ? <span {...stylex.props(styles.currentLabel)}>Selected</span> : null
+                  }
+                  onImageError={() => imageLoading.settle(printing.id, true)}
+                  onImageLoad={() => imageLoading.settle(printing.id)}
+                />
 
                 <div {...stylex.props(styles.identity)}>
                   <div {...stylex.props(styles.setLine)}>
@@ -226,30 +215,6 @@ const styles = stylex.create({
   },
   linkSelected: {
     color: "#f4f1e8",
-  },
-  imageFrame: {
-    width: "100%",
-    aspectRatio: "5 / 7",
-    position: "relative",
-    overflow: "hidden",
-    display: "grid",
-    placeItems: "center",
-    border: "1px solid #34362f",
-    borderRadius: "3.5% / 2.5%",
-    backgroundColor: "#171815",
-    boxShadow: "6px 7px 0 rgba(0, 0, 0, 0.38)",
-  },
-  image: {
-    width: "100%",
-    height: "100%",
-    display: "block",
-    objectFit: "cover",
-  },
-  imageFallback: {
-    color: "#85887e",
-    fontSize: "7px",
-    letterSpacing: "0.09em",
-    textTransform: "uppercase",
   },
   currentLabel: {
     minHeight: "24px",
