@@ -14,7 +14,17 @@ import {
   shell,
   type OpenDialogOptions,
 } from "electron";
-import { SpoilerPolicySchema, SpoilerTargetIdSchema } from "@mooligan/domain/spoilers";
+import {
+  SpoilerPolicySchema,
+  SpoilerTargetIdSchema,
+  type CatalogPrintingResult,
+} from "@mooligan/domain/spoilers";
+import {
+  AddCollectionHoldingRequestSchema,
+  RemoveCollectionHoldingRequestSchema,
+  UpdateCollectionHoldingRequestSchema,
+  type AddCollectionHoldingRequest,
+} from "@mooligan/domain/collection";
 import * as z from "zod";
 import type { JSONType } from "zod";
 
@@ -28,6 +38,7 @@ import {
 import { registerCatalogImageProtocol } from "./catalog/image-protocol";
 import {
   queryCatalogImageSource,
+  queryCatalogPrintingDetail,
   queryCatalogSetSymbolSource,
   registerCatalogIpc,
   resolveCatalogRootSetId,
@@ -119,7 +130,7 @@ if (!authStartup.isPrimary) {
     .then(async () => {
       const workspace = new WorkspaceManager(app.getPath("userData"));
       const spoilers = new SpoilerService(workspace);
-      const spoilerMutations = new WorkspaceMutationQueue(workspace);
+      const workspaceMutations = new WorkspaceMutationQueue(workspace);
       let spoilerWorkspaceReady = false;
 
       function readSpoilerStateForRenderer(state = spoilers.snapshot()) {
@@ -144,7 +155,7 @@ if (!authStartup.isPrimary) {
 
       function runSpoilerMutation<Result>(operation: () => Result | PromiseLike<Result>) {
         requireSpoilerWorkspace();
-        return spoilerMutations.run(() => {
+        return workspaceMutations.run(() => {
           requireSpoilerWorkspace();
           return operation();
         });
@@ -152,6 +163,7 @@ if (!authStartup.isPrimary) {
 
       registerCatalogIpc({
         getVisibilitySnapshot: readSpoilerVisibility,
+        getWorkspacePath: () => workspace.databasePath,
       });
       const imageCache = createCatalogImageCache({
         cacheDirectory: resolveCatalogImageCacheDirectory(app.getPath("home")),
@@ -190,6 +202,7 @@ if (!authStartup.isPrimary) {
         onWorkspaceSelected() {
           spoilerWorkspaceReady = true;
           publish("preferences:changed", readPreferencesForRenderer());
+          publish("collection:changed", undefined);
           spoilers.refresh();
         },
       });
@@ -414,6 +427,59 @@ if (!authStartup.isPrimary) {
         });
       });
 
+      ipcMain.handle("collection:add", (event, value) => {
+        assertTrustedSender(event);
+        const request = AddCollectionHoldingRequestSchema.parse(value);
+
+        return runCollectionMutation(async () => {
+          const detail = await readCollectionPrintingForMutation(request.printingId);
+          assertCollectionPrintingCanUseFinish(detail, request);
+          const result = workspace.addCollectionHolding(request);
+          publish("collection:changed", undefined);
+          return result;
+        });
+      });
+
+      ipcMain.handle("collection:update", (event, value) => {
+        assertTrustedSender(event);
+        const request = UpdateCollectionHoldingRequestSchema.parse(value);
+
+        return runCollectionMutation(async () => {
+          const lot = workspace.readCollectionLot(request.lotId);
+
+          if (!lot) {
+            throw new Error("This Collection holding no longer exists.");
+          }
+
+          const detail = await readCollectionPrintingForMutation(lot.printingId);
+
+          if (detail === null) {
+            if (request.finish !== lot.finish) {
+              throw new Error("The finish cannot change while this printing is unavailable.");
+            }
+          } else {
+            assertCollectionPrintingCanUseFinish(detail, {
+              ...request,
+              printingId: lot.printingId,
+            });
+          }
+
+          const result = workspace.updateCollectionHolding(request);
+          publish("collection:changed", undefined);
+          return result;
+        });
+      });
+
+      ipcMain.handle("collection:remove", (event, value) => {
+        assertTrustedSender(event);
+        const request = RemoveCollectionHoldingRequestSchema.parse(value);
+
+        return runCollectionMutation(() => {
+          workspace.removeCollectionHolding(request.lotId);
+          publish("collection:changed", undefined);
+        });
+      });
+
       ipcMain.handle("workspace:export", async (event) => {
         assertTrustedSender(event);
         requireSpoilerWorkspace();
@@ -492,15 +558,39 @@ if (!authStartup.isPrimary) {
           return "cancelled" as const;
         }
 
-        return spoilerMutations.runFor(workspaceId, () => {
+        return workspaceMutations.runFor(workspaceId, () => {
           requireSpoilerWorkspace();
           workspace.importBackup(backup);
+          publish("collection:changed", undefined);
           publish("preferences:changed", readPreferencesForRenderer());
           spoilers.refresh();
           queueWorkspaceSync();
           return "imported" as const;
         });
       });
+
+      function runCollectionMutation<Result>(operation: () => Promise<Result> | Result) {
+        requireSpoilerWorkspace();
+        const workspaceId = workspace.workspaceId;
+
+        return workspaceMutations.runFor(workspaceId, async () => {
+          requireSpoilerWorkspace();
+          const result = await operation();
+          assertSelectedWorkspace(workspace, workspaceId);
+          return result;
+        });
+      }
+
+      async function readCollectionPrintingForMutation(printingId: string) {
+        const revision = workspace.readSpoilerState().revision;
+        const result = await queryCatalogPrintingDetail(printingId);
+
+        if (workspace.readSpoilerState().revision !== revision) {
+          throw new Error("Spoiler choices changed before this action completed.");
+        }
+
+        return result;
+      }
 
       void authStartup.start(
         async (url) => {
@@ -601,6 +691,24 @@ function publicAuthError(cause: unknown) {
 
 function validateSpoilerTarget(value: JSONType) {
   return SpoilerTargetIdSchema.parse(value);
+}
+
+function assertCollectionPrintingCanUseFinish(
+  result: CatalogPrintingResult | null,
+  request: Pick<AddCollectionHoldingRequest, "finish" | "printingId">,
+) {
+  if (!result) {
+    throw new Error("This printing is not present in the installed catalog.");
+  }
+  if (result.status === "protected") {
+    throw new Error("Reveal this printing before adding it to the Collection.");
+  }
+  if (result.detail.selectedPrinting.isDigital) {
+    throw new Error("Digital printings cannot be added to the Collection.");
+  }
+  if (!result.detail.selectedPrinting.finishes?.includes(request.finish)) {
+    throw new Error("This finish is not available for the selected printing.");
+  }
 }
 
 async function requireCatalogRootSetId(targetId: string) {

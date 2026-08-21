@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import manaFontUrl from "mana-font/fonts/mana.woff2?url";
 
 import "./global.css";
+import { subscribeToCollectionChanges } from "./features/collection/collection-cache";
 import { subscribeToSpoilerState } from "./features/spoilers/use-spoilers";
 import { routeTree } from "./routeTree.gen";
 
@@ -52,6 +53,7 @@ function App() {
   }, []);
 
   useEffect(() => subscribeToSpoilerState(queryClient), []);
+  useEffect(() => subscribeToCollectionChanges(queryClient), []);
 
   return (
     <QueryClientProvider client={queryClient}>

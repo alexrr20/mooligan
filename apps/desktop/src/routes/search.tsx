@@ -121,11 +121,13 @@ function SearchPage() {
                   }}
                 />
                 <span {...stylex.props(styles.count)} aria-live="polite">
-                  {catalog.loading && catalog.cards.length === 0
-                    ? activeQuery
-                      ? "Searching…"
-                      : "Reading index…"
-                    : `${(catalog.total ?? catalog.cards.length).toLocaleString()}${catalog.total === null && catalog.hasMore ? "+" : ""} ${activeQuery ? "matches" : uniqueCards ? (catalog.total === 1 ? "card" : "cards") : catalog.total === 1 ? "printing" : "printings"}`}
+                  {catalog.queryError
+                    ? "Query error"
+                    : catalog.loading && catalog.cards.length === 0
+                      ? activeQuery
+                        ? "Searching…"
+                        : "Reading index…"
+                      : `${(catalog.total ?? catalog.cards.length).toLocaleString()}${catalog.total === null && catalog.hasMore ? "+" : ""} ${activeQuery ? "matches" : uniqueCards ? (catalog.total === 1 ? "card" : "cards") : catalog.total === 1 ? "printing" : "printings"}`}
                 </span>
               </div>
             </div>
@@ -139,6 +141,7 @@ function SearchPage() {
               imagesReady={catalog.imagesReady}
               loading={catalog.loading}
               origin={createCatalogSearchOrigin(searchState)}
+              queryError={catalog.queryError}
               total={catalog.total}
               onLoadMore={catalog.loadMore}
             />

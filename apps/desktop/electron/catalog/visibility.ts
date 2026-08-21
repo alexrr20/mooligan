@@ -2,7 +2,7 @@ import type { SpoilerVisibilitySnapshot } from "@mooligan/domain/spoilers";
 
 export const effectiveReleaseDateSql = "cards.effective_released_at";
 
-export function catalogVisibilitySqlFor(table: "cards" | "newer") {
+export function catalogVisibilitySqlFor(table: "cards" | "newer" | "sibling") {
   const releaseDate = `${table}.effective_released_at`;
   return `(
   ${releaseDate} IS NULL

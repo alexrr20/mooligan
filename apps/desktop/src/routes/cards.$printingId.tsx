@@ -7,7 +7,7 @@ import {
   shouldMoveCardDetailFocus,
 } from "../features/cards/card-detail-focus";
 import { useCatalogCardDetail } from "../features/cards/use-card-detail";
-import { readCatalogSearchOrigin } from "../features/search/catalog-search-origin";
+import { readCardDetailOrigin } from "../features/cards/card-detail-origin";
 import { ProtectedPreviewGate } from "../features/spoilers/protected-preview-gate";
 
 export const Route = createFileRoute("/cards/$printingId")({
@@ -17,7 +17,7 @@ export const Route = createFileRoute("/cards/$printingId")({
 function CardDetailRoute() {
   const { printingId } = Route.useParams();
   const historyState = useLocation({ select: (location) => location.state });
-  const origin = useMemo(() => readCatalogSearchOrigin(historyState), [historyState]);
+  const origin = useMemo(() => readCardDetailOrigin(historyState), [historyState]);
   const { error, loading, result, retry } = useCatalogCardDetail(printingId);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const previousFocusIdentityRef = useRef<string | null>(null);

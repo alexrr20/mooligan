@@ -6,7 +6,7 @@ import { Button } from "../../components/button";
 import { colors } from "../../styles/tokens.stylex.js";
 import { typography } from "../../styles/typography";
 import { ReturnNavigation } from "../cards/card-detail";
-import type { CatalogSearchOrigin } from "../search/catalog-search-origin";
+import type { CardDetailOrigin } from "../cards/card-detail-origin";
 import { CatalogSetSymbol } from "../catalog/catalog-set-symbol";
 import { formatSpoilerReleaseDate } from "./spoiler-ui-state";
 import { useSpoilers } from "./use-spoilers";
@@ -15,7 +15,7 @@ type ProtectedPrinting = Extract<CatalogPrintingResult, { status: "protected" }>
 
 type ProtectedPreviewGateProps = {
   headingRef: Ref<HTMLHeadingElement>;
-  origin: CatalogSearchOrigin | null;
+  origin: CardDetailOrigin | null;
   preview: ProtectedPrinting;
 };
 

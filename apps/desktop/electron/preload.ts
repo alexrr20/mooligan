@@ -7,6 +7,14 @@ import type {
   SpoilerRevealSummaries,
   SpoilerState,
 } from "@mooligan/domain/spoilers";
+import type {
+  AddCollectionHoldingRequest,
+  CollectionListPage,
+  CollectionListRequest,
+  CollectionMutationResult,
+  RemoveCollectionHoldingRequest,
+  UpdateCollectionHoldingRequest,
+} from "@mooligan/domain/collection";
 
 import type { AuthSnapshot } from "./auth/service";
 import type { CatalogProgress, CatalogStatus } from "./catalog/ipc";
@@ -28,6 +36,18 @@ function subscribe<Value>(channel: string, callback: (value: Value) => void) {
 }
 
 export const desktopApi = {
+  collection: {
+    add: (request: AddCollectionHoldingRequest): Promise<CollectionMutationResult> =>
+      ipcRenderer.invoke("collection:add", request),
+    list: (request?: CollectionListRequest): Promise<CollectionListPage> =>
+      ipcRenderer.invoke("collection:list", request),
+    onChanged: (callback: () => void) => subscribe<void>("collection:changed", callback),
+    remove: (request: RemoveCollectionHoldingRequest): Promise<void> =>
+      ipcRenderer.invoke("collection:remove", request),
+    update: (request: UpdateCollectionHoldingRequest): Promise<CollectionMutationResult> =>
+      ipcRenderer.invoke("collection:update", request),
+  },
+
   catalog: {
     detail: (printingId: string): Promise<CatalogPrintingResult | null> =>
       ipcRenderer.invoke("catalog:detail", printingId),
@@ -95,6 +115,7 @@ export const desktopApi = {
 export type DesktopApi = typeof desktopApi;
 
 contextBridge.exposeInMainWorld("catalog", desktopApi.catalog);
+contextBridge.exposeInMainWorld("collection", desktopApi.collection);
 contextBridge.exposeInMainWorld("spoilers", desktopApi.spoilers);
 contextBridge.exposeInMainWorld("preferences", desktopApi.preferences);
 contextBridge.exposeInMainWorld("preferenceSync", desktopApi.preferenceSync);

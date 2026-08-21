@@ -10,6 +10,7 @@ import { PrintingImage } from "../cards/printing-image";
 import { PrintingPrices } from "../cards/printing-prices";
 import { type CatalogSearchOrigin, withCatalogSearchOrigin } from "./catalog-search-origin";
 import { formatSpoilerReleaseDate } from "../spoilers/spoiler-ui-state";
+import { AddToCollectionButton } from "../collection/collection-editor";
 
 type CommonSearchResultsProps = {
   error: string;
@@ -24,6 +25,7 @@ type CommonSearchResultsProps = {
 
 type SearchResultsProps = CommonSearchResultsProps & {
   cards: CatalogCardSummary[];
+  queryError: string;
 };
 
 type UpcomingSearchResultsProps = CommonSearchResultsProps & {
@@ -47,12 +49,13 @@ export function SearchResults({
   loading,
   onLoadMore,
   origin,
+  queryError,
   total,
 }: SearchResultsProps) {
   return (
     <CatalogResults
-      emptyCopy="Try a card name or a three-letter set code."
-      emptyTitle="No matching cards"
+      emptyCopy={queryError || "Try a card name, set code, or a query such as t:creature c:green."}
+      emptyTitle={queryError ? "Search query not understood" : "No matching cards"}
       error={error}
       grid={grid}
       hasMore={hasMore}
@@ -241,6 +244,13 @@ function CatalogResults({
                   {!grid && item.status === "visible" ? <PrintingPrices /> : null}
                 </div>
               </Link>
+              {card && !card.isDigital ? (
+                <div
+                  {...stylex.props(styles.collectionAction, grid && styles.tileCollectionAction)}
+                >
+                  <AddToCollectionButton printingId={card.id} />
+                </div>
+              ) : null}
             </li>
           );
         })}
@@ -285,6 +295,17 @@ const styles = stylex.create({
   },
   cardItem: {
     minWidth: 0,
+    position: "relative",
+  },
+  collectionAction: {
+    position: "absolute",
+    zIndex: 3,
+    right: "8px",
+    top: "27px",
+  },
+  tileCollectionAction: {
+    right: "7px",
+    top: "7px",
   },
   cardGrid: {
     paddingBlock: "22px 30px",

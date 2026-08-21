@@ -70,6 +70,7 @@ const visibleSearch: CatalogListPage = {
       gridImage: null,
       id: "future-printing",
       image: null,
+      isDigital: false,
       name: "Account A Secret",
       rarity: "rare",
       setCode: "SEC",

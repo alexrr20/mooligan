@@ -62,8 +62,8 @@ void test("workspace backups round-trip user data while preserving local metadat
 
   try {
     const source = new WorkspaceStore(join(sourceDirectory, "workspace.sqlite"));
+    putCollectionLotThroughBackup(source, collectionLot);
     source.updatePreferences({ motion: "reduced" });
-    source.putCollectionLot(collectionLot);
     source.putDeck(deck);
     source.putCardList(cardList);
     source.revealSpoilerPrinting("preview-printing");
@@ -95,7 +95,7 @@ void test("workspace backups round-trip user data while preserving local metadat
     target.selectForUser("target-user");
     target.bindActiveWorkspace("target-user", "target-remote");
     const targetWorkspaceId = target.workspaceId;
-    target.putCollectionLot({ ...collectionLot, id: "old-lot" });
+    putCollectionLotThroughBackup(target, { ...collectionLot, id: "old-lot" });
     target.applyRemotePreference({
       updatedAt: "2026-08-04T10:00:00.000Z",
       value: "full",
@@ -128,7 +128,7 @@ void test("workspace backups round-trip user data while preserving local metadat
       })),
       [
         {
-          generation: 1,
+          generation: 2,
           pending: true,
           remoteVersion: null,
           scope: "printing",
@@ -136,7 +136,7 @@ void test("workspace backups round-trip user data while preserving local metadat
           targetId: "preview-printing",
         },
         {
-          generation: 1,
+          generation: 2,
           pending: true,
           remoteVersion: null,
           scope: "release",
@@ -145,7 +145,7 @@ void test("workspace backups round-trip user data while preserving local metadat
         },
       ],
     );
-    assert.equal(target.readSpoilerSyncState().global.resetGeneration, 1);
+    assert.equal(target.readSpoilerSyncState().global.resetGeneration, 2);
     assert.equal(target.readSpoilerSyncState().global.pending, true);
     assert.deepEqual(JSON.parse(target.createBackup()), JSON.parse(backup));
     target.close();
@@ -237,7 +237,7 @@ void test("invalid backups are fully rejected before any workspace data changes"
     const store = new WorkspaceStore(join(directory, "workspace.sqlite"));
     store.bind("bound-user", "remote-workspace");
     store.updatePreferences({ motion: "full" });
-    store.putCollectionLot({ ...collectionLot, id: "existing-lot" });
+    putCollectionLotThroughBackup(store, { ...collectionLot, id: "existing-lot" });
     store.putDeck({ ...deck, id: "existing-deck" });
     store.putCardList({ ...cardList, id: "existing-list" });
     const before = store.createBackup();
@@ -268,6 +268,28 @@ void test("invalid backups are fully rejected before any workspace data changes"
     Object.assign(replacement.decks[0].value.entries[0], { unexpected: true });
     assert.throws(() => parseWorkspaceBackup(JSON.stringify(replacement)), /invalid fields/);
 
+    const unattributed: Omit<CollectionLot, "id"> = {
+      condition: "near-mint",
+      finish: "foil",
+      language: "en",
+      printingId: "printing-duplicate",
+      quantity: 1,
+    };
+    assert.throws(
+      () =>
+        parseWorkspaceBackup(
+          JSON.stringify({
+            ...replacement,
+            collectionLots: [
+              { id: "duplicate-a", value: { ...unattributed, id: "duplicate-a" } },
+              { id: "duplicate-b", value: { ...unattributed, id: "duplicate-b" } },
+            ],
+            decks: [],
+          }),
+        ),
+      /workspace backup is invalid/,
+    );
+
     assert.equal(store.createBackup(), before);
     assert.equal(store.workspaceId, workspaceId);
     assert.equal(store.boundUserId, "bound-user");
@@ -277,3 +299,12 @@ void test("invalid backups are fully rejected before any workspace data changes"
     await rm(directory, { force: true, recursive: true });
   }
 });
+
+function putCollectionLotThroughBackup(
+  workspace: Pick<WorkspaceStore, "createBackup" | "importBackup">,
+  lot: CollectionLot,
+) {
+  const backup = parseWorkspaceBackup(workspace.createBackup());
+  backup.collectionLots.push({ id: lot.id, value: lot });
+  workspace.importBackup(backup);
+}

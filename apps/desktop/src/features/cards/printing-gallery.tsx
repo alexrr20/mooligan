@@ -5,7 +5,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { colors } from "../../styles/tokens.stylex.js";
 import { useCatalogImageLoading } from "../catalog/catalog-image-loading";
-import { type CatalogSearchOrigin, withCatalogSearchOrigin } from "../search/catalog-search-origin";
+import { type CardDetailOrigin, withCardDetailOrigin } from "./card-detail-origin";
 import { PrintingImage } from "./printing-image";
 import {
   getInitialGalleryVisibleCount,
@@ -15,7 +15,7 @@ import { PrintingPrices } from "./printing-prices";
 
 type PrintingGalleryProps = {
   cardName: string;
-  origin: CatalogSearchOrigin | null;
+  origin: CardDetailOrigin | null;
   printings: readonly CatalogSiblingPrinting[];
   selectedPrintingId: string;
 };
@@ -76,7 +76,7 @@ export function PrintingGallery({
                 {...stylex.props(styles.link, selected && styles.linkSelected)}
                 aria-current={selected ? "page" : undefined}
                 params={{ printingId: printing.id }}
-                state={withCatalogSearchOrigin(origin)}
+                state={withCardDetailOrigin(origin)}
                 to="/cards/$printingId"
               >
                 <PrintingImage

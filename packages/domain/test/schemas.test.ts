@@ -10,6 +10,12 @@ import {
   type ScryfallCardDownload,
 } from "../src/catalog-sync.ts";
 import { DeckEntrySchema } from "../src/decks.ts";
+import {
+  AddCollectionHoldingRequestSchema,
+  CardLanguageSchema,
+  CollectionHoldingSchema,
+  CollectionListRequestSchema,
+} from "../src/collection.ts";
 
 function scryfallCard(overrides: Partial<ScryfallCardDownload> = {}) {
   return ScryfallCardDownloadSchema.parse({
@@ -38,6 +44,38 @@ void test("deck entries require an exact printing, finish, and positive quantity
   assert.deepEqual(DeckEntrySchema.parse(entry), entry);
   assert.equal(DeckEntrySchema.safeParse({ ...entry, printingId: "" }).success, false);
   assert.equal(DeckEntrySchema.safeParse({ ...entry, quantity: 0 }).success, false);
+});
+
+void test("collection contracts accept known physical properties and stay strict", () => {
+  assert.equal(CardLanguageSchema.safeParse("ph").success, true);
+  assert.equal(CardLanguageSchema.safeParse("xx").success, false);
+  assert.deepEqual(
+    AddCollectionHoldingRequestSchema.parse({
+      condition: "near-mint",
+      finish: "glossy",
+      language: "en",
+      printingId: "printing-1",
+      quantity: 2,
+    }),
+    {
+      condition: "near-mint",
+      finish: "glossy",
+      language: "en",
+      printingId: "printing-1",
+      quantity: 2,
+    },
+  );
+  assert.equal(CollectionListRequestSchema.safeParse({ limit: 101 }).success, false);
+  assert.equal(CollectionListRequestSchema.safeParse({ unknown: true }).success, false);
+  assert.equal(
+    CollectionHoldingSchema.safeParse({
+      label: "Protected preview",
+      quantity: 4,
+      routePrintingId: "printing-1",
+      status: "protected",
+    }).success,
+    true,
+  );
 });
 
 void test("Scryfall set lists preserve the stable family fields and reject pagination", () => {

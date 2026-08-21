@@ -33,6 +33,7 @@ import {
   reconcileCatalogSearchDraft,
   validateCatalogSearch,
 } from "../src/features/search/search-state.ts";
+import { WorkspaceStore } from "../electron/workspace/store.ts";
 
 const QueryPlanRowSchema = z.object({ detail: z.string() });
 const SHOW_ALL: SpoilerVisibilitySnapshot = {
@@ -93,7 +94,7 @@ void test("catalog search state keeps only valid non-default values", () => {
       digital: true,
       grid: true,
       mode: "upcoming",
-      query: `  Mooligan ${"x".repeat(120)}  `,
+      query: `  Mooligan ${"x".repeat(520)}  `,
       tokens: true,
       uniqueCards: true,
       universe: "beyond",
@@ -104,7 +105,7 @@ void test("catalog search state keeps only valid non-default values", () => {
       digital: true,
       grid: true,
       mode: "upcoming",
-      query: `Mooligan ${"x".repeat(91)}`,
+      query: `Mooligan ${"x".repeat(491)}`,
       tokens: true,
       uniqueCards: true,
       universe: "beyond",
@@ -306,12 +307,17 @@ void test("catalog filters tokens and ad cards independently", () => {
         oracle_id TEXT,
         identity_id TEXT NOT NULL,
         name TEXT NOT NULL,
+        compact_name TEXT NOT NULL,
         set_id TEXT NOT NULL,
         root_set_id TEXT NOT NULL,
         set_code TEXT NOT NULL,
         set_name TEXT NOT NULL,
         collector_number TEXT NOT NULL,
         type_line TEXT NOT NULL,
+        oracle_text TEXT NOT NULL,
+        mana_cost TEXT NOT NULL,
+        artist TEXT NOT NULL,
+        flavor_text TEXT NOT NULL,
         rarity TEXT NOT NULL,
         released_at TEXT NOT NULL,
         effective_released_at TEXT,
@@ -319,19 +325,25 @@ void test("catalog filters tokens and ad cards independently", () => {
       );
       CREATE VIRTUAL TABLE card_search USING fts5(
         name,
+        compact_name,
         set_code,
         collector_number,
         set_name,
         type_line,
+        oracle_text,
+        mana_cost,
+        artist,
+        flavor_text,
         content = 'cards',
         content_rowid = 'rowid'
       );
     `);
     const insert = database.prepare(
       `INSERT INTO cards
-       (id, oracle_id, identity_id, name, set_id, root_set_id, set_code, set_name, collector_number,
-        type_line, rarity, released_at, effective_released_at, json)
-       VALUES (?, ?, ?, ?, 'set-tst', 'set-tst', 'tst', 'Filter Test', ?, ?, 'common',
+       (id, oracle_id, identity_id, name, compact_name, set_id, root_set_id, set_code, set_name,
+        collector_number, type_line, oracle_text, mana_cost, artist, flavor_text, rarity, released_at,
+        effective_released_at, json)
+       VALUES (?, ?, ?, ?, '', 'set-tst', 'set-tst', 'tst', 'Filter Test', ?, ?, '', '', '', '', 'common',
                '2024-01-01', '2024-01-01', ?)`,
     );
     const cards = [
@@ -536,10 +548,12 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
     {
       artist: "Test Artist",
       collector_number: "1",
+      colors: ["U"],
       color_identity: ["U"],
       cmc: 2,
       digital: false,
       finishes: ["nonfoil", "foil"],
+      flavor_text: "A battle begins.",
       id: "printing-1",
       image_uris: {
         grid: "https://cards.scryfall.io/grid/front/1.webp",
@@ -556,7 +570,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
       mana_cost: "{1}{U}",
       name: "Mooligan Test Card",
       object: "card",
-      oracle_text: "Flying\n{T}: Draw a card.",
+      oracle_text: "Flying\nWhenever Mooligan Test Card attacks, draw a card.",
       oracle_id: "oracle-1",
       promo: false,
       promo_types: ["universesbeyond"],
@@ -602,6 +616,9 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
     },
     {
       collector_number: "2",
+      colors: ["G"],
+      color_identity: ["G"],
+      cmc: 3,
       digital: false,
       finishes: ["nonfoil"],
       id: "printing-2",
@@ -713,7 +730,10 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
       assert.ok(sharedDetail);
       assert.equal(sharedDetail.card.id, "oracle-1");
       assert.equal(sharedDetail.card.hasSharedIdentity, true);
-      assert.equal(sharedDetail.card.faces[0]?.oracleText, "Flying\n{T}: Draw a card.");
+      assert.equal(
+        sharedDetail.card.faces[0]?.oracleText,
+        "Flying\nWhenever Mooligan Test Card attacks, draw a card.",
+      );
       assert.deepEqual(sharedDetail.legalities, [
         { formatId: "future_format", formatName: "Future Format", status: "not-legal" },
         { formatId: "modern", formatName: "Modern", status: "legal" },
@@ -766,6 +786,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
             gridImage: null,
             id: "printing-3",
             image: null,
+            isDigital: true,
             name: "Mooligan Test Card",
             rarity: "uncommon",
             setCode: "zzz",
@@ -840,6 +861,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
             gridImage: null,
             id: "printing-3",
             image: null,
+            isDigital: true,
             name: "Mooligan Test Card",
             rarity: "uncommon",
             setCode: "zzz",
@@ -859,6 +881,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
               printingId: "printing-2",
               size: "thumb",
             },
+            isDigital: false,
             name: "Second Test Card",
             rarity: "common",
             setCode: "moo",
@@ -888,6 +911,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
               printingId: "printing-2",
               size: "thumb",
             },
+            isDigital: false,
             name: "Second Test Card",
             rarity: "common",
             setCode: "moo",
@@ -902,6 +926,80 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
         queryCatalog({ query: "creat" }).cards.map((card) => card.id),
         ["printing-2"],
       );
+      assert.deepEqual(
+        queryCatalog({ query: "t:creature c:g mv<=3" }).cards.map((card) => card.id),
+        ["printing-2"],
+      );
+      assert.deepEqual(
+        queryCatalog({ query: 'o:"draw a card" f:modern' }).cards.map((card) => card.id),
+        ["printing-1"],
+      );
+      assert.deepEqual(
+        queryCatalog({ query: "attacks" }).cards.map((card) => card.id),
+        ["printing-1"],
+      );
+      assert.deepEqual(
+        queryCatalog({ query: "reach" }).cards.map((card) => card.id),
+        ["printing-2"],
+      );
+      assert.deepEqual(queryCatalog({ query: "o:at" }).cards, []);
+      assert.deepEqual(
+        queryCatalog({ query: "o:attacks" }).cards.map((card) => card.id),
+        ["printing-1"],
+      );
+      assert.deepEqual(queryCatalog({ query: "a:art" }).cards, []);
+      assert.deepEqual(
+        queryCatalog({ query: "a:artist" }).cards.map((card) => card.id),
+        ["printing-1"],
+      );
+      assert.deepEqual(queryCatalog({ query: "ft:at" }).cards, []);
+      assert.deepEqual(
+        queryCatalog({ query: "ft:battle" }).cards.map((card) => card.id),
+        ["printing-1"],
+      );
+      assert.deepEqual(
+        queryCatalog({ query: "m:1u" }).cards.map((card) => card.id),
+        ["printing-1"],
+      );
+      assert.deepEqual(
+        queryCatalog({ query: "s:moo r:rare" }).cards.map((card) => card.id),
+        ["printing-1"],
+      );
+      assert.deepEqual(
+        queryCatalog({ query: "-is:digital (kw:flying or pow>=3)" }).cards.map((card) => card.id),
+        ["printing-1", "printing-2"],
+      );
+      assert.deepEqual(
+        queryCatalog({ query: "id:g" }).cards.map((card) => card.id),
+        ["printing-2"],
+      );
+      assert.deepEqual(
+        queryCatalog({ query: "pt:3/4" }).cards.map((card) => card.id),
+        ["printing-2"],
+      );
+      assert.deepEqual(
+        queryCatalog({ query: '!"Mooligan Test Card"' }).cards.map((card) => card.id),
+        ["printing-3", "printing-1", "art-series-1"],
+      );
+      assert.deepEqual(queryCatalog({ query: 'name:"Test Mooligan"' }).cards, []);
+      assert.deepEqual(queryCatalog({ query: "otag:ramp" }), {
+        cards: [],
+        hasMore: false,
+        queryError: 'The local catalog does not support the "otag" operator.',
+        total: 0,
+      });
+      assert.deepEqual(queryCatalog({ query: "t:creature (c:g or c:u" }), {
+        cards: [],
+        hasMore: false,
+        queryError: "Close the open parenthesis in the Scryfall query.",
+        total: 0,
+      });
+      assert.deepEqual(queryCatalog({ query: "o:/draw (a|two) cards?/" }), {
+        cards: [],
+        hasMore: false,
+        queryError: "Regular expression searches are not supported in the local catalog.",
+        total: 0,
+      });
       assert.deepEqual(queryCatalog({ query: "///" }), {
         cards: [],
         hasMore: false,
@@ -947,8 +1045,9 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
           }),
       );
 
+      const workspace = new WorkspaceStore(join(directory, "workspace.sqlite"));
       const worker = new Worker(new URL("../electron/catalog/query-worker.ts", import.meta.url), {
-        workerData: destination,
+        workerData: { catalogPath: destination, workspacePath: workspace.databasePath },
       });
 
       try {
@@ -983,6 +1082,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
                   printingId: "printing-2",
                   size: "thumb",
                 },
+                isDigital: false,
                 name: "Second Test Card",
                 rarity: "common",
                 setCode: "moo",
@@ -1079,6 +1179,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
         });
       } finally {
         await worker.terminate();
+        workspace.close();
       }
     } finally {
       database.close();

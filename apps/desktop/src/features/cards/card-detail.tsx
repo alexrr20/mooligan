@@ -9,29 +9,30 @@ import { colors } from "../../styles/tokens.stylex.js";
 import { CardRules } from "./card-rules";
 import { ManaCost } from "./mana-cost";
 import { CardLegalities } from "./card-legalities";
-import type { CatalogSearchOrigin } from "../search/catalog-search-origin";
+import type { CardDetailOrigin } from "./card-detail-origin";
 import { PrintingDetails } from "./printing-details";
 import { PrintingGallery } from "./printing-gallery";
 import { PrintingImage } from "./printing-image";
 import { PrintingViewer } from "./printing-viewer";
 import { PrintingSpoilerControl } from "../spoilers/printing-spoiler-control";
+import { AddToCollectionButton } from "../collection/collection-editor";
 
 type CardDetailProps = {
   detail: CatalogCardDetailModel;
   headingRef: Ref<HTMLHeadingElement>;
-  origin: CatalogSearchOrigin | null;
+  origin: CardDetailOrigin | null;
   visibility: CatalogPrintingVisibility;
 };
 
 type CardDetailSkeletonProps = {
-  origin: CatalogSearchOrigin | null;
+  origin: CardDetailOrigin | null;
 };
 
 type CardDetailProblemProps = {
   headingRef: Ref<HTMLHeadingElement>;
   kind: "error" | "unavailable";
   onRetry?: () => void;
-  origin: CatalogSearchOrigin | null;
+  origin: CardDetailOrigin | null;
 };
 
 export function CardDetail({ detail, headingRef, origin, visibility }: CardDetailProps) {
@@ -75,6 +76,9 @@ export function CardDetail({ detail, headingRef, origin, visibility }: CardDetai
 
           <CardRules card={detail.card} />
           <PrintingDetails printing={detail.selectedPrinting} />
+          <div {...stylex.props(styles.collectionAction)}>
+            <AddToCollectionButton detail={detail} />
+          </div>
           <PrintingSpoilerControl printingId={detail.selectedPrinting.id} visibility={visibility} />
           <CardLegalities legalities={detail.legalities} />
         </div>
@@ -145,14 +149,27 @@ export function CardDetailProblem({ headingRef, kind, onRetry, origin }: CardDet
   );
 }
 
-export function ReturnNavigation({ origin }: { origin: CatalogSearchOrigin | null }) {
+export function ReturnNavigation({ origin }: { origin: CardDetailOrigin | null }) {
+  if (origin?.kind === "collection") {
+    return (
+      <nav {...stylex.props(styles.returnRow)} aria-label="Card detail return">
+        <Link {...stylex.props(styles.returnLink)} search={origin.value.search} to="/collection">
+          <span {...stylex.props(styles.returnArrow)} aria-hidden="true">
+            ←
+          </span>
+          <span>Back to collection</span>
+        </Link>
+      </nav>
+    );
+  }
+
   return (
     <nav {...stylex.props(styles.returnRow)} aria-label="Card detail return">
-      <Link {...stylex.props(styles.returnLink)} search={origin?.search ?? {}} to="/search">
+      <Link {...stylex.props(styles.returnLink)} search={origin?.value.search ?? {}} to="/search">
         <span {...stylex.props(styles.returnArrow)} aria-hidden="true">
           ←
         </span>
-        <span>{origin ? "Back to results" : "All cards"}</span>
+        <span>{origin?.kind === "search" ? "Back to results" : "All cards"}</span>
       </Link>
     </nav>
   );
@@ -241,6 +258,9 @@ const styles = stylex.create({
   },
   information: {
     minWidth: 0,
+  },
+  collectionAction: {
+    marginTop: "18px",
   },
   identityHeader: {
     minWidth: 0,

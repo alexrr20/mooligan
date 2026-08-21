@@ -63,6 +63,7 @@ const ScryfallImageUrisSchema = z.object({
 const ScryfallCardFaceDownloadSchema = z.object({
   artist: z.string().nullish(),
   defense: z.string().nullish(),
+  flavor_text: z.string().nullish(),
   image_uris: ScryfallImageUrisSchema.nullish(),
   loyalty: z.string().nullish(),
   mana_cost: z.string().nullish(),
@@ -85,6 +86,7 @@ export const ScryfallCardDownloadSchema = z
     defense: z.string().nullish(),
     digital: z.boolean().optional(),
     finishes: z.array(FinishSchema).optional(),
+    flavor_text: z.string().nullish(),
     id: z.string().min(1),
     image_uris: ScryfallImageUrisSchema.nullish(),
     keywords: z.array(z.string().min(1)).optional(),

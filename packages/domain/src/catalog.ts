@@ -5,7 +5,7 @@ const dateTimeSchema = z.iso.datetime({ offset: true });
 export const ColorSchema = z.enum(["W", "U", "B", "R", "G"]);
 export type Color = z.infer<typeof ColorSchema>;
 
-export const FinishSchema = z.enum(["nonfoil", "foil", "etched"]);
+export const FinishSchema = z.enum(["nonfoil", "foil", "etched", "glossy"]);
 export type Finish = z.infer<typeof FinishSchema>;
 
 export const RaritySchema = z.enum(["common", "uncommon", "rare", "mythic", "special", "bonus"]);

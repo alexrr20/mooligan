@@ -25,7 +25,7 @@ export function reconcileCatalogSearchDraft(
 
 export function validateCatalogSearch(search: CatalogSearchInput): CatalogSearchState {
   const input = isJsonObject(search) ? search : {};
-  const query = isString(input.query) ? input.query.trim().slice(0, 100) : "";
+  const query = isString(input.query) ? input.query.trim().slice(0, 500) : "";
 
   return {
     ...(input.adCards === true && { adCards: true as const }),
