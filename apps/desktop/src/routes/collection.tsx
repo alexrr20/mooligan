@@ -6,6 +6,9 @@ import {
   cardConditions,
   cardLanguages,
 } from "@mooligan/domain/collection";
+import { Select } from "@base-ui/react/select";
+import { Toggle } from "@base-ui/react/toggle";
+import { ToggleGroup } from "@base-ui/react/toggle-group";
 import * as stylex from "@stylexjs/stylex";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
@@ -94,62 +97,62 @@ function CollectionPage() {
         <div {...stylex.props(styles.controls)}>
           <Filter
             label="Set"
+            options={[
+              { label: "All sets", value: null },
+              ...collection.sets.map(({ code, name }) => ({
+                label: `${name} · ${code.toUpperCase()}`,
+                value: code,
+              })),
+            ]}
             value={search.set ?? ""}
             onChange={(set) => update({ set: set || undefined })}
-          >
-            <option value="">All sets</option>
-            {collection.sets.map(({ code, name }) => (
-              <option key={code} value={code}>
-                {name} · {code.toUpperCase()}
-              </option>
-            ))}
-          </Filter>
+          />
           <Filter
             label="Finish"
+            options={[
+              { label: "All finishes", value: null },
+              { label: "Nonfoil", value: "nonfoil" },
+              { label: "Foil", value: "foil" },
+              { label: "Etched", value: "etched" },
+              { label: "Glossy", value: "glossy" },
+            ]}
             value={search.finish ?? ""}
             onChange={(finish) => {
               const parsed = FinishSchema.safeParse(finish);
               update({ finish: parsed.success ? parsed.data : undefined });
             }}
-          >
-            <option value="">All finishes</option>
-            <option value="nonfoil">Nonfoil</option>
-            <option value="foil">Foil</option>
-            <option value="etched">Etched</option>
-            <option value="glossy">Glossy</option>
-          </Filter>
+          />
           <Filter
             label="Language"
+            options={[
+              { label: "All languages", value: null },
+              ...cardLanguages.map(({ label, value }) => ({ label, value })),
+            ]}
             value={search.language ?? ""}
             onChange={(language) => {
               const parsed = CardLanguageSchema.safeParse(language);
               update({ language: parsed.success ? parsed.data : undefined });
             }}
-          >
-            <option value="">All languages</option>
-            {cardLanguages.map(({ label, value }) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </Filter>
+          />
           <Filter
             label="Condition"
+            options={[
+              { label: "All conditions", value: null },
+              ...cardConditions.map(({ label, value }) => ({ label, value })),
+            ]}
             value={search.condition ?? ""}
             onChange={(condition) => {
               const parsed = CardConditionSchema.safeParse(condition);
               update({ condition: parsed.success ? parsed.data : undefined });
             }}
-          >
-            <option value="">All conditions</option>
-            {cardConditions.map(({ label, value }) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </Filter>
+          />
           <Filter
             label="Sort"
+            options={[
+              { label: "Name", value: "name" },
+              { label: "Set", value: "set" },
+              { label: "Quantity", value: "quantity" },
+            ]}
             value={search.sort ?? "name"}
             onChange={(sort) => {
               const parsed = CollectionSortSchema.safeParse(sort);
@@ -157,31 +160,34 @@ function CollectionPage() {
                 sort: parsed.success && parsed.data !== "name" ? parsed.data : undefined,
               });
             }}
-          >
-            <option value="name">Name</option>
-            <option value="set">Set</option>
-            <option value="quantity">Quantity</option>
-          </Filter>
+          />
           <div {...stylex.props(styles.viewControl)}>
             <span {...stylex.props(styles.controlLabel)}>View</span>
-            <div {...stylex.props(styles.viewToggle)} role="group" aria-label="Collection view">
+            <ToggleGroup
+              {...stylex.props(styles.viewToggle)}
+              aria-label="Collection view"
+              value={[view]}
+              onValueChange={(nextViews) => {
+                const nextView = nextViews[0];
+                if (nextView) setView(nextView);
+              }}
+            >
               {(["list", "grid"] as const).map((option) => (
-                <button
-                  {...stylex.props(styles.viewButton, view === option && styles.viewButtonActive)}
-                  aria-pressed={view === option}
+                <Toggle
+                  {...stylex.props(styles.viewButton)}
                   key={option}
                   type="button"
-                  onClick={() => setView(option)}
+                  value={option}
                 >
                   {option}
-                </button>
+                </Toggle>
               ))}
-            </div>
+            </ToggleGroup>
           </div>
           {activeFilters ? (
-            <button {...stylex.props(styles.clear)} type="button" onClick={clearFilters}>
+            <Button size="small" type="button" variant="ghost" onClick={clearFilters}>
               Clear
-            </button>
+            </Button>
           ) : null}
         </div>
 
@@ -249,27 +255,59 @@ function CollectionPage() {
 }
 
 function Filter({
-  children,
   label,
   onChange,
+  options,
   value,
 }: {
-  children: React.ReactNode;
   label: string;
   onChange: (value: string) => void;
+  options: readonly { label: string; value: null | string }[];
   value: string;
 }) {
   return (
-    <label {...stylex.props(styles.filter)}>
+    <div {...stylex.props(styles.filter)}>
       <span {...stylex.props(styles.controlLabel)}>{label}</span>
-      <select
-        {...stylex.props(styles.select)}
-        value={value}
-        onChange={(event) => onChange(event.currentTarget.value)}
+      <Select.Root<string>
+        items={options}
+        value={value || null}
+        onValueChange={(nextValue) => onChange(nextValue ?? "")}
       >
-        {children}
-      </select>
-    </label>
+        <Select.Trigger {...stylex.props(styles.selectTrigger)} aria-label={label}>
+          <Select.Value />
+          <Select.Icon {...stylex.props(styles.selectIcon)} aria-hidden="true">
+            ▾
+          </Select.Icon>
+        </Select.Trigger>
+        <Select.Portal>
+          <Select.Positioner
+            {...stylex.props(styles.selectPositioner)}
+            align="start"
+            alignItemWithTrigger={false}
+            sideOffset={6}
+          >
+            <Select.Popup {...stylex.props(styles.selectPopup)}>
+              <Select.List {...stylex.props(styles.selectList)}>
+                {options.map((option) => (
+                  <Select.Item
+                    {...stylex.props(styles.selectItem)}
+                    key={option.value ?? "all"}
+                    value={option.value}
+                  >
+                    <span {...stylex.props(styles.selectIndicatorSlot)}>
+                      <Select.ItemIndicator {...stylex.props(styles.selectIndicator)}>
+                        ✓
+                      </Select.ItemIndicator>
+                    </span>
+                    <Select.ItemText>{option.label}</Select.ItemText>
+                  </Select.Item>
+                ))}
+              </Select.List>
+            </Select.Popup>
+          </Select.Positioner>
+        </Select.Portal>
+      </Select.Root>
+    </div>
   );
 }
 
@@ -351,17 +389,60 @@ const styles = stylex.create({
     letterSpacing: ".12em",
     textTransform: "uppercase",
   },
-  select: {
+  selectTrigger: {
+    minWidth: "120px",
     height: "34px",
     paddingInline: "8px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
     border: "1px solid #43463e",
     borderRadius: "2px",
     color: "#d7d5cc",
     backgroundColor: "#151613",
     fontSize: "9px",
+    textAlign: "left",
+    cursor: "pointer",
     outline: "none",
-    ":focus": { borderColor: colors.accent },
+    ":hover": { borderColor: "#696c63" },
+    ":focus-visible": { borderColor: colors.accent },
+    "[data-popup-open]": { borderColor: colors.accent },
   },
+  selectIcon: { color: "#85887e", fontSize: "9px" },
+  selectPositioner: { zIndex: 120 },
+  selectPopup: {
+    width: "var(--anchor-width)",
+    maxWidth: "calc(100vw - 32px)",
+    border: "1px solid #55584f",
+    borderRadius: "3px",
+    color: "#f4f1e8",
+    backgroundColor: "#151613",
+    boxShadow: "0 16px 42px rgba(0, 0, 0, 0.52)",
+    outline: "none",
+  },
+  selectList: {
+    maxHeight: "min(276px, var(--available-height))",
+    padding: "6px",
+    overflowY: "auto",
+  },
+  selectItem: {
+    minHeight: "32px",
+    paddingInline: "6px",
+    display: "grid",
+    gridTemplateColumns: "16px minmax(0, 1fr)",
+    alignItems: "center",
+    gap: "4px",
+    borderRadius: "2px",
+    color: "#b8baaf",
+    fontSize: "9px",
+    cursor: "pointer",
+    outline: "none",
+    "[data-highlighted]": { color: "#f4f1e8", backgroundColor: "#242620" },
+    "[data-selected]": { color: "#f4f1e8" },
+  },
+  selectIndicatorSlot: { width: "16px", display: "grid", placeItems: "center" },
+  selectIndicator: { color: colors.accent, fontSize: "9px" },
   viewControl: { display: "grid", gap: "7px" },
   viewToggle: {
     height: "34px",
@@ -380,18 +461,7 @@ const styles = stylex.create({
     letterSpacing: ".08em",
     textTransform: "uppercase",
     cursor: "pointer",
-  },
-  viewButtonActive: { color: "#1b1d19", backgroundColor: colors.accent },
-  clear: {
-    height: "34px",
-    paddingInline: "10px",
-    border: 0,
-    color: "#a6a89d",
-    backgroundColor: "transparent",
-    fontSize: "7px",
-    textTransform: "uppercase",
-    cursor: "pointer",
-    ":hover": { color: "#f4f1e8" },
+    "[data-pressed]": { color: "#1b1d19", backgroundColor: colors.accent },
   },
   filteredCount: {
     margin: 0,

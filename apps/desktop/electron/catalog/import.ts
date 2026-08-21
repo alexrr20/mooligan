@@ -12,7 +12,7 @@ import {
 import * as z from "zod";
 
 const transactionSize = 500;
-export const catalogSchemaVersion = 6;
+export const catalogSchemaVersion = 7;
 const IntegrityCheckSchema = z.object({ quick_check: z.literal("ok") });
 const CatalogCountSchema = z.object({ cardCount: z.number().int().nonnegative() });
 const CatalogSetCountSchema = z.object({ setCount: z.number().int().positive() });
@@ -48,8 +48,9 @@ export async function importCatalog(
     const insert = database.prepare(
       `INSERT INTO cards
        (id, oracle_id, identity_id, name, compact_name, set_id, root_set_id, set_code, set_name,
-        collector_number, type_line, rarity, released_at, effective_released_at, json, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        collector_number, type_line, oracle_text, mana_cost, artist, flavor_text, rarity, released_at,
+        effective_released_at, json, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
 
     database.exec("BEGIN");
@@ -101,6 +102,22 @@ export async function importCatalog(
         card.data.set_name,
         card.data.collector_number,
         card.data.type_line,
+        combinedCardText(
+          card.data.oracle_text,
+          card.data.card_faces?.map((face) => face.oracle_text),
+        ),
+        combinedCardText(
+          card.data.mana_cost,
+          card.data.card_faces?.map((face) => face.mana_cost),
+        ),
+        combinedCardText(
+          card.data.artist,
+          card.data.card_faces?.map((face) => face.artist),
+        ),
+        combinedCardText(
+          card.data.flavor_text,
+          card.data.card_faces?.map((face) => face.flavor_text),
+        ),
         card.data.rarity,
         card.data.released_at ?? null,
         card.data.released_at ?? cardSet.released_at ?? null,
@@ -242,6 +259,10 @@ function createCatalogSchema(database: DatabaseSync) {
       set_name TEXT NOT NULL,
       collector_number TEXT NOT NULL,
       type_line TEXT NOT NULL,
+      oracle_text TEXT NOT NULL,
+      mana_cost TEXT NOT NULL,
+      artist TEXT NOT NULL,
+      flavor_text TEXT NOT NULL,
       rarity TEXT NOT NULL,
       released_at TEXT,
       effective_released_at TEXT,
@@ -258,11 +279,22 @@ function createCatalogSchema(database: DatabaseSync) {
       collector_number,
       set_name,
       type_line,
+      oracle_text,
+      mana_cost,
+      artist,
+      flavor_text,
       content = 'cards',
       content_rowid = 'rowid',
       prefix = '2 3 4'
     );
   `);
+}
+
+function combinedCardText(
+  cardValue: null | string | undefined,
+  faceValues: readonly (null | string | undefined)[] = [],
+) {
+  return [cardValue, ...faceValues].filter((value): value is string => Boolean(value)).join("\n");
 }
 
 function insertCatalogSets(database: DatabaseSync, sets: readonly ResolvedCatalogSet[]) {

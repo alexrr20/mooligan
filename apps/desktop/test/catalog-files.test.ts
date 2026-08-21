@@ -307,12 +307,17 @@ void test("catalog filters tokens and ad cards independently", () => {
         oracle_id TEXT,
         identity_id TEXT NOT NULL,
         name TEXT NOT NULL,
+        compact_name TEXT NOT NULL,
         set_id TEXT NOT NULL,
         root_set_id TEXT NOT NULL,
         set_code TEXT NOT NULL,
         set_name TEXT NOT NULL,
         collector_number TEXT NOT NULL,
         type_line TEXT NOT NULL,
+        oracle_text TEXT NOT NULL,
+        mana_cost TEXT NOT NULL,
+        artist TEXT NOT NULL,
+        flavor_text TEXT NOT NULL,
         rarity TEXT NOT NULL,
         released_at TEXT NOT NULL,
         effective_released_at TEXT,
@@ -320,19 +325,25 @@ void test("catalog filters tokens and ad cards independently", () => {
       );
       CREATE VIRTUAL TABLE card_search USING fts5(
         name,
+        compact_name,
         set_code,
         collector_number,
         set_name,
         type_line,
+        oracle_text,
+        mana_cost,
+        artist,
+        flavor_text,
         content = 'cards',
         content_rowid = 'rowid'
       );
     `);
     const insert = database.prepare(
       `INSERT INTO cards
-       (id, oracle_id, identity_id, name, set_id, root_set_id, set_code, set_name, collector_number,
-        type_line, rarity, released_at, effective_released_at, json)
-       VALUES (?, ?, ?, ?, 'set-tst', 'set-tst', 'tst', 'Filter Test', ?, ?, 'common',
+       (id, oracle_id, identity_id, name, compact_name, set_id, root_set_id, set_code, set_name,
+        collector_number, type_line, oracle_text, mana_cost, artist, flavor_text, rarity, released_at,
+        effective_released_at, json)
+       VALUES (?, ?, ?, ?, '', 'set-tst', 'set-tst', 'tst', 'Filter Test', ?, ?, '', '', '', '', 'common',
                '2024-01-01', '2024-01-01', ?)`,
     );
     const cards = [
@@ -542,6 +553,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
       cmc: 2,
       digital: false,
       finishes: ["nonfoil", "foil"],
+      flavor_text: "A battle begins.",
       id: "printing-1",
       image_uris: {
         grid: "https://cards.scryfall.io/grid/front/1.webp",
@@ -558,7 +570,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
       mana_cost: "{1}{U}",
       name: "Mooligan Test Card",
       object: "card",
-      oracle_text: "Flying\n{T}: Draw a card.",
+      oracle_text: "Flying\nWhenever Mooligan Test Card attacks, draw a card.",
       oracle_id: "oracle-1",
       promo: false,
       promo_types: ["universesbeyond"],
@@ -718,7 +730,10 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
       assert.ok(sharedDetail);
       assert.equal(sharedDetail.card.id, "oracle-1");
       assert.equal(sharedDetail.card.hasSharedIdentity, true);
-      assert.equal(sharedDetail.card.faces[0]?.oracleText, "Flying\n{T}: Draw a card.");
+      assert.equal(
+        sharedDetail.card.faces[0]?.oracleText,
+        "Flying\nWhenever Mooligan Test Card attacks, draw a card.",
+      );
       assert.deepEqual(sharedDetail.legalities, [
         { formatId: "future_format", formatName: "Future Format", status: "not-legal" },
         { formatId: "modern", formatName: "Modern", status: "legal" },
@@ -917,6 +932,29 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
       );
       assert.deepEqual(
         queryCatalog({ query: 'o:"draw a card" f:modern' }).cards.map((card) => card.id),
+        ["printing-1"],
+      );
+      assert.deepEqual(
+        queryCatalog({ query: "attacks" }).cards.map((card) => card.id),
+        ["printing-1"],
+      );
+      assert.deepEqual(
+        queryCatalog({ query: "reach" }).cards.map((card) => card.id),
+        ["printing-2"],
+      );
+      assert.deepEqual(queryCatalog({ query: "o:at" }).cards, []);
+      assert.deepEqual(
+        queryCatalog({ query: "o:attacks" }).cards.map((card) => card.id),
+        ["printing-1"],
+      );
+      assert.deepEqual(queryCatalog({ query: "a:art" }).cards, []);
+      assert.deepEqual(
+        queryCatalog({ query: "a:artist" }).cards.map((card) => card.id),
+        ["printing-1"],
+      );
+      assert.deepEqual(queryCatalog({ query: "ft:at" }).cards, []);
+      assert.deepEqual(
+        queryCatalog({ query: "ft:battle" }).cards.map((card) => card.id),
         ["printing-1"],
       );
       assert.deepEqual(

@@ -65,6 +65,8 @@ const colorNames = new Map([
 ]);
 const colorOrder = "WUBRG";
 const cardFacesPath = "$.card_faces";
+const bareSearchColumns =
+  "{name compact_name set_code collector_number set_name type_line oracle_text}";
 const cardTypeWords = new Set([
   "artifact",
   "battle",
@@ -280,7 +282,7 @@ function compileTerm(raw: string, visibility: SpoilerVisibilitySnapshot): SqlFra
   }
 
   const match = /^([a-z][a-z0-9_-]*)(:|!=|<=|>=|=|<|>)(.*)$/iu.exec(raw);
-  if (!match) return compileFtsText(decodeValue(raw), undefined, isQuoted(raw));
+  if (!match) return compileFtsText(decodeValue(raw), bareSearchColumns, isQuoted(raw), true);
 
   const field = match[1]!.toLowerCase();
   const matchedComparison = match[2]!;
@@ -322,7 +324,13 @@ function compileTerm(raw: string, visibility: SpoilerVisibilitySnapshot): SqlFra
     case "o":
     case "fulloracle":
     case "fo":
-      return requireTextComparison(field, comparison, compileJsonText(value, oracleTextSql));
+      return requireTextComparison(
+        field,
+        comparison,
+        value.includes("~")
+          ? compileJsonText(value, oracleTextSql)
+          : compileFtsText(value, "oracle_text", quoted, false),
+      );
     case "keyword":
     case "kw":
       return requireEquality(field, comparison, compileArrayValue("$.keywords", value));
@@ -331,7 +339,7 @@ function compileTerm(raw: string, visibility: SpoilerVisibilitySnapshot): SqlFra
       return requireTextComparison(
         field,
         comparison,
-        compileJsonText(normalizeManaCost(value), manaCostSql),
+        compileFtsText(normalizeManaCost(value), "mana_cost", quoted, false),
       );
     case "color":
     case "c":
@@ -418,10 +426,18 @@ function compileTerm(raw: string, visibility: SpoilerVisibilitySnapshot): SqlFra
       return requireEquality(field, comparison, compileArrayValue("$.finishes", value));
     case "artist":
     case "a":
-      return requireTextComparison(field, comparison, compileJsonText(value, artistTextSql));
+      return requireTextComparison(
+        field,
+        comparison,
+        compileFtsText(value, "artist", quoted, false),
+      );
     case "flavor":
     case "ft":
-      return requireTextComparison(field, comparison, compileJsonText(value, flavorTextSql));
+      return requireTextComparison(
+        field,
+        comparison,
+        compileFtsText(value, "flavor_text", quoted, false),
+      );
     case "watermark":
     case "wm":
       return requireEquality(field, comparison, compileJsonScalar("$.watermark", value));
@@ -481,15 +497,21 @@ function compileTerm(raw: string, visibility: SpoilerVisibilitySnapshot): SqlFra
   }
 }
 
-function compileFtsText(value: string, column?: string, phrase = false): SqlFragment {
+function compileFtsText(
+  value: string,
+  column?: string,
+  phrase = false,
+  prefixTerms = true,
+): SqlFragment {
   const terms = value.match(/[\p{L}\p{N}]+/gu) ?? [];
   if (terms.length === 0) {
     return { parameters: [], sql: "0" };
   }
   const prefix = column ? `${column} : ` : "";
+  const termSuffix = prefixTerms ? "*" : "";
   const ftsQuery = phrase
-    ? `${prefix}"${terms.join(" ").replaceAll('"', '""')}"*`
-    : terms.map((term) => `${prefix}"${term.replaceAll('"', '""')}"*`).join(" AND ");
+    ? `${prefix}"${terms.join(" ").replaceAll('"', '""')}"${termSuffix}`
+    : terms.map((term) => `${prefix}"${term.replaceAll('"', '""')}"${termSuffix}`).join(" AND ");
   return {
     parameters: [ftsQuery],
     sql: `cards.rowid IN (
@@ -512,21 +534,6 @@ const manaCostSql = `(
     FROM json_each(cards.json, '${cardFacesPath}') AS face
   ), '')
 )`;
-const artistTextSql = `(
-  COALESCE(json_extract(cards.json, '$.artist'), '') || ' ' ||
-  COALESCE((
-    SELECT group_concat(COALESCE(json_extract(face.value, '$.artist'), ''), ' ')
-    FROM json_each(cards.json, '${cardFacesPath}') AS face
-  ), '')
-)`;
-const flavorTextSql = `(
-  COALESCE(json_extract(cards.json, '$.flavor_text'), '') || ' ' ||
-  COALESCE((
-    SELECT group_concat(COALESCE(json_extract(face.value, '$.flavor_text'), ''), ' ')
-    FROM json_each(cards.json, '${cardFacesPath}') AS face
-  ), '')
-)`;
-
 function compileJsonText(value: string, expression: string): SqlFragment {
   if (value.includes("~")) {
     return {
