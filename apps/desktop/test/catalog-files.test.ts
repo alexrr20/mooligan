@@ -33,6 +33,7 @@ import {
   reconcileCatalogSearchDraft,
   validateCatalogSearch,
 } from "../src/features/search/search-state.ts";
+import { WorkspaceStore } from "../electron/workspace/store.ts";
 
 const QueryPlanRowSchema = z.object({ detail: z.string() });
 const SHOW_ALL: SpoilerVisibilitySnapshot = {
@@ -93,7 +94,7 @@ void test("catalog search state keeps only valid non-default values", () => {
       digital: true,
       grid: true,
       mode: "upcoming",
-      query: `  Mooligan ${"x".repeat(120)}  `,
+      query: `  Mooligan ${"x".repeat(520)}  `,
       tokens: true,
       uniqueCards: true,
       universe: "beyond",
@@ -104,7 +105,7 @@ void test("catalog search state keeps only valid non-default values", () => {
       digital: true,
       grid: true,
       mode: "upcoming",
-      query: `Mooligan ${"x".repeat(91)}`,
+      query: `Mooligan ${"x".repeat(491)}`,
       tokens: true,
       uniqueCards: true,
       universe: "beyond",
@@ -536,6 +537,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
     {
       artist: "Test Artist",
       collector_number: "1",
+      colors: ["U"],
       color_identity: ["U"],
       cmc: 2,
       digital: false,
@@ -602,6 +604,9 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
     },
     {
       collector_number: "2",
+      colors: ["G"],
+      color_identity: ["G"],
+      cmc: 3,
       digital: false,
       finishes: ["nonfoil"],
       id: "printing-2",
@@ -766,6 +771,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
             gridImage: null,
             id: "printing-3",
             image: null,
+            isDigital: true,
             name: "Mooligan Test Card",
             rarity: "uncommon",
             setCode: "zzz",
@@ -840,6 +846,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
             gridImage: null,
             id: "printing-3",
             image: null,
+            isDigital: true,
             name: "Mooligan Test Card",
             rarity: "uncommon",
             setCode: "zzz",
@@ -859,6 +866,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
               printingId: "printing-2",
               size: "thumb",
             },
+            isDigital: false,
             name: "Second Test Card",
             rarity: "common",
             setCode: "moo",
@@ -888,6 +896,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
               printingId: "printing-2",
               size: "thumb",
             },
+            isDigital: false,
             name: "Second Test Card",
             rarity: "common",
             setCode: "moo",
@@ -902,6 +911,57 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
         queryCatalog({ query: "creat" }).cards.map((card) => card.id),
         ["printing-2"],
       );
+      assert.deepEqual(
+        queryCatalog({ query: "t:creature c:g mv<=3" }).cards.map((card) => card.id),
+        ["printing-2"],
+      );
+      assert.deepEqual(
+        queryCatalog({ query: 'o:"draw a card" f:modern' }).cards.map((card) => card.id),
+        ["printing-1"],
+      );
+      assert.deepEqual(
+        queryCatalog({ query: "m:1u" }).cards.map((card) => card.id),
+        ["printing-1"],
+      );
+      assert.deepEqual(
+        queryCatalog({ query: "s:moo r:rare" }).cards.map((card) => card.id),
+        ["printing-1"],
+      );
+      assert.deepEqual(
+        queryCatalog({ query: "-is:digital (kw:flying or pow>=3)" }).cards.map((card) => card.id),
+        ["printing-1", "printing-2"],
+      );
+      assert.deepEqual(
+        queryCatalog({ query: "id:g" }).cards.map((card) => card.id),
+        ["printing-2"],
+      );
+      assert.deepEqual(
+        queryCatalog({ query: "pt:3/4" }).cards.map((card) => card.id),
+        ["printing-2"],
+      );
+      assert.deepEqual(
+        queryCatalog({ query: '!"Mooligan Test Card"' }).cards.map((card) => card.id),
+        ["printing-3", "printing-1", "art-series-1"],
+      );
+      assert.deepEqual(queryCatalog({ query: 'name:"Test Mooligan"' }).cards, []);
+      assert.deepEqual(queryCatalog({ query: "otag:ramp" }), {
+        cards: [],
+        hasMore: false,
+        queryError: 'The local catalog does not support the "otag" operator.',
+        total: 0,
+      });
+      assert.deepEqual(queryCatalog({ query: "t:creature (c:g or c:u" }), {
+        cards: [],
+        hasMore: false,
+        queryError: "Close the open parenthesis in the Scryfall query.",
+        total: 0,
+      });
+      assert.deepEqual(queryCatalog({ query: "o:/draw (a|two) cards?/" }), {
+        cards: [],
+        hasMore: false,
+        queryError: "Regular expression searches are not supported in the local catalog.",
+        total: 0,
+      });
       assert.deepEqual(queryCatalog({ query: "///" }), {
         cards: [],
         hasMore: false,
@@ -947,8 +1007,9 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
           }),
       );
 
+      const workspace = new WorkspaceStore(join(directory, "workspace.sqlite"));
       const worker = new Worker(new URL("../electron/catalog/query-worker.ts", import.meta.url), {
-        workerData: destination,
+        workerData: { catalogPath: destination, workspacePath: workspace.databasePath },
       });
 
       try {
@@ -983,6 +1044,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
                   printingId: "printing-2",
                   size: "thumb",
                 },
+                isDigital: false,
                 name: "Second Test Card",
                 rarity: "common",
                 setCode: "moo",
@@ -1079,6 +1141,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
         });
       } finally {
         await worker.terminate();
+        workspace.close();
       }
     } finally {
       database.close();

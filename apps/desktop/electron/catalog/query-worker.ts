@@ -17,16 +17,22 @@ import {
   createCatalogImageSourceQuery,
   createCatalogSetSymbolSourceQuery,
 } from "./detail.ts";
+import { createCollectionQuery } from "./collection-query.ts";
 
 const port = parentPort;
-const catalogPath = z.string().safeParse(workerData);
+const paths = z
+  .strictObject({ catalogPath: z.string().min(1), workspacePath: z.string().min(1) })
+  .safeParse(workerData);
 
-if (!port || !catalogPath.success) {
-  throw new Error("The catalog query worker was started without a catalog path.");
+if (!port || !paths.success) {
+  throw new Error("The catalog query worker was started without trusted database paths.");
 }
 
-const database = new DatabaseSync(catalogPath.data, { readOnly: true });
+const database = new DatabaseSync(paths.data.catalogPath, { readOnly: true });
+database.prepare("ATTACH DATABASE ? AS workspace").run(paths.data.workspacePath);
+database.exec("PRAGMA query_only = ON");
 const listCatalog = createCatalogQuery(database);
+const listCollection = createCollectionQuery(database);
 const queryDetail = createCatalogDetailQuery(database);
 const queryImageSource = createCatalogImageSourceQuery(database);
 const queryRootSet = createCatalogRootSetQuery(database);
@@ -52,6 +58,13 @@ port.on("message", (message) => {
 
   try {
     switch (operation.type) {
+      case "collection-list":
+        response = {
+          id,
+          operation: operation.type,
+          result: listCollection(operation.request, operation.visibility),
+        };
+        break;
       case "detail":
         response = {
           id,

@@ -95,7 +95,10 @@ const BackupCollections = {
   collectionLots: z
     .array(BackupCollectionLotSchema)
     .max(MAX_COLLECTION_LOTS)
-    .refine(hasUniqueEntityIds, { message: "Collection lot IDs must be unique." }),
+    .refine(hasUniqueEntityIds, { message: "Collection lot IDs must be unique." })
+    .refine(hasUniqueUnattributedHoldingKeys, {
+      message: "Unattributed collection Holdings must be unique.",
+    }),
   decks: z
     .array(BackupDeckSchema)
     .max(MAX_DECKS)
@@ -199,4 +202,21 @@ function hasUniqueSpoilerTargets(decisions: readonly WorkspaceBackupSpoilerDecis
     new Set(decisions.map(({ scope, targetId }) => `${scope}\0${targetId}`)).size ===
     decisions.length
   );
+}
+
+function hasUniqueUnattributedHoldingKeys(lots: readonly Readonly<{ value: CollectionLot }>[]) {
+  const keys = lots
+    .map(({ value }) => value)
+    .filter(
+      ({ acquiredAt, locationId, notes, unitCost }) =>
+        acquiredAt === undefined &&
+        locationId === undefined &&
+        notes === undefined &&
+        unitCost === undefined,
+    )
+    .map(({ condition, finish, language, printingId }) =>
+      [printingId, finish, language, condition].join("\0"),
+    );
+
+  return new Set(keys).size === keys.length;
 }

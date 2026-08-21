@@ -43,10 +43,21 @@ export function SearchModeTabs({ mode, onChange }: SearchModeTabsProps) {
 
 type SearchFormProps = {
   activeQuery: string;
+  ariaLabel?: string;
+  autoFocus?: boolean;
+  id?: string;
+  placeholder?: string;
   onSearch: (query: string) => void;
 };
 
-export function SearchForm({ activeQuery, onSearch }: SearchFormProps) {
+export function SearchForm({
+  activeQuery,
+  ariaLabel = "Search cards",
+  autoFocus = true,
+  id = "card-search",
+  placeholder = "CARD NAME OR SCRYFALL QUERY",
+  onSearch,
+}: SearchFormProps) {
   const [query, setQuery] = useState(activeQuery);
   const [previousActiveQuery, setPreviousActiveQuery] = useState(activeQuery);
 
@@ -81,10 +92,12 @@ export function SearchForm({ activeQuery, onSearch }: SearchFormProps) {
       </svg>
       <Input
         {...stylex.props(styles.searchInput)}
-        aria-label="Search cards"
-        id="card-search"
+        aria-label={ariaLabel}
+        autoFocus={autoFocus}
+        id={id}
+        maxLength={500}
         name="query"
-        placeholder="CARD, SET, NUMBER, OR TYPE"
+        placeholder={placeholder}
         type="search"
         value={query}
         onValueChange={setQuery}

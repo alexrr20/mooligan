@@ -3,7 +3,16 @@ import { existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-import type { CollectionLot } from "@mooligan/domain/collection";
+import {
+  CardConditionSchema,
+  CardLanguageSchema,
+  type AddCollectionHoldingRequest,
+  type CollectionHoldingKey,
+  type CollectionLot,
+  type CollectionMutationResult,
+  type UpdateCollectionHoldingRequest,
+} from "@mooligan/domain/collection";
+import { FinishSchema } from "@mooligan/domain/catalog";
 import type { Deck } from "@mooligan/domain/decks";
 import type { CardList } from "@mooligan/domain/lists";
 import {
@@ -96,6 +105,19 @@ const WorkspaceMetadataSchema = z.object({
 const WorkspaceIdSchema = z.uuidv4();
 const WorkspaceRegistryRowSchema = z.object({ workspaceId: WorkspaceIdSchema });
 const EntityRowSchema = z.object({ id: z.string(), payload: z.string() });
+const CollectionLotRowSchema = z.object({
+  acquiredAt: z.string().nullable(),
+  condition: CardConditionSchema,
+  finish: FinishSchema,
+  id: z.string(),
+  language: CardLanguageSchema,
+  locationId: z.string().nullable(),
+  notes: z.string().nullable(),
+  printingId: z.string(),
+  quantity: z.number().int().positive(),
+  unitCostAmountMinor: z.number().int().nonnegative().nullable(),
+  unitCostCurrency: z.string().nullable(),
+});
 const SpoilerStateRowSchema = z.object({
   pending: z.union([z.literal(0), z.literal(1)]),
   remoteVersion: z.number().int().positive().nullable(),
@@ -215,8 +237,39 @@ export class WorkspaceStore {
 
         CREATE TABLE IF NOT EXISTS collection_lots (
           id TEXT PRIMARY KEY,
-          payload TEXT NOT NULL CHECK (json_valid(payload))
+          printing_id TEXT NOT NULL,
+          finish TEXT NOT NULL CHECK (finish IN ('nonfoil', 'foil', 'etched', 'glossy')),
+          language TEXT NOT NULL CHECK (
+            language IN ('en', 'es', 'fr', 'de', 'it', 'pt', 'ja', 'ko', 'ru', 'zhs', 'zht',
+                         'he', 'la', 'grc', 'ar', 'sa', 'ph')
+          ),
+          condition TEXT NOT NULL CHECK (
+            condition IN ('near-mint', 'lightly-played', 'moderately-played',
+                          'heavily-played', 'damaged')
+          ),
+          quantity INTEGER NOT NULL CHECK (quantity > 0),
+          acquired_at TEXT,
+          unit_cost_amount_minor INTEGER CHECK (
+            unit_cost_amount_minor IS NULL OR unit_cost_amount_minor >= 0
+          ),
+          unit_cost_currency TEXT CHECK (
+            unit_cost_currency IS NULL OR unit_cost_currency GLOB '[A-Z][A-Z][A-Z]'
+          ),
+          location_id TEXT CHECK (location_id IS NULL OR length(location_id) > 0),
+          notes TEXT,
+          CHECK ((unit_cost_amount_minor IS NULL) = (unit_cost_currency IS NULL))
         ) STRICT;
+
+        CREATE UNIQUE INDEX IF NOT EXISTS collection_lots_unattributed_holding
+          ON collection_lots (printing_id, finish, language, condition)
+          WHERE acquired_at IS NULL
+            AND unit_cost_amount_minor IS NULL
+            AND unit_cost_currency IS NULL
+            AND location_id IS NULL
+            AND notes IS NULL;
+
+        CREATE INDEX IF NOT EXISTS collection_lots_holding
+          ON collection_lots (printing_id, finish, language, condition);
 
         CREATE TABLE IF NOT EXISTS decks (
           id TEXT PRIMARY KEY,
@@ -327,9 +380,8 @@ export class WorkspaceStore {
     const now = new Date().toISOString();
 
     transact(this.#database, () => {
-      replaceEntities(
+      replaceCollectionLots(
         this.#database,
-        "collection_lots",
         backup.collectionLots.map(({ value }) => value),
       );
       replaceEntities(
@@ -379,12 +431,164 @@ export class WorkspaceStore {
     });
   }
 
-  putCollectionLot(value: CollectionLot): CollectionLot {
-    return putEntity(this.#database, "collection_lots", value);
+  addCollectionHolding(request: AddCollectionHoldingRequest): CollectionMutationResult {
+    return transact(this.#database, () => {
+      const lotId = randomUUID();
+      const row = z.object({ id: z.string(), quantity: z.number().int().positive() }).parse(
+        this.#database
+          .prepare(
+            `INSERT INTO collection_lots
+               (id, printing_id, finish, language, condition, quantity)
+               VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT (printing_id, finish, language, condition)
+                 WHERE acquired_at IS NULL
+                   AND unit_cost_amount_minor IS NULL
+                   AND unit_cost_currency IS NULL
+                   AND location_id IS NULL
+                   AND notes IS NULL
+               DO UPDATE SET quantity = collection_lots.quantity + excluded.quantity
+               RETURNING id, quantity`,
+          )
+          .get(
+            lotId,
+            request.printingId,
+            request.finish,
+            request.language,
+            request.condition,
+            request.quantity,
+          ),
+      );
+
+      return { holdingQuantity: row.quantity, lotId: row.id };
+    });
   }
 
   readCollectionLots(): CollectionLot[] {
-    return readEntities(this.#database, "collection_lots", validateCollectionLot);
+    return this.#database
+      .prepare(
+        `SELECT id,
+                printing_id AS printingId,
+                finish,
+                language,
+                condition,
+                quantity,
+                acquired_at AS acquiredAt,
+                unit_cost_amount_minor AS unitCostAmountMinor,
+                unit_cost_currency AS unitCostCurrency,
+                location_id AS locationId,
+                notes
+         FROM collection_lots
+         ORDER BY id`,
+      )
+      .all()
+      .map((row) => toCollectionLot(CollectionLotRowSchema.parse(row)));
+  }
+
+  readCollectionLot(lotId: string): CollectionLot | null {
+    const row = this.#database
+      .prepare(
+        `SELECT id,
+                printing_id AS printingId,
+                finish,
+                language,
+                condition,
+                quantity,
+                acquired_at AS acquiredAt,
+                unit_cost_amount_minor AS unitCostAmountMinor,
+                unit_cost_currency AS unitCostCurrency,
+                location_id AS locationId,
+                notes
+         FROM collection_lots
+         WHERE id = ?`,
+      )
+      .get(lotId);
+
+    return row === undefined ? null : toCollectionLot(CollectionLotRowSchema.parse(row));
+  }
+
+  updateCollectionHolding(request: UpdateCollectionHoldingRequest): CollectionMutationResult {
+    return transact(this.#database, () => {
+      const source = this.readCollectionLot(request.lotId);
+
+      if (!source || !isUnattributedCollectionLot(source)) {
+        throw new Error("This Collection holding cannot be edited.");
+      }
+
+      const targetKey: CollectionHoldingKey = {
+        condition: request.condition,
+        finish: request.finish,
+        language: request.language,
+        printingId: source.printingId,
+      };
+
+      if (sameHoldingKey(source, targetKey)) {
+        this.#database
+          .prepare("UPDATE collection_lots SET quantity = ? WHERE id = ?")
+          .run(request.quantity, source.id);
+        return { holdingQuantity: request.quantity, lotId: source.id };
+      }
+
+      const target = z
+        .object({ id: z.string(), quantity: z.number().int().positive() })
+        .nullable()
+        .parse(
+          this.#database
+            .prepare(
+              `SELECT id, quantity
+               FROM collection_lots
+               WHERE printing_id = ?
+                 AND finish = ?
+                 AND language = ?
+                 AND condition = ?
+                 AND acquired_at IS NULL
+                 AND unit_cost_amount_minor IS NULL
+                 AND unit_cost_currency IS NULL
+                 AND location_id IS NULL
+                 AND notes IS NULL`,
+            )
+            .get(targetKey.printingId, targetKey.finish, targetKey.language, targetKey.condition) ??
+            null,
+        );
+
+      if (target) {
+        const holdingQuantity = target.quantity + request.quantity;
+        this.#database
+          .prepare("UPDATE collection_lots SET quantity = ? WHERE id = ?")
+          .run(holdingQuantity, target.id);
+        this.#database.prepare("DELETE FROM collection_lots WHERE id = ?").run(source.id);
+        return { holdingQuantity, lotId: target.id };
+      }
+
+      this.#database
+        .prepare(
+          `UPDATE collection_lots
+           SET finish = ?, language = ?, condition = ?, quantity = ?
+           WHERE id = ?`,
+        )
+        .run(request.finish, request.language, request.condition, request.quantity, source.id);
+
+      return { holdingQuantity: request.quantity, lotId: source.id };
+    });
+  }
+
+  removeCollectionHolding(lotId: string) {
+    return transact(this.#database, () => {
+      const result = this.#database
+        .prepare(
+          `DELETE FROM collection_lots
+           WHERE id = ?
+             AND acquired_at IS NULL
+             AND unit_cost_amount_minor IS NULL
+             AND unit_cost_currency IS NULL
+             AND location_id IS NULL
+             AND notes IS NULL`,
+        )
+        .run(lotId);
+
+      if (result.changes !== 1) {
+        throw new Error("This Collection holding cannot be removed.");
+      }
+    });
   }
 
   putDeck(value: Deck): Deck {
@@ -1368,12 +1572,24 @@ export class WorkspaceManager {
     this.#active.importBackup(backup);
   }
 
-  putCollectionLot(value: CollectionLot) {
-    return this.#active.putCollectionLot(value);
+  addCollectionHolding(request: AddCollectionHoldingRequest) {
+    return this.#active.addCollectionHolding(request);
   }
 
   readCollectionLots() {
     return this.#active.readCollectionLots();
+  }
+
+  readCollectionLot(lotId: string) {
+    return this.#active.readCollectionLot(lotId);
+  }
+
+  updateCollectionHolding(request: UpdateCollectionHoldingRequest) {
+    return this.#active.updateCollectionHolding(request);
+  }
+
+  removeCollectionHolding(lotId: string) {
+    return this.#active.removeCollectionHolding(lotId);
   }
 
   putDeck(value: Deck) {
@@ -1595,7 +1811,7 @@ function transact<Result>(database: DatabaseSync, callback: () => Result): Resul
   }
 }
 
-type EntityTable = "card_lists" | "collection_lots" | "decks";
+type EntityTable = "card_lists" | "decks";
 
 function putEntity<Entity extends { id: string }>(
   database: DatabaseSync,
@@ -1651,6 +1867,81 @@ function replaceEntities<Entity extends { id: string }>(
   for (const entity of entities) {
     insert.run(entity.id, JSON.stringify(entity));
   }
+}
+
+function replaceCollectionLots(database: DatabaseSync, lots: CollectionLot[]) {
+  database.prepare("DELETE FROM collection_lots").run();
+  const insert = database.prepare(
+    `INSERT INTO collection_lots
+     (id, printing_id, finish, language, condition, quantity, acquired_at,
+      unit_cost_amount_minor, unit_cost_currency, location_id, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+
+  for (const lot of lots) {
+    insert.run(...collectionLotArguments(lot));
+  }
+}
+
+function collectionLotArguments(lot: CollectionLot) {
+  const value = validateCollectionLot(lot);
+  return [
+    value.id,
+    value.printingId,
+    value.finish,
+    value.language,
+    value.condition,
+    value.quantity,
+    optionalText(value.acquiredAt),
+    value.unitCost?.amountMinor ?? null,
+    value.unitCost?.currency ?? null,
+    optionalText(value.locationId),
+    optionalText(value.notes),
+  ] as const;
+}
+
+type CollectionLotRow = z.infer<typeof CollectionLotRowSchema>;
+
+function toCollectionLot(row: CollectionLotRow): CollectionLot {
+  const lot: CollectionLot = {
+    condition: row.condition,
+    finish: row.finish,
+    id: row.id,
+    language: row.language,
+    printingId: row.printingId,
+    quantity: row.quantity,
+  };
+
+  if (row.acquiredAt) lot.acquiredAt = row.acquiredAt;
+  if (row.locationId) lot.locationId = row.locationId;
+  if (row.notes) lot.notes = row.notes;
+  if (row.unitCostAmountMinor !== null && row.unitCostCurrency !== null) {
+    lot.unitCost = { amountMinor: row.unitCostAmountMinor, currency: row.unitCostCurrency };
+  }
+
+  return validateCollectionLot(lot);
+}
+
+function optionalText(value: string | undefined) {
+  return value?.trim() ? value : null;
+}
+
+function isUnattributedCollectionLot(lot: CollectionLot) {
+  return (
+    lot.acquiredAt === undefined &&
+    lot.unitCost === undefined &&
+    lot.locationId === undefined &&
+    lot.notes === undefined
+  );
+}
+
+function sameHoldingKey(lot: CollectionLot, key: CollectionHoldingKey) {
+  return (
+    lot.printingId === key.printingId &&
+    lot.finish === key.finish &&
+    lot.language === key.language &&
+    lot.condition === key.condition
+  );
 }
 
 function assertIdentifier(value: string, name: string) {

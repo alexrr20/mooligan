@@ -140,6 +140,12 @@ void test("catalog reads enforce spoiler visibility before any card data crosses
         total: 0,
       });
       assert.deepEqual(
+        list({ query: "prints=1" }, PROTECTED).cards.map(({ id }) => id),
+        ["old-reprint"],
+      );
+      assert.deepEqual(list({ query: "prints=2" }, PROTECTED).cards, []);
+      assert.deepEqual(list({ query: "in:fut" }, PROTECTED).cards, []);
+      assert.deepEqual(
         list({ uniqueCards: true }, PROTECTED).cards.map(({ id }) => id),
         ["old-reprint"],
       );
@@ -233,6 +239,14 @@ void test("catalog reads enforce spoiler visibility before any card data crosses
       assert.deepEqual(
         list({ uniqueCards: true }, releaseReveal).cards.map(({ id }) => id),
         ["fallback-date", "secret-treatment", "future-reprint"],
+      );
+      assert.deepEqual(
+        list({ query: "prints=2" }, releaseReveal).cards.map(({ id }) => id),
+        ["secret-treatment", "future-reprint", "secret-card", "old-reprint"],
+      );
+      assert.deepEqual(
+        list({ query: "in:fut" }, releaseReveal).cards.map(({ id }) => id),
+        ["secret-treatment", "future-reprint", "secret-card", "old-reprint"],
       );
       const releaseVisible = detail("secret-treatment", releaseReveal);
       assert.ok(releaseVisible && releaseVisible.status === "visible");
@@ -333,6 +347,7 @@ function assertionCard(id: string, name: string, setCode: string) {
     gridImage: null,
     id,
     image: null,
+    isDigital: false,
     name,
     rarity: "common",
     setCode,

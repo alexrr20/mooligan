@@ -5,6 +5,10 @@ import type {
 } from "../electron/auth/service";
 import type { CatalogCardDetail as CatalogCardDetailType } from "@mooligan/domain/catalog-detail";
 import type {
+  CollectionHolding as CollectionHoldingType,
+  CollectionListPage as CollectionListPageType,
+} from "@mooligan/domain/collection";
+import type {
   CatalogPrintingResult as CatalogPrintingResultType,
   CatalogReleaseSummary as CatalogReleaseSummaryType,
   SpoilerPolicy as SpoilerPolicyType,
@@ -34,6 +38,8 @@ declare global {
   type CatalogStatus = CatalogStatusType;
   type CatalogCardSummary = CatalogCardSummaryType;
   type CatalogCardDetail = CatalogCardDetailType;
+  type CollectionHolding = CollectionHoldingType;
+  type CollectionListPage = CollectionListPageType;
   type CatalogPrintingResult = CatalogPrintingResultType;
   type CatalogUpcomingPrinting = CatalogUpcomingPrintingType;
   type CatalogReleaseSummary = CatalogReleaseSummaryType;

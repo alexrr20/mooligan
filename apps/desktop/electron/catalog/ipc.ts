@@ -6,6 +6,7 @@ import { Worker } from "node:worker_threads";
 
 import { CatalogSnapshotSchema, type CatalogSnapshot } from "@mooligan/domain/catalog";
 import type { CatalogImageDescriptor } from "@mooligan/domain/catalog-detail";
+import type { CollectionListPage } from "@mooligan/domain/collection";
 import {
   CatalogReleaseSchema,
   ScryfallSetListSchema,
@@ -21,11 +22,13 @@ import {
 } from "@mooligan/domain/spoilers";
 import { app, ipcMain, net, type IpcMainInvokeEvent } from "electron";
 import * as z from "zod";
+import type { JSONType } from "zod";
 
 import { isFileNotFound, recoverInterruptedReplacement } from "./files";
 import { validateCatalogPrintingId } from "./detail";
 import { catalogSchemaVersion, importCatalog, readGzipJsonLines } from "./import";
 import { parseCatalogQueryWorkerResponse, validateCatalogListRequest } from "./query";
+import { validateCollectionListRequest } from "./collection-query";
 import {
   validateCatalogUpcomingPrintingRequest,
   type CatalogListPage,
@@ -62,9 +65,12 @@ let catalogEpoch = 0;
 let catalogQueriesAvailable = Promise.resolve();
 let catalogQueryId = 0;
 let catalogQueryWorker: Worker | undefined;
+let catalogQueryWorkerIdentity: string | undefined;
 let getCatalogVisibilitySnapshot: (() => SpoilerVisibilitySnapshot) | undefined;
+let getWorkspacePath: (() => string) | undefined;
 type CatalogQueryResult =
   | CatalogListPage
+  | CollectionListPage
   | CatalogPrintingResult
   | CatalogReleaseSummary[]
   | CatalogUpcomingPrintingPage
@@ -82,10 +88,12 @@ const catalogQueries = new Map<
 
 export type CatalogIpcOptions = {
   getVisibilitySnapshot: () => SpoilerVisibilitySnapshot;
+  getWorkspacePath: () => string;
 };
 
 export function registerCatalogIpc(options: CatalogIpcOptions) {
   getCatalogVisibilitySnapshot = options.getVisibilitySnapshot;
+  getWorkspacePath = options.getWorkspacePath;
   ipcMain.handle("catalog:status", (event) => {
     assertTrustedSender(event);
     return getCatalogStatus();
@@ -100,16 +108,22 @@ export function registerCatalogIpc(options: CatalogIpcOptions) {
   });
   ipcMain.handle("catalog:detail", async (event, printingId) => {
     assertTrustedSender(event);
-    const validPrintingId = validateCatalogPrintingId(printingId);
+    return queryCatalogPrintingDetail(printingId);
+  });
+  ipcMain.handle("collection:list", async (event, request) => {
+    assertTrustedSender(event);
+    const workspacePath = readWorkspacePath();
+    const validRequest = validateCollectionListRequest(request);
+    await catalogQueriesAvailable;
+    const result = await queryCatalogWithStableVisibility((visibility) =>
+      queryCatalog({ request: validRequest, type: "collection-list", visibility }),
+    );
 
-    if (!validPrintingId) {
-      return null;
+    if (workspacePath !== readWorkspacePath()) {
+      throw new Error("The active workspace changed before the Collection was read.");
     }
 
-    await catalogQueriesAvailable;
-    return queryCatalogWithStableVisibility((visibility) =>
-      queryCatalog({ printingId: validPrintingId, type: "detail", visibility }),
-    );
+    return result;
   });
   ipcMain.handle("catalog:upcoming", async (event) => {
     assertTrustedSender(event);
@@ -386,6 +400,21 @@ export async function resolveCatalogRootSetId(targetId: string) {
   return queryCatalog({ targetId: validTargetId, type: "root-set" });
 }
 
+export async function queryCatalogPrintingDetail(
+  printingId: JSONType,
+): Promise<CatalogPrintingResult | null> {
+  const validPrintingId = validateCatalogPrintingId(printingId);
+
+  if (!validPrintingId) {
+    return null;
+  }
+
+  await catalogQueriesAvailable;
+  return queryCatalogWithStableVisibility((visibility) =>
+    queryCatalog({ printingId: validPrintingId, type: "detail", visibility }),
+  );
+}
+
 async function queryAuthorizedCatalogImageSource(image: CatalogImageDescriptor) {
   const authorizedCatalogEpoch = catalogEpoch;
   const stable = await readWithStableCatalogVisibility(
@@ -423,6 +452,9 @@ function queryCatalog(
   operation: Extract<CatalogQueryOperation, { type: "list" }>,
 ): Promise<CatalogListPage>;
 function queryCatalog(
+  operation: Extract<CatalogQueryOperation, { type: "collection-list" }>,
+): Promise<CollectionListPage>;
+function queryCatalog(
   operation: Extract<CatalogQueryOperation, { type: "root-set" }>,
 ): Promise<string | null>;
 function queryCatalog(
@@ -439,6 +471,13 @@ function queryCatalog(
 ): Promise<CatalogUpcomingPrintingPage>;
 function queryCatalog(operation: CatalogQueryOperation): Promise<CatalogQueryResult> {
   const id = ++catalogQueryId;
+  let worker: Worker;
+
+  try {
+    worker = getCatalogQueryWorker();
+  } catch {
+    return Promise.reject(catalogReadError());
+  }
 
   return new Promise<CatalogQueryResult>((resolve, reject) => {
     catalogQueries.set(id, {
@@ -448,7 +487,6 @@ function queryCatalog(operation: CatalogQueryOperation): Promise<CatalogQueryRes
     });
 
     try {
-      const worker = getCatalogQueryWorker();
       worker.postMessage({ id, operation } satisfies CatalogQueryWorkerRequest);
     } catch {
       catalogQueries.delete(id);
@@ -464,14 +502,28 @@ function readCatalogVisibilitySnapshot() {
   return getCatalogVisibilitySnapshot();
 }
 
+function readWorkspacePath() {
+  if (!getWorkspacePath) {
+    throw new Error("The active workspace has not been initialized.");
+  }
+  return getWorkspacePath();
+}
+
 function getCatalogQueryWorker() {
-  if (catalogQueryWorker) {
+  const paths = { catalogPath: catalogPath(), workspacePath: readWorkspacePath() };
+  const identity = JSON.stringify(paths);
+
+  if (catalogQueryWorker && catalogQueryWorkerIdentity === identity) {
     return catalogQueryWorker;
+  }
+
+  if (catalogQueryWorker) {
+    failCatalogQueryWorker(catalogQueryWorker);
   }
 
   const worker = new Worker(
     new URL(/* @vite-ignore */ "./catalog-query-worker.js", import.meta.url),
-    { workerData: catalogPath() },
+    { workerData: paths },
   );
 
   worker.on("message", (value) => {
@@ -507,6 +559,7 @@ function getCatalogQueryWorker() {
   worker.once("error", () => failCatalogQueryWorker(worker));
   worker.once("exit", () => failCatalogQueryWorker(worker));
   catalogQueryWorker = worker;
+  catalogQueryWorkerIdentity = identity;
   return worker;
 }
 
@@ -516,6 +569,7 @@ function failCatalogQueryWorker(worker: Worker, terminate = true) {
   }
 
   catalogQueryWorker = undefined;
+  catalogQueryWorkerIdentity = undefined;
 
   for (const pending of catalogQueries.values()) {
     pending.reject(catalogReadError());

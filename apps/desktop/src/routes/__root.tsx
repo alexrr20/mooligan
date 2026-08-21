@@ -88,6 +88,6 @@ const styles = stylex.create({
   route: {
     minHeight: "100%",
     borderRadius: "10px",
-    backgroundColor: "#121213",
+    backgroundColor: "#0d0d0d",
   },
 });

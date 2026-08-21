@@ -62,6 +62,7 @@ export function useCatalogSearch(
     imagesReady: !result.isError && !result.isPlaceholderData,
     loading: result.isFetching,
     loadMore,
+    queryError: result.isPlaceholderData ? "" : (lastPage?.queryError ?? ""),
     total: result.isPlaceholderData ? null : (lastPage?.total ?? null),
   };
 }
