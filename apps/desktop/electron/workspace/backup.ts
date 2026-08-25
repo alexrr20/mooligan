@@ -17,7 +17,8 @@ import {
 import * as z from "zod";
 import type { JSONType } from "zod";
 
-import { MotionPreferenceSchema, PreferencesSchema, type Preferences } from "./preferences.ts";
+import type { Preferences } from "../../shared/desktop-api.ts";
+import { MotionPreferenceSchema, PreferencesSchema } from "./preferences.ts";
 
 const BACKUP_FORMAT = "mooligan-workspace";
 const BACKUP_VERSION = 2;

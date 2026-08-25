@@ -1,8 +1,7 @@
 import type {
-  AuthSnapshot as AuthSnapshotType,
-  AuthStatus as AuthStatusType,
-  AuthUser as AuthUserType,
-} from "../electron/auth/service";
+  CatalogCardSummary as CatalogCardSummaryType,
+  CatalogUpcomingPrinting as CatalogUpcomingPrintingType,
+} from "@mooligan/domain/catalog-search";
 import type { CatalogCardDetail as CatalogCardDetailType } from "@mooligan/domain/catalog-detail";
 import type {
   CollectionHolding as CollectionHoldingType,
@@ -16,18 +15,15 @@ import type {
   SpoilerState as SpoilerStateType,
 } from "@mooligan/domain/spoilers";
 import type {
+  AuthSnapshot as AuthSnapshotType,
+  AuthStatus as AuthStatusType,
+  AuthUser as AuthUserType,
   CatalogProgress as CatalogProgressType,
   CatalogStatus as CatalogStatusType,
-} from "../electron/catalog/ipc";
-import type {
-  CatalogCardSummary as CatalogCardSummaryType,
-  CatalogUpcomingPrinting as CatalogUpcomingPrintingType,
-} from "../electron/catalog/query";
-import type { DesktopApi } from "../electron/preload";
-import type {
+  DesktopApi,
   MotionPreference as MotionPreferenceType,
   Preferences as PreferencesType,
-} from "../electron/workspace/preferences";
+} from "../shared/desktop-api";
 
 declare global {
   type CatalogProgress = CatalogProgressType;

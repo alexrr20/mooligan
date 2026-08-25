@@ -1,17 +1,10 @@
 import * as z from "zod";
 import type { JSONType } from "zod";
 
-import { SpoilerPolicySchema, type SpoilerPolicy } from "@mooligan/domain/spoilers";
+import { SpoilerPolicySchema } from "@mooligan/domain/spoilers";
+import type { Preferences, PreferencesUpdate } from "../../shared/desktop-api.ts";
 
 export const MotionPreferenceSchema = z.enum(["system", "reduced", "full"]);
-export type MotionPreference = z.infer<typeof MotionPreferenceSchema>;
-
-export type Preferences = {
-  motion: MotionPreference;
-  spoilerPolicy: SpoilerPolicy;
-};
-
-export type PreferencesUpdate = Partial<Preferences>;
 
 type PreferenceDefinitions = {
   [Key in keyof Preferences]: {

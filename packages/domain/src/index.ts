@@ -1,6 +1,7 @@
 export * from "./catalog.ts";
 export * from "./catalog-detail.ts";
 export * from "./catalog-download.ts";
+export * from "./catalog-search.ts";
 export * from "./collection.ts";
 export * from "./decks.ts";
 export * from "./lists.ts";
