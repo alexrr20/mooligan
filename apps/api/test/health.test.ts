@@ -59,7 +59,7 @@ test("GET /catalog/release bootstraps an empty catalog", async () => {
   }
 });
 
-test("the release sync writes only when Scryfall publishes a new archive", async () => {
+test("the release refresh writes only when Scryfall publishes a new archive", async () => {
   const store = releaseDatabase();
   const source = {
     compressed_size: 77_064_542,

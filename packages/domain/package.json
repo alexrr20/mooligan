@@ -8,13 +8,12 @@
     ".": "./src/index.ts",
     "./catalog": "./src/catalog.ts",
     "./catalog-detail": "./src/catalog-detail.ts",
-    "./catalog-sync": "./src/catalog-sync.ts",
+    "./catalog-download": "./src/catalog-download.ts",
     "./collection": "./src/collection.ts",
     "./decks": "./src/decks.ts",
     "./lists": "./src/lists.ts",
     "./market": "./src/market.ts",
-    "./spoilers": "./src/spoilers.ts",
-    "./workspace-sync": "./src/workspace-sync.ts"
+    "./spoilers": "./src/spoilers.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",

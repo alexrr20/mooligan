@@ -24,7 +24,6 @@ import type {
   CatalogUpcomingPrintingPage,
   CatalogUpcomingPrintingRequest,
 } from "./catalog/query";
-import type { PreferenceSyncSnapshot } from "./workspace/preference-sync";
 import type { Preferences, PreferencesUpdate } from "./workspace/preferences";
 
 function subscribe<Value>(channel: string, callback: (value: Value) => void) {
@@ -90,13 +89,6 @@ export const desktopApi = {
       ipcRenderer.invoke("preferences:update", update),
   },
 
-  preferenceSync: {
-    onChanged: (callback: (snapshot: PreferenceSyncSnapshot) => void) =>
-      subscribe("sync:changed", callback),
-    read: (): Promise<PreferenceSyncSnapshot> => ipcRenderer.invoke("sync:read"),
-    retry: (): Promise<PreferenceSyncSnapshot> => ipcRenderer.invoke("sync:retry"),
-  },
-
   workspace: {
     exportBackup: (): Promise<"cancelled" | "exported"> => ipcRenderer.invoke("workspace:export"),
     importBackup: (): Promise<"cancelled" | "imported"> => ipcRenderer.invoke("workspace:import"),
@@ -118,6 +110,5 @@ contextBridge.exposeInMainWorld("catalog", desktopApi.catalog);
 contextBridge.exposeInMainWorld("collection", desktopApi.collection);
 contextBridge.exposeInMainWorld("spoilers", desktopApi.spoilers);
 contextBridge.exposeInMainWorld("preferences", desktopApi.preferences);
-contextBridge.exposeInMainWorld("preferenceSync", desktopApi.preferenceSync);
 contextBridge.exposeInMainWorld("workspace", desktopApi.workspace);
 contextBridge.exposeInMainWorld("auth", desktopApi.auth);

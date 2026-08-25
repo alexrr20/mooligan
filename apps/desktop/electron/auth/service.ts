@@ -58,7 +58,7 @@ const AuthUserEnvelopeSchema = z.object({ user: z.json() });
 export type AuthStatus =
   | "signed-out"
   | "signed-in"
-  | "sync-paused"
+  | "session-unavailable"
   | "protected-storage-unavailable";
 
 export type AuthUser = StoredAuthUser;
@@ -226,7 +226,7 @@ export class DesktopAuth {
       if (failure) {
         state.cookies = cookies;
         await this.#storage.save(state);
-        this.#setSnapshot("sync-paused", this.#current.user);
+        this.#setSnapshot("session-unavailable", this.#current.user);
         throw failure;
       }
 
@@ -245,42 +245,6 @@ export class DesktopAuth {
       status: this.#current.status,
       user: this.#current.user ? { ...this.#current.user } : null,
     };
-  }
-
-  request(
-    expectedUserId: string,
-    path: `/sync/${string}`,
-    init: RequestInit = {},
-  ): Promise<Response> {
-    return this.#serialize(async () => {
-      await this.#requireState();
-      if (this.#current.user?.id !== expectedUserId) {
-        throw new AuthRequestError("The signed-in account changed during synchronization.");
-      }
-      const url = new URL(path, this.#origin);
-
-      if (
-        url.origin !== this.#origin ||
-        !url.pathname.startsWith("/sync/") ||
-        url.hash ||
-        path.startsWith("//")
-      ) {
-        throw new AuthInputError("Only same-origin sync requests are allowed.");
-      }
-
-      const response = await this.#send(`${url.pathname}${url.search}`, init);
-      if (response.status === 401 || response.status === 403) {
-        this.#setSnapshot("sync-paused", this.#current.user);
-      }
-      const headers = new Headers(response.headers);
-      headers.delete("set-cookie");
-
-      return new Response(response.body, {
-        headers,
-        status: response.status,
-        statusText: response.statusText,
-      });
-    });
   }
 
   async #load() {
@@ -320,7 +284,10 @@ export class DesktopAuth {
 
     this.#state = state;
     const hasCookies = Object.keys(state.cookies).length > 0;
-    this.#setSnapshot(hasCookies ? "sync-paused" : "signed-out", hasCookies ? state.user : null);
+    this.#setSnapshot(
+      hasCookies ? "session-unavailable" : "signed-out",
+      hasCookies ? state.user : null,
+    );
     return state;
   }
 
@@ -407,7 +374,7 @@ export class DesktopAuth {
         return this.#setSnapshot("signed-out", null);
       }
       if (!response.ok) {
-        return this.#setSnapshot("sync-paused", this.#current.user);
+        return this.#setSnapshot("session-unavailable", this.#current.user);
       }
 
       const data = await readJson(response);
@@ -428,7 +395,7 @@ export class DesktopAuth {
       if (error instanceof ProtectedStorageError) {
         throw error;
       }
-      return this.#setSnapshot("sync-paused", this.#current.user);
+      return this.#setSnapshot("session-unavailable", this.#current.user);
     }
   }
 

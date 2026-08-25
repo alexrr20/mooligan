@@ -9,7 +9,7 @@ import {
   ScryfallSetDownloadSchema,
   type ScryfallCardDownload,
   type ScryfallSetDownload,
-} from "@mooligan/domain/catalog-sync";
+} from "@mooligan/domain/catalog-download";
 import type { SpoilerVisibilitySnapshot } from "@mooligan/domain/spoilers";
 import * as z from "zod";
 

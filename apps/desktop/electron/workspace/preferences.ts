@@ -2,9 +2,9 @@ import * as z from "zod";
 import type { JSONType } from "zod";
 
 import { SpoilerPolicySchema, type SpoilerPolicy } from "@mooligan/domain/spoilers";
-import { MotionPreferenceSchema, type MotionPreference } from "@mooligan/domain/workspace-sync";
 
-export { MotionPreferenceSchema, type MotionPreference };
+export const MotionPreferenceSchema = z.enum(["system", "reduced", "full"]);
+export type MotionPreference = z.infer<typeof MotionPreferenceSchema>;
 
 export type Preferences = {
   motion: MotionPreference;
@@ -16,13 +16,12 @@ export type PreferencesUpdate = Partial<Preferences>;
 type PreferenceDefinitions = {
   [Key in keyof Preferences]: {
     defaultValue: Preferences[Key];
-    syncable: boolean;
   };
 };
 
 export const preferenceDefinitions = {
-  motion: { defaultValue: "system", syncable: true },
-  spoilerPolicy: { defaultValue: "protect", syncable: true },
+  motion: { defaultValue: "system" },
+  spoilerPolicy: { defaultValue: "protect" },
 } satisfies PreferenceDefinitions;
 
 export const PreferencesSchema = z.strictObject({

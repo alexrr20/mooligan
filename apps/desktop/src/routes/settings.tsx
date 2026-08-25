@@ -4,7 +4,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Button } from "../components/button";
 import { PageFrame } from "../components/page-frame";
 import { useAuth } from "../features/auth/use-auth";
-import { usePreferenceSync } from "../features/preferences/use-preference-sync";
 import { usePreferences } from "../features/preferences/use-preferences";
 import { useWorkspaceBackup } from "../features/preferences/use-workspace-backup";
 import { SpoilerSettings } from "../features/spoilers/spoiler-settings";
@@ -16,13 +15,12 @@ export const Route = createFileRoute("/settings")({
 });
 function SettingsPage() {
   const auth = useAuth();
-  const preferenceSync = usePreferenceSync();
   const backup = useWorkspaceBackup();
   const { error, loading, preferences, saving, update } = usePreferences();
 
   return (
     <PageFrame>
-      <AccountSetting auth={auth} preferenceSync={preferenceSync} />
+      <AccountSetting auth={auth} />
 
       <section {...stylex.props(styles.setting)} aria-labelledby="motion-heading">
         <div {...stylex.props(styles.settingIntro)}>
@@ -86,10 +84,6 @@ function SettingsPage() {
           >
             {statusMessage({ error, loading, saving })}
           </p>
-          <span {...stylex.props(styles.statusDivider)} aria-hidden="true" />
-          <p {...stylex.props(typography.label, styles.status)}>
-            {cloudMessage(preferenceSync.snapshot.status)}
-          </p>
         </div>
       </section>
 
@@ -100,15 +94,9 @@ function SettingsPage() {
   );
 }
 
-function AccountSetting({
-  auth,
-  preferenceSync,
-}: {
-  auth: ReturnType<typeof useAuth>;
-  preferenceSync: ReturnType<typeof usePreferenceSync>;
-}) {
+function AccountSetting({ auth }: { auth: ReturnType<typeof useAuth> }) {
   const { snapshot } = auth;
-  const signedIn = snapshot.user !== null || snapshot.status === "sync-paused";
+  const signedIn = snapshot.user !== null || snapshot.status === "session-unavailable";
 
   return (
     <section {...stylex.props(styles.account)} aria-labelledby="account-heading">
@@ -120,8 +108,8 @@ function AccountSetting({
           </h1>
         </div>
         <p {...stylex.props(typography.body, styles.settingCopy)}>
-          Sign in only when you want cloud synchronization. Your library stays in its local
-          workspace and remains available if the service is offline.
+          Sign in to connect an online identity. Your library stays in its local workspace and
+          remains available if the account service is offline.
         </p>
       </div>
 
@@ -131,7 +119,7 @@ function AccountSetting({
             {...stylex.props(
               styles.accountGlyph,
               signedIn && styles.accountGlyphSignedIn,
-              snapshot.status === "sync-paused" && styles.accountGlyphPaused,
+              snapshot.status === "session-unavailable" && styles.accountGlyphPaused,
             )}
             aria-hidden="true"
           >
@@ -146,22 +134,16 @@ function AccountSetting({
             </span>
           </div>
           <span {...stylex.props(typography.label, styles.accountBadge)}>
-            {accountBadge(snapshot.status, preferenceSync.snapshot.status)}
+            {accountBadge(snapshot.status)}
           </span>
         </div>
 
         <div {...stylex.props(styles.accountActions)}>
           {signedIn ? (
             <>
-              {(snapshot.status === "sync-paused" ||
-                preferenceSync.snapshot.status === "paused" ||
-                preferenceSync.snapshot.status === "pending") && (
-                <Button
-                  disabled={auth.busy || preferenceSync.busy}
-                  onClick={() => auth.refresh()}
-                  variant="secondary"
-                >
-                  Retry sync
+              {snapshot.status === "session-unavailable" && (
+                <Button disabled={auth.busy} onClick={() => auth.refresh()} variant="secondary">
+                  Retry connection
                 </Button>
               )}
               <Button disabled={auth.busy} onClick={() => auth.signOut()} variant="secondary">
@@ -188,13 +170,14 @@ function AccountSetting({
 
       <div {...stylex.props(styles.statusRow)}>
         <span
-          {...stylex.props(styles.localDot, snapshot.status === "sync-paused" && styles.pausedDot)}
+          {...stylex.props(
+            styles.localDot,
+            snapshot.status === "session-unavailable" && styles.pausedDot,
+          )}
           aria-hidden="true"
         />
         <p {...stylex.props(typography.label, styles.status)} aria-live="polite">
-          {auth.busy || preferenceSync.busy
-            ? "Working…"
-            : accountStatus(snapshot.status, preferenceSync.snapshot.status)}
+          {auth.busy ? "Working…" : accountStatus(snapshot.status)}
         </p>
       </div>
     </section>
@@ -213,8 +196,7 @@ function BackupSetting({ backup }: { backup: ReturnType<typeof useWorkspaceBacku
         </div>
         <p {...stylex.props(typography.body, styles.settingCopy)}>
           Export a validated copy of this workspace, including preferences, spoiler choices,
-          collection lots, decks, and lists. Backups never contain account sessions or cloud
-          credentials.
+          collection lots, decks, and lists. Backups never contain account sessions or credentials.
         </p>
       </div>
 
@@ -268,7 +250,7 @@ function accountTitle({ loading, snapshot }: { loading: boolean; snapshot: AuthS
   if (snapshot.status === "protected-storage-unavailable") {
     return "Protected storage unavailable";
   }
-  if (snapshot.status === "sync-paused") {
+  if (snapshot.status === "session-unavailable") {
     return "Account session offline";
   }
   return "No account connected";
@@ -278,55 +260,33 @@ function accountDescription(status: AuthStatus) {
   if (status === "protected-storage-unavailable") {
     return "Sign-in is disabled; the local workspace still works.";
   }
-  if (status === "sync-paused") {
-    return "The local workspace is available while sync reconnects.";
+  if (status === "session-unavailable") {
+    return "The local workspace is available while the account service reconnects.";
   }
-  return "Keep using this device, or add sync when you need it.";
+  return "Keep using this device, or connect an optional account.";
 }
 
-function accountBadge(status: AuthStatus, syncStatus: PreferenceSyncStatus) {
-  if (status === "signed-in" && syncStatus === "synced") {
+function accountBadge(status: AuthStatus) {
+  if (status === "signed-in") {
     return "Connected";
   }
-  if (status === "sync-paused" || syncStatus === "paused") {
-    return "Paused";
-  }
-  if (syncStatus === "pending") {
-    return "Pending";
-  }
-  if (syncStatus === "syncing") {
-    return "Syncing";
+  if (status === "session-unavailable") {
+    return "Offline";
   }
   return "Local only";
 }
 
-function accountStatus(status: AuthStatus, syncStatus: PreferenceSyncStatus) {
-  if (status === "signed-in" && syncStatus === "synced") {
-    return "Session protected / sync available";
+function accountStatus(status: AuthStatus) {
+  if (status === "signed-in") {
+    return "Local access ready / account connected";
   }
-  if (status === "sync-paused" || syncStatus === "paused") {
-    return "Local access ready / cloud sync paused";
-  }
-  if (syncStatus === "pending") {
-    return "Saved locally / cloud update pending";
-  }
-  if (syncStatus === "syncing") {
-    return "Local access ready / synchronizing";
+  if (status === "session-unavailable") {
+    return "Local access ready / account service unavailable";
   }
   if (status === "protected-storage-unavailable") {
     return "Local access ready / account storage unavailable";
   }
   return "Local access ready / no account required";
-}
-
-function cloudMessage(status: PreferenceSyncStatus) {
-  return {
-    "local-only": "Not synced",
-    paused: "Cloud sync paused",
-    pending: "Cloud update pending",
-    synced: "Synced to cloud",
-    syncing: "Syncing…",
-  }[status];
 }
 
 function backupStatus(backup: ReturnType<typeof useWorkspaceBackup>) {
@@ -628,12 +588,6 @@ const styles = stylex.create({
   status: {
     margin: 0,
     color: "#85887e",
-  },
-  statusDivider: {
-    width: "1px",
-    height: "12px",
-    marginInline: "4px",
-    backgroundColor: "#34362f",
   },
   visuallyHidden: {
     width: "1px",

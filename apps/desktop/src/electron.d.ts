@@ -25,10 +25,6 @@ import type {
 } from "../electron/catalog/query";
 import type { DesktopApi } from "../electron/preload";
 import type {
-  PreferenceSyncSnapshot as PreferenceSyncSnapshotType,
-  PreferenceSyncStatus as PreferenceSyncStatusType,
-} from "../electron/workspace/preference-sync";
-import type {
   MotionPreference as MotionPreferenceType,
   Preferences as PreferencesType,
 } from "../electron/workspace/preferences";
@@ -47,8 +43,6 @@ declare global {
   type AuthStatus = AuthStatusType;
   type AuthUser = AuthUserType;
   type MotionPreference = MotionPreferenceType;
-  type PreferenceSyncSnapshot = PreferenceSyncSnapshotType;
-  type PreferenceSyncStatus = PreferenceSyncStatusType;
   type Preferences = PreferencesType;
   type SpoilerPolicy = SpoilerPolicyType;
   type SpoilerRevealSummaries = SpoilerRevealSummariesType;

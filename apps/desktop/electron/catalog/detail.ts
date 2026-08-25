@@ -7,7 +7,7 @@ import {
 import {
   ScryfallCardDownloadSchema,
   type ScryfallCardDownload,
-} from "@mooligan/domain/catalog-sync";
+} from "@mooligan/domain/catalog-download";
 import {
   type CatalogPrintingResult,
   type CatalogSetSymbolDescriptor,
