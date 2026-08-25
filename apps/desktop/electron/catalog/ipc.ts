@@ -12,7 +12,7 @@ import {
   ScryfallSetListSchema,
   type CatalogRelease,
   type ScryfallSetDownload,
-} from "@mooligan/domain/catalog-sync";
+} from "@mooligan/domain/catalog-download";
 import {
   type CatalogPrintingResult,
   type CatalogReleaseSummary,

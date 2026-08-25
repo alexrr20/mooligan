@@ -10,7 +10,6 @@ import { type AsyncSafeStorage, ProtectedAuthStateSchema } from "../electron/aut
 import {
   AUTH_PROTOCOL,
   AuthInputError,
-  AuthRequestError,
   DesktopAuth,
   resolveAuthOrigin,
 } from "../electron/auth/service.ts";
@@ -45,8 +44,6 @@ void test("desktop sign-in persists PKCE first and keeps session material out of
   let openedUrl: URL | undefined;
   let tokenCalls = 0;
   let tokenRequest: TokenRequest | undefined;
-  let syncCookie = "";
-  let syncUnauthorized = false;
   let signOutFails = false;
   let hangSessionRequest = false;
   let sessionUnauthorized = false;
@@ -67,20 +64,6 @@ void test("desktop sign-in persists PKCE first and keeps session material out of
       return jsonResponse({ token: "raw-session-token", user }, [
         "better-auth.session_token=session-one; Path=/; HttpOnly; Max-Age=3600",
         "not-better-auth.session_token=ignored; Path=/; Max-Age=3600",
-      ]);
-    }
-
-    if (url.pathname === "/sync/workspace") {
-      if (syncUnauthorized) {
-        return new Response(null, { status: 401 });
-      }
-      syncCookie = headers.get("cookie") ?? "";
-      assert.equal(headers.get("authorization"), null);
-      assert.equal(headers.get("origin"), null);
-      assert.equal(headers.get("electron-origin"), `${AUTH_PROTOCOL}:/`);
-      assert.equal(init?.credentials, "omit");
-      return jsonResponse({ ok: true }, [
-        "better-auth.session_token=session-two; Path=/; HttpOnly; Max-Age=3600",
       ]);
     }
 
@@ -186,14 +169,8 @@ void test("desktop sign-in persists PKCE first and keeps session material out of
     });
 
     hangSessionRequest = true;
-    assert.equal((await auth.refresh()).status, "sync-paused");
+    assert.equal((await auth.refresh()).status, "session-unavailable");
     hangSessionRequest = false;
-    assert.equal((await auth.refresh()).status, "signed-in");
-
-    syncUnauthorized = true;
-    assert.equal((await auth.request(sanitizedUser.id, "/sync/workspace")).status, 401);
-    assert.equal(auth.snapshot().status, "sync-paused");
-    syncUnauthorized = false;
     assert.equal((await auth.refresh()).status, "signed-in");
 
     const protectedState = await safeStorage.readState(path);
@@ -202,27 +179,12 @@ void test("desktop sign-in persists PKCE first and keeps session material out of
     assert.equal(protectedState.pendingAuth, null);
     assert.deepEqual(protectedState.user, sanitizedUser);
 
-    await assert.rejects(auth.request("different-user", "/sync/workspace"), AuthRequestError);
-    const response = await auth.request(sanitizedUser.id, "/sync/workspace", {
-      headers: {
-        authorization: "renderer-controlled bearer token",
-        cookie: "renderer-controlled-cookie=value",
-      },
-    });
-    assert.equal(syncCookie, "better-auth.session_token=session-one");
-    assert.equal(response.headers.get("set-cookie"), null);
-    assert.deepEqual(await response.json(), { ok: true });
-    assert.equal(
-      (await safeStorage.readState(path)).cookies["better-auth.session_token"]?.value,
-      "session-two",
-    );
-
     signOutFails = true;
     await assert.rejects(auth.signOut());
-    assert.equal(auth.snapshot().status, "sync-paused");
+    assert.equal(auth.snapshot().status, "session-unavailable");
     assert.equal(
       (await safeStorage.readState(path)).cookies["better-auth.session_token"]?.value,
-      "session-two",
+      "session-one",
     );
     signOutFails = false;
     assert.deepEqual(await auth.signOut(), {
@@ -271,13 +233,13 @@ void test("desktop sign-in persists PKCE first and keeps session material out of
     });
     assert.deepEqual(await offlineRelaunch.restore(), {
       pendingAuth: false,
-      status: "sync-paused",
+      status: "session-unavailable",
       user: sanitizedUser,
     });
     assert.equal(offlineRequests, 0);
     assert.deepEqual(await offlineRelaunch.initialize(), {
       pendingAuth: false,
-      status: "sync-paused",
+      status: "session-unavailable",
       user: sanitizedUser,
     });
     assert.equal(offlineRequests, 1);

@@ -1,7 +1,7 @@
 import * as z from "zod";
 
 import { ColorSchema, FinishSchema, LegalityStatusSchema, RaritySchema } from "./catalog.ts";
-import type { ScryfallCardDownload } from "./catalog-sync.ts";
+import type { ScryfallCardDownload } from "./catalog-download.ts";
 
 const idSchema = z.string().min(1);
 const textSchema = z.string().min(1);

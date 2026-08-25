@@ -7,7 +7,10 @@ import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
 import { Worker } from "node:worker_threads";
 import { gzipSync } from "node:zlib";
-import { ScryfallSetDownloadSchema, type ScryfallSetDownload } from "@mooligan/domain/catalog-sync";
+import {
+  ScryfallSetDownloadSchema,
+  type ScryfallSetDownload,
+} from "@mooligan/domain/catalog-download";
 import type { SpoilerVisibilitySnapshot } from "@mooligan/domain/spoilers";
 import * as z from "zod";
 

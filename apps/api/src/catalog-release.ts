@@ -2,7 +2,7 @@ import {
   CatalogReleaseSchema,
   ScryfallBulkDataSchema,
   type CatalogRelease,
-} from "@mooligan/domain/catalog-sync";
+} from "@mooligan/domain/catalog-download";
 
 type CatalogReleaseRow = {
   compressed_size: number;

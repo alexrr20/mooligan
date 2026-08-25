@@ -8,7 +8,7 @@ import {
   ScryfallSetDownloadSchema,
   ScryfallSetListSchema,
   type ScryfallCardDownload,
-} from "../src/catalog-sync.ts";
+} from "../src/catalog-download.ts";
 import { DeckEntrySchema } from "../src/decks.ts";
 import {
   AddCollectionHoldingRequestSchema,

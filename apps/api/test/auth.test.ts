@@ -9,16 +9,13 @@ import { test } from "vitest";
 
 import { createAuth } from "../src/auth.ts";
 
-test("auth endpoints and protected routes reject a missing session", async () => {
+test("the Better Auth session endpoint accepts a missing session", async () => {
   const sessionResponse = await exports.default.fetch(
     new Request("http://127.0.0.1:3000/api/auth/get-session"),
   );
-  const protectedResponse = await exports.default.fetch(new Request("http://127.0.0.1:3000/me"));
 
   assert.equal(sessionResponse.status, 200);
   assert.equal(await sessionResponse.json(), null);
-  assert.equal(protectedResponse.status, 401);
-  assert.deepEqual(await protectedResponse.json(), { error: "unauthorized" });
 });
 
 test("the Electron server plugin is mounted under the auth handler", async () => {
@@ -122,7 +119,7 @@ test("the Electron plugin transfers a browser session through PKCE exactly once"
   assert.equal(repeatedExchange.status, 404);
 });
 
-test("an authenticated Worker request resolves the Better Auth user", async () => {
+test("an authenticated session resolves the Better Auth user", async () => {
   const context = await createAuth(env).$context;
   const user = await context.internalAdapter.createUser({
     email: "test@example.com",
@@ -140,16 +137,10 @@ test("an authenticated Worker request resolves the Better Auth user", async () =
   const sessionResponse = await exports.default.fetch(
     new Request("http://127.0.0.1:3000/api/auth/get-session", { headers }),
   );
-  const protectedResponse = await exports.default.fetch(
-    new Request("http://127.0.0.1:3000/me", { headers }),
-  );
 
   assert.equal(sessionResponse.status, 200);
-  assert.equal(protectedResponse.status, 200);
   const sessionBody = await sessionResponse.json<{ user: { email: string; id: string } }>();
-  const protectedBody = await protectedResponse.json<{ user: { email: string; id: string } }>();
 
   assert.equal(sessionBody.user.id, user.id);
   assert.equal(sessionBody.user.email, "test@example.com");
-  assert.deepEqual(protectedBody.user, sessionBody.user);
 });

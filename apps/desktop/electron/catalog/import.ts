@@ -8,7 +8,7 @@ import {
   ScryfallCardDownloadSchema,
   type CatalogRelease,
   type ScryfallSetDownload,
-} from "@mooligan/domain/catalog-sync";
+} from "@mooligan/domain/catalog-download";
 import * as z from "zod";
 
 const transactionSize = 500;
