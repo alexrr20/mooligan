@@ -16,8 +16,9 @@ Docs are local at `node_modules/vite-plus/docs` or online at https://viteplus.de
 <!--VITE PLUS END-->
 
 - Read `PROJECT.md` before making product, UX, data-model, or architecture
-  recommendations. Treat its product direction as the target and the current
-  implementation as an early foundation, not as the full intended scope.
+  recommendations. Use its domain language consistently. Treat its product
+  direction as the target and the current implementation as an early
+  foundation, not as the full intended scope.
 - Do not preserve backward compatibility. Remove obsolete paths instead of adding compatibility layers, fallbacks, or migrations. Whenever a change you are doing causes a regression, you should state it clearly.
 - Choose the simplest implementation that fully meets the current requirements. Avoid speculative abstractions, configuration, and indirection.
 - Grow the system in layers. Start from the smallest version that works end to end, and add each new capability on top of a product that already works. Never trade a working product for unfinished complexity.

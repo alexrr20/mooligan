@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
+import { ReadableStream } from "node:stream/web";
 import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
 import { Worker } from "node:worker_threads";
@@ -25,6 +26,7 @@ import {
   importCatalog,
   readGzipJsonLines,
   resolveCatalogSets,
+  type CatalogImportWorkerMessage,
 } from "../electron/catalog/import.ts";
 import {
   createCatalogQuery,
@@ -246,6 +248,76 @@ void test("catalog import rejects missing and mismatched card set identities", a
     } finally {
       await rm(directory, { force: true, recursive: true });
     }
+  }
+});
+
+void test("catalog import worker builds and validates the downloaded database", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "mooligan-import-worker-"));
+  const destinationPath = join(directory, "cards.sqlite");
+  const release = {
+    compressedSize: 1,
+    downloadUrl: "https://data.scryfall.io/default-cards/test.jsonl.gz",
+    updatedAt: "2026-08-19T12:00:00+00:00",
+  };
+  const card = {
+    collector_number: "1",
+    id: "printing-worker",
+    name: "Worker Card",
+    object: "card" as const,
+    rarity: "common" as const,
+    set: "tst",
+    set_id: "set-tst",
+    set_name: "Test Set",
+    type_line: "Artifact",
+  };
+  const archive = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(gzipSync(`${JSON.stringify(card)}\n`));
+      controller.close();
+    },
+  });
+  const worker = new Worker(new URL("../electron/catalog/import-worker.ts", import.meta.url), {
+    transferList: [archive],
+    workerData: {
+      archive,
+      destinationPath,
+      release,
+      sets: [scryfallSet({ code: "tst", id: "set-tst" })],
+    },
+  });
+
+  try {
+    const messages = await new Promise<CatalogImportWorkerMessage[]>((resolve, reject) => {
+      const received: CatalogImportWorkerMessage[] = [];
+      worker.once("error", reject);
+      worker.on("message", (message: CatalogImportWorkerMessage) => {
+        received.push(message);
+        if (message.type === "complete") resolve(received);
+      });
+    });
+
+    assert.deepEqual(messages, [
+      { completedCards: 1, type: "progress" },
+      {
+        snapshot: { cardCount: 1, updatedAt: release.updatedAt },
+        type: "complete",
+      },
+    ]);
+    const database = new DatabaseSync(destinationPath, { readOnly: true });
+    try {
+      assert.deepEqual(
+        database
+          .prepare("SELECT id, name FROM cards")
+          .all()
+          .map((row) => ({ ...row })),
+        [{ id: "printing-worker", name: "Worker Card" }],
+      );
+    } finally {
+      database.close();
+    }
+  } finally {
+    await worker.terminate();
+    await rm(directory, { force: true, recursive: true });
   }
 });
 

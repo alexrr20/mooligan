@@ -69,6 +69,7 @@ export function CatalogSetup() {
     state.kind === "outdated" ||
     ((state.kind === "downloading" || state.kind === "error") && state.updating);
   const progress = downloading ? state.progress : undefined;
+  const indexing = Boolean(progress?.totalBytes && progress.completedBytes >= progress.totalBytes);
   const progressRatio =
     progress && progress.totalBytes > 0 ? progress.completedBytes / progress.totalBytes : 0;
 
@@ -118,7 +119,9 @@ export function CatalogSetup() {
                 <span>{updating ? "Catalog refresh / Card index" : "First run / Card index"}</span>
                 <span>
                   {downloading
-                    ? "Receiving & indexing"
+                    ? indexing
+                      ? "Indexing locally"
+                      : "Receiving catalog"
                     : updating
                       ? "Update available"
                       : "Local setup"}
@@ -165,7 +168,13 @@ export function CatalogSetup() {
                   {downloading ? (
                     <div {...stylex.props(styles.progressBlock)} aria-live="polite">
                       <div {...stylex.props(styles.progressMeta)}>
-                        <span>{updating ? "Refreshing local index" : "Building local index"}</span>
+                        <span>
+                          {indexing
+                            ? "Indexing local catalog"
+                            : updating
+                              ? "Downloading catalog update"
+                              : "Downloading card catalog"}
+                        </span>
                         <span>
                           {progress?.totalBytes
                             ? `${formatBytes(progress.completedBytes)} / ${formatBytes(progress.totalBytes)} · ${progress.completedCards.toLocaleString()} cards`
@@ -191,7 +200,9 @@ export function CatalogSetup() {
                   <div {...stylex.props(styles.actions)}>
                     <Button disabled={downloading} onClick={() => void download()} size="large">
                       {downloading
-                        ? "Downloading…"
+                        ? indexing
+                          ? "Indexing…"
+                          : "Downloading…"
                         : state.kind === "error"
                           ? updating
                             ? "Try update again"

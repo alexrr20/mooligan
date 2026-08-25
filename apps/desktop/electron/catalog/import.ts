@@ -22,6 +22,9 @@ const CatalogMetadataSchema = CatalogSnapshotSchema.extend({
 });
 
 export type ResolvedCatalogSet = ScryfallSetDownload & { rootSetId: string };
+export type CatalogImportWorkerMessage =
+  | { completedCards: number; type: "progress" }
+  | { snapshot: CatalogSnapshot; type: "complete" };
 
 export function readGzipJsonLines(input: Readable) {
   return createInterface({ input: input.pipe(createGunzip()), crlfDelay: Infinity });
