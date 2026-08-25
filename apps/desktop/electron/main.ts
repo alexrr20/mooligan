@@ -1,34 +1,12 @@
 import { createHash } from "node:crypto";
-import { readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import {
-  app,
-  BrowserWindow,
-  dialog,
-  ipcMain,
-  protocol,
-  safeStorage,
-  session,
-  shell,
-  type OpenDialogOptions,
-} from "electron";
-import {
-  SpoilerPolicySchema,
-  SpoilerTargetIdSchema,
-  type CatalogPrintingResult,
-} from "@mooligan/domain/spoilers";
-import {
-  AddCollectionHoldingRequestSchema,
-  RemoveCollectionHoldingRequestSchema,
-  UpdateCollectionHoldingRequestSchema,
-  type AddCollectionHoldingRequest,
-} from "@mooligan/domain/collection";
+import { app, BrowserWindow, protocol, safeStorage, session, shell } from "electron";
 import * as z from "zod";
-import type { JSONType } from "zod";
 
-import { type AuthSnapshot, DesktopAuth, resolveAuthOrigin } from "./auth/service";
+import { registerAuthIpc } from "./auth/ipc";
+import { DesktopAuth, resolveAuthOrigin } from "./auth/service";
 import { registerAuthColdStart } from "./auth/startup";
 import { createCatalogImageCache } from "./catalog/image-cache";
 import {
@@ -38,23 +16,24 @@ import {
 import { registerCatalogImageProtocol } from "./catalog/image-protocol";
 import {
   queryCatalogImageSource,
-  queryCatalogPrintingDetail,
   queryCatalogSetSymbolSource,
   registerCatalogIpc,
-  resolveCatalogRootSetId,
 } from "./catalog/ipc";
 import { createCatalogSetSymbolCache } from "./catalog/set-symbol-cache";
 import { registerCatalogSetSymbolProtocol } from "./catalog/set-symbol-protocol";
-import { assertTrustedSender, developmentRendererUrl } from "./ipc-security";
+import { registerCollectionIpc } from "./collection/ipc";
+import { developmentRendererUrl } from "./ipc-security";
 import { registerDesktopSchemes } from "./protocols";
-import { releaseProtectionTarget, SpoilerService } from "./spoilers/service";
-import { validatePreferencesUpdate } from "./workspace/preferences";
-import { parseWorkspaceBackup, type WorkspaceBackup } from "./workspace/backup";
-import { MutationQueue, runForUnchangedRevision } from "./workspace/mutations";
+import { registerSpoilerIpc } from "./spoilers/ipc";
+import { SpoilerService } from "./spoilers/service";
+import { focusFirstWindow } from "./windows";
+import { registerWorkspaceIpc } from "./workspace/ipc";
+import { MutationQueue } from "./workspace/mutations";
 import { WorkspaceManager } from "./workspace/store";
 
 app.enableSandbox();
 registerDesktopSchemes(protocol);
+
 const authStartup = registerAuthColdStart({
   onOpenUrl(listener) {
     app.on("open-url", listener);
@@ -69,7 +48,6 @@ const authStartup = registerAuthColdStart({
   setAsDefaultProtocolClient: (scheme, path, args) =>
     app.setAsDefaultProtocolClient(scheme, path, args),
 });
-const MAX_WORKSPACE_BACKUP_BYTES = 50 * 1024 * 1024;
 
 async function createWindow() {
   const window = new BrowserWindow({
@@ -117,26 +95,19 @@ if (!authStartup.isPrimary) {
       const spoilers = new SpoilerService(workspace);
       const workspaceMutations = new MutationQueue();
 
-      function readSpoilerStateForRenderer(state = spoilers.snapshot()) {
-        return state;
-      }
-
-      function readSpoilerVisibility() {
-        return spoilers.visibilitySnapshot();
-      }
-
-      function readPreferencesForRenderer() {
-        return workspace.readPreferences();
-      }
-
-      function runSpoilerMutation<Result>(operation: () => Result | PromiseLike<Result>) {
-        return workspaceMutations.run(operation);
-      }
-
       registerCatalogIpc({
-        getVisibilitySnapshot: readSpoilerVisibility,
+        getVisibilitySnapshot: () => spoilers.visibilitySnapshot(),
         getWorkspacePath: () => workspace.databasePath,
       });
+      registerCollectionIpc(workspace, workspaceMutations);
+      const spoilerIpc = registerSpoilerIpc(workspace, spoilers, workspaceMutations);
+      const publishPreferences = registerWorkspaceIpc(
+        workspace,
+        spoilers,
+        workspaceMutations,
+        app.getPath("documents"),
+      );
+
       const imageCache = createCatalogImageCache({
         cacheDirectory: resolveCatalogImageCacheDirectory(app.getPath("home")),
       });
@@ -153,8 +124,8 @@ if (!authStartup.isPrimary) {
         setSymbolCache,
         queryCatalogSetSymbolSource,
       );
-      const authOrigin = resolveAuthOrigin();
 
+      const authOrigin = resolveAuthOrigin();
       const auth = new DesktopAuth({
         filePath: join(
           app.getPath("userData"),
@@ -164,326 +135,10 @@ if (!authStartup.isPrimary) {
         origin: authOrigin,
         safeStorage,
       });
-      const unsubscribeSpoilers = spoilers.subscribe((state) => {
-        publish("spoilers:changed", readSpoilerStateForRenderer(state));
-      });
-
-      let lastAuthError: string | null = null;
-
-      function applyAuthSnapshot(snapshot: AuthSnapshot) {
-        lastAuthError = null;
-        publish("auth:changed", snapshot);
-        return snapshot;
-      }
-
-      async function runAuth(operation: () => Promise<AuthSnapshot>) {
-        try {
-          return applyAuthSnapshot(await operation());
-        } catch (error) {
-          applyAuthSnapshot(auth.snapshot());
-          throw new Error(publicAuthError(error));
-        }
-      }
-
-      applyAuthSnapshot(await auth.restore());
-
-      ipcMain.handle("auth:read", (event) => {
-        assertTrustedSender(event);
-        return auth.snapshot();
-      });
-      ipcMain.handle("auth:sign-in", (event) => {
-        assertTrustedSender(event);
-        return runAuth(() => auth.beginSignIn());
-      });
-      ipcMain.handle("auth:refresh", (event) => {
-        assertTrustedSender(event);
-        return runAuth(() => auth.refresh());
-      });
-      ipcMain.handle("auth:sign-out", (event) => {
-        assertTrustedSender(event);
-        return runAuth(() => auth.signOut());
-      });
-      ipcMain.handle("preferences:read", (event) => {
-        assertTrustedSender(event);
-        return readPreferencesForRenderer();
-      });
-      ipcMain.handle("preferences:update", (event, update) => {
-        assertTrustedSender(event);
-        const validated = validatePreferencesUpdate(update);
-        const applyUpdate = () => {
-          if (validated.spoilerPolicy !== undefined) {
-            spoilers.setPolicy(validated.spoilerPolicy);
-          }
-          workspace.updatePreferences(
-            validated.motion === undefined ? {} : { motion: validated.motion },
-          );
-          const publicPreferences = readPreferencesForRenderer();
-          publish("preferences:changed", publicPreferences);
-          return publicPreferences;
-        };
-
-        return validated.spoilerPolicy === undefined
-          ? applyUpdate()
-          : runSpoilerMutation(applyUpdate);
-      });
-
-      ipcMain.handle("spoilers:read", (event) => {
-        assertTrustedSender(event);
-        return readSpoilerStateForRenderer();
-      });
-      ipcMain.handle("spoilers:set-policy", (event, value) => {
-        assertTrustedSender(event);
-        const policy = SpoilerPolicySchema.parse(value);
-        return runSpoilerMutation(() => {
-          const state = spoilers.setPolicy(policy);
-          publish("preferences:changed", readPreferencesForRenderer());
-          return state;
-        });
-      });
-      ipcMain.handle("spoilers:reveal-printing", (event, value) => {
-        assertTrustedSender(event);
-        const printingId = validateSpoilerTarget(value);
-        return runSpoilerMutation(async () => {
-          const rootSetId = await runForUnchangedRevision(
-            () => workspace.readSpoilerState().revision,
-            () => resolveCatalogRootSetId(printingId),
-          );
-
-          if (!rootSetId) {
-            throw new Error("This printing is not present in the installed catalog.");
-          }
-
-          const state = spoilers.revealPrinting(printingId);
-          return state;
-        });
-      });
-      ipcMain.handle("spoilers:protect-printing", (event, value) => {
-        assertTrustedSender(event);
-        const printingId = validateSpoilerTarget(value);
-        return runSpoilerMutation(async () => {
-          const rootSetId = await resolveOptionalCatalogRootSetId(printingId);
-          const current = workspace.readSpoilerState();
-          const active = current.activePrintingIds.includes(printingId);
-
-          if (current.policy === "show") {
-            throw new Error('Turn off "Always show previews" before protecting one printing.');
-          }
-
-          if (!active && !rootSetId) {
-            throw new Error("This printing is not present in the installed catalog.");
-          }
-          if (rootSetId && current.activeRootSetIds.includes(rootSetId)) {
-            throw new Error("Protect this release before protecting one printing from it.");
-          }
-
-          const state = spoilers.protectPrinting(printingId);
-          return state;
-        });
-      });
-      ipcMain.handle("spoilers:reveal-release", (event, value) => {
-        assertTrustedSender(event);
-        const targetId = validateSpoilerTarget(value);
-        return runSpoilerMutation(async () => {
-          const rootSetId = await runForUnchangedRevision(
-            () => workspace.readSpoilerState().revision,
-            () => requireCatalogRootSetId(targetId),
-          );
-          const state = spoilers.revealRelease(rootSetId);
-          return state;
-        });
-      });
-      ipcMain.handle("spoilers:protect-release", (event, value) => {
-        assertTrustedSender(event);
-        const targetId = validateSpoilerTarget(value);
-        return runSpoilerMutation(async () => {
-          const rootSetId = await resolveOptionalCatalogRootSetId(targetId);
-          const current = workspace.readSpoilerState();
-
-          if (current.policy === "show") {
-            throw new Error('Turn off "Always show previews" before protecting one release.');
-          }
-
-          const protectionTarget = releaseProtectionTarget(current, targetId, rootSetId);
-          if (!protectionTarget) {
-            throw new Error("This release is not present in the installed catalog.");
-          }
-
-          const state = spoilers.protectRelease(protectionTarget);
-          return state;
-        });
-      });
-      ipcMain.handle("spoilers:protect-all", (event) => {
-        assertTrustedSender(event);
-        return runSpoilerMutation(() => {
-          const state = spoilers.protectAll();
-          publish("preferences:changed", readPreferencesForRenderer());
-          return state;
-        });
-      });
-
-      ipcMain.handle("collection:add", (event, value) => {
-        assertTrustedSender(event);
-        const request = AddCollectionHoldingRequestSchema.parse(value);
-
-        return runCollectionMutation(async () => {
-          const detail = await readCollectionPrintingForMutation(request.printingId);
-          assertCollectionPrintingCanUseFinish(detail, request);
-          const result = workspace.addCollectionHolding(request);
-          publish("collection:changed", undefined);
-          return result;
-        });
-      });
-
-      ipcMain.handle("collection:update", (event, value) => {
-        assertTrustedSender(event);
-        const request = UpdateCollectionHoldingRequestSchema.parse(value);
-
-        return runCollectionMutation(async () => {
-          const lot = workspace.readCollectionLot(request.lotId);
-
-          if (!lot) {
-            throw new Error("This Collection holding no longer exists.");
-          }
-
-          const detail = await readCollectionPrintingForMutation(lot.printingId);
-
-          if (detail === null) {
-            if (request.finish !== lot.finish) {
-              throw new Error("The finish cannot change while this printing is unavailable.");
-            }
-          } else {
-            assertCollectionPrintingCanUseFinish(detail, {
-              ...request,
-              printingId: lot.printingId,
-            });
-          }
-
-          const result = workspace.updateCollectionHolding(request);
-          publish("collection:changed", undefined);
-          return result;
-        });
-      });
-
-      ipcMain.handle("collection:remove", (event, value) => {
-        assertTrustedSender(event);
-        const request = RemoveCollectionHoldingRequestSchema.parse(value);
-
-        return runCollectionMutation(() => {
-          workspace.removeCollectionHolding(request.lotId);
-          publish("collection:changed", undefined);
-        });
-      });
-
-      ipcMain.handle("workspace:export", async (event) => {
-        assertTrustedSender(event);
-        const owner = BrowserWindow.fromWebContents(event.sender);
-        const options = {
-          defaultPath: join(
-            app.getPath("documents"),
-            `mooligan-workspace-${new Date().toISOString().slice(0, 10)}.json`,
-          ),
-          filters: [{ extensions: ["json"], name: "Mooligan workspace" }],
-          title: "Export Mooligan workspace",
-        };
-        const result = owner
-          ? await dialog.showSaveDialog(owner, options)
-          : await dialog.showSaveDialog(options);
-
-        if (result.canceled || !result.filePath) {
-          return "cancelled" as const;
-        }
-
-        const backup = workspace.createBackup();
-        try {
-          await writeFile(result.filePath, backup, "utf8");
-          return "exported" as const;
-        } catch {
-          throw new Error("The workspace backup could not be exported.");
-        }
-      });
-
-      ipcMain.handle("workspace:import", async (event) => {
-        assertTrustedSender(event);
-        const owner = BrowserWindow.fromWebContents(event.sender);
-        const options: OpenDialogOptions = {
-          filters: [{ extensions: ["json"], name: "Mooligan workspace" }],
-          properties: ["openFile"],
-          title: "Import Mooligan workspace",
-        };
-        const result = owner
-          ? await dialog.showOpenDialog(owner, options)
-          : await dialog.showOpenDialog(options);
-
-        if (result.canceled || !result.filePaths[0]) {
-          return "cancelled" as const;
-        }
-
-        let backup: WorkspaceBackup;
-        try {
-          const info = await stat(result.filePaths[0]);
-          if (!info.isFile() || info.size > MAX_WORKSPACE_BACKUP_BYTES) {
-            throw new Error("invalid backup");
-          }
-          backup = parseWorkspaceBackup(await readFile(result.filePaths[0], "utf8"));
-        } catch {
-          throw new Error("The selected file is not a valid Mooligan workspace backup.");
-        }
-
-        const confirmationOptions = {
-          buttons: ["Cancel", "Replace local workspace"],
-          cancelId: 0,
-          defaultId: 0,
-          detail:
-            "Preferences, spoiler choices, collection lots, decks, and lists in this workspace will be replaced. Your local workspace and account binding will stay the same.",
-          message: "Import this backup?",
-          noLink: true,
-          type: "warning" as const,
-        };
-        const confirmation = owner
-          ? await dialog.showMessageBox(owner, confirmationOptions)
-          : await dialog.showMessageBox(confirmationOptions);
-
-        if (confirmation.response !== 1) {
-          return "cancelled" as const;
-        }
-
-        return workspaceMutations.run(() => {
-          workspace.importBackup(backup);
-          publish("collection:changed", undefined);
-          publish("preferences:changed", readPreferencesForRenderer());
-          spoilers.refresh();
-          return "imported" as const;
-        });
-      });
-
-      function runCollectionMutation<Result>(operation: () => Promise<Result> | Result) {
-        return workspaceMutations.run(operation);
-      }
-
-      async function readCollectionPrintingForMutation(printingId: string) {
-        const revision = workspace.readSpoilerState().revision;
-        const result = await queryCatalogPrintingDetail(printingId);
-
-        if (workspace.readSpoilerState().revision !== revision) {
-          throw new Error("Spoiler choices changed before this action completed.");
-        }
-
-        return result;
-      }
-
-      void authStartup.start(
-        async (url) => {
-          await runAuth(() => auth.handleCallback(url));
-          focusWindow();
-        },
-        (error) => {
-          lastAuthError = publicAuthError(error);
-          publish("auth:error", lastAuthError);
-        },
-      );
+      const publishAuthStateAndRefresh = await registerAuthIpc(auth, authStartup);
 
       app.once("will-quit", () => {
-        unsubscribeSpoilers();
+        spoilerIpc.close();
         spoilers.close();
         workspace.close();
       });
@@ -494,29 +149,16 @@ if (!authStartup.isPrimary) {
       });
 
       await createWindow();
-      publish("auth:changed", auth.snapshot());
-      publish("preferences:changed", readPreferencesForRenderer());
-      publish("spoilers:changed", readSpoilerStateForRenderer());
-      if (lastAuthError) {
-        publish("auth:error", lastAuthError);
-      }
-
-      void auth
-        .refresh()
-        .then(applyAuthSnapshot)
-        .catch((cause: unknown) => {
-          const authError = publicAuthError(cause);
-          applyAuthSnapshot(auth.snapshot());
-          lastAuthError = authError;
-          publish("auth:error", lastAuthError);
-        });
+      publishAuthStateAndRefresh();
+      publishPreferences();
+      spoilerIpc.publish();
 
       app.on("activate", () => {
         if (BrowserWindow.getAllWindows().length === 0) {
           void createWindow();
         }
       });
-      app.on("second-instance", focusWindow);
+      app.on("second-instance", focusFirstWindow);
     })
     .catch((cause: unknown) => {
       process.stderr.write(`Failed to create desktop window: ${String(cause)}\n`);
@@ -529,75 +171,3 @@ app.on("window-all-closed", () => {
     app.quit();
   }
 });
-
-function publish<Value>(channel: string, value: Value) {
-  for (const window of BrowserWindow.getAllWindows()) {
-    if (!window.isDestroyed()) {
-      window.webContents.send(channel, value);
-    }
-  }
-}
-
-function focusWindow() {
-  const window = BrowserWindow.getAllWindows()[0];
-
-  if (!window) {
-    return;
-  }
-  if (window.isMinimized()) {
-    window.restore();
-  }
-  window.show();
-  window.focus();
-}
-
-function publicAuthError(cause: unknown) {
-  if (
-    cause instanceof Error &&
-    ["AuthInputError", "AuthRequestError", "ProtectedStorageError"].includes(cause.name)
-  ) {
-    return cause.message;
-  }
-
-  return "Account sign-in could not be completed. Return to Settings and try again.";
-}
-
-function validateSpoilerTarget(value: JSONType) {
-  return SpoilerTargetIdSchema.parse(value);
-}
-
-function assertCollectionPrintingCanUseFinish(
-  result: CatalogPrintingResult | null,
-  request: Pick<AddCollectionHoldingRequest, "finish" | "printingId">,
-) {
-  if (!result) {
-    throw new Error("This printing is not present in the installed catalog.");
-  }
-  if (result.status === "protected") {
-    throw new Error("Reveal this printing before adding it to the Collection.");
-  }
-  if (result.detail.selectedPrinting.isDigital) {
-    throw new Error("Digital printings cannot be added to the Collection.");
-  }
-  if (!result.detail.selectedPrinting.finishes?.includes(request.finish)) {
-    throw new Error("This finish is not available for the selected printing.");
-  }
-}
-
-async function requireCatalogRootSetId(targetId: string) {
-  const rootSetId = await resolveCatalogRootSetId(targetId);
-
-  if (!rootSetId) {
-    throw new Error("This release is not present in the installed catalog.");
-  }
-
-  return rootSetId;
-}
-
-async function resolveOptionalCatalogRootSetId(targetId: string) {
-  try {
-    return await resolveCatalogRootSetId(targetId);
-  } catch {
-    return null;
-  }
-}

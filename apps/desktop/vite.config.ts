@@ -29,6 +29,7 @@ export default defineConfig(({ command }) => ({
     electron({
       main: {
         entry: {
+          "catalog-import-worker": "electron/catalog/import-worker.ts",
           "catalog-query-worker": "electron/catalog/query-worker.ts",
           main: "electron/main.ts",
         },

@@ -1,7 +1,7 @@
 import { mkdir, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { Readable } from "node:stream";
 import { DatabaseSync } from "node:sqlite";
+import { ReadableStream as TransferableReadableStream } from "node:stream/web";
 import { Worker } from "node:worker_threads";
 
 import { CatalogSnapshotSchema, type CatalogSnapshot } from "@mooligan/domain/catalog";
@@ -26,7 +26,7 @@ import type { JSONType } from "zod";
 
 import { isFileNotFound, recoverInterruptedReplacement } from "./files";
 import { validateCatalogPrintingId } from "./detail";
-import { catalogSchemaVersion, importCatalog, readGzipJsonLines } from "./import";
+import { catalogSchemaVersion } from "./import";
 import { parseCatalogQueryWorkerResponse, validateCatalogListRequest } from "./query";
 import { validateCollectionListRequest } from "./collection-query";
 import {
@@ -60,6 +60,10 @@ const scryfallRequestHeaders = {
   "User-Agent": "Mooligan/0.0.0 (https://github.com/alexrr20/mooligan)",
 };
 const CatalogMetadataSchema = CatalogSnapshotSchema.extend({ schemaVersion: z.number().int() });
+const CatalogImportWorkerMessageSchema = z.discriminatedUnion("type", [
+  z.strictObject({ completedCards: z.number().int().nonnegative(), type: z.literal("progress") }),
+  z.strictObject({ snapshot: CatalogSnapshotSchema, type: z.literal("complete") }),
+]);
 let activeDownload: Promise<CatalogStatus> | undefined;
 let catalogEpoch = 0;
 let catalogQueriesAvailable = Promise.resolve();
@@ -272,11 +276,16 @@ async function downloadCatalog(event: IpcMainInvokeEvent): Promise<CatalogStatus
         },
       }),
     );
-    const lines = readGzipJsonLines(Readable.from(monitored));
-    const snapshot = await importCatalog(partial, release, sets, lines, (count) => {
-      completedCards = count;
-      reportProgress();
-    });
+    const snapshot = await importCatalogInWorker(
+      partial,
+      TransferableReadableStream.from(monitored),
+      release,
+      sets,
+      (count) => {
+        completedCards = count;
+        reportProgress();
+      },
+    );
 
     if (completedBytes !== release.compressedSize) {
       throw new Error("The card download was incomplete.");
@@ -297,6 +306,55 @@ async function downloadCatalog(event: IpcMainInvokeEvent): Promise<CatalogStatus
     await rm(partial, { force: true });
     throw error;
   }
+}
+
+function importCatalogInWorker(
+  destinationPath: string,
+  archive: TransferableReadableStream<Uint8Array>,
+  release: CatalogRelease,
+  sets: readonly ScryfallSetDownload[],
+  onProgress: (completedCards: number) => void,
+) {
+  const worker = new Worker(
+    new URL(/* @vite-ignore */ "./catalog-import-worker.js", import.meta.url),
+    {
+      transferList: [archive],
+      workerData: { archive, destinationPath, release, sets },
+    },
+  );
+
+  return new Promise<CatalogSnapshot>((resolve, reject) => {
+    let settled = false;
+    const fail = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
+
+    worker.on("message", (value) => {
+      const message = CatalogImportWorkerMessageSchema.safeParse(value);
+      if (!message.success) {
+        void worker.terminate().catch(() => undefined);
+        fail(new Error("The catalog import worker returned an invalid response."));
+        return;
+      }
+      if (message.data.type === "progress") {
+        onProgress(message.data.completedCards);
+        return;
+      }
+
+      settled = true;
+      resolve(message.data.snapshot);
+    });
+    worker.once("error", fail);
+    worker.once("exit", (code) => {
+      if (code !== 0) {
+        fail(new Error("The catalog import worker stopped before the import completed."));
+      } else if (!settled) {
+        fail(new Error("The catalog import worker exited without a result."));
+      }
+    });
+  });
 }
 
 async function fetchScryfallSets(): Promise<ScryfallSetDownload[]> {
