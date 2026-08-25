@@ -9,6 +9,7 @@ import {
 import * as z from "zod";
 import type { JSONType } from "zod";
 
+import type { AuthSnapshot, AuthStatus, AuthUser } from "../../shared/desktop-api.ts";
 import {
   type AsyncSafeStorage,
   type AuthStateStorage,
@@ -16,7 +17,6 @@ import {
   type PendingAuth,
   type ProtectedAuthState,
   ProtectedStorageError,
-  type StoredAuthUser,
   type StoredAuthCookie,
 } from "./storage.ts";
 
@@ -54,20 +54,6 @@ const AuthUserPayloadSchema = z.object({
     .refine((value) => !hasControlCharacter(value)),
 });
 const AuthUserEnvelopeSchema = z.object({ user: z.json() });
-
-export type AuthStatus =
-  | "signed-out"
-  | "signed-in"
-  | "session-unavailable"
-  | "protected-storage-unavailable";
-
-export type AuthUser = StoredAuthUser;
-
-export interface AuthSnapshot {
-  status: AuthStatus;
-  user: AuthUser | null;
-  pendingAuth: boolean;
-}
 
 type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 

@@ -1,6 +1,6 @@
 import { infiniteQueryOptions, type InfiniteData, useInfiniteQuery } from "@tanstack/react-query";
 
-import type { CatalogListPage } from "../../../electron/catalog/query";
+import type { CatalogListPage } from "@mooligan/domain/catalog-search";
 import { spoilerCatalogCacheKey, useSpoilerState } from "../spoilers/use-spoilers.ts";
 import type { UniverseFilter } from "./search-state";
 

@@ -19,6 +19,27 @@ This describes the product direction rather than a committed feature roadmap.
 
 ## Domain language
 
+### Workspace and identity
+
+**Workspace**:
+The personal data boundary containing one Collection, its Decks and card lists,
+and durable user decisions such as spoiler reveals. A workspace exists without
+an Account, may be available on several Devices, and may be associated with at
+most one Account.
+_Avoid_: Account
+
+**Device**:
+One installation of Mooligan that holds local workspace data and device-specific
+settings. A Device may hold several Workspaces, but it is not itself a Workspace
+or Account.
+_Avoid_: Workspace, Account
+
+**Account**:
+An optional online identity used to synchronize one personal Workspace across
+Devices and publish selected content. An Account is not required to create,
+open, or edit a Workspace.
+_Avoid_: Workspace
+
 ### Cards
 
 **Card**:

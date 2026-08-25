@@ -6,6 +6,7 @@ import { Worker } from "node:worker_threads";
 
 import { CatalogSnapshotSchema, type CatalogSnapshot } from "@mooligan/domain/catalog";
 import type { CatalogImageDescriptor } from "@mooligan/domain/catalog-detail";
+import type { CatalogListPage, CatalogUpcomingPrintingPage } from "@mooligan/domain/catalog-search";
 import type { CollectionListPage } from "@mooligan/domain/collection";
 import {
   CatalogReleaseSchema,
@@ -24,6 +25,7 @@ import { app, ipcMain, net, type IpcMainInvokeEvent } from "electron";
 import * as z from "zod";
 import type { JSONType } from "zod";
 
+import type { CatalogProgress, CatalogStatus } from "../../shared/desktop-api.ts";
 import { isFileNotFound, recoverInterruptedReplacement } from "./files";
 import { validateCatalogPrintingId } from "./detail";
 import { catalogSchemaVersion } from "./import";
@@ -31,10 +33,8 @@ import { parseCatalogQueryWorkerResponse, validateCatalogListRequest } from "./q
 import { validateCollectionListRequest } from "./collection-query";
 import {
   validateCatalogUpcomingPrintingRequest,
-  type CatalogListPage,
   type CatalogQueryOperation,
   type CatalogQueryWorkerRequest,
-  type CatalogUpcomingPrintingPage,
 } from "./query";
 import {
   CatalogVisibilityChangedError,
@@ -42,16 +42,6 @@ import {
   readWithStableCatalogVisibility,
 } from "./stable-visibility";
 import { assertTrustedSender } from "../ipc-security";
-
-export type CatalogProgress = {
-  completedBytes: number;
-  completedCards: number;
-  totalBytes: number;
-};
-
-export type CatalogStatus =
-  | { installed: false }
-  | (CatalogSnapshot & { installed: true; updateAvailable: boolean });
 
 const apiBaseUrl = process.env.MOOLIGAN_API_URL ?? "http://127.0.0.1:3000";
 const scryfallSetsUrl = "https://api.scryfall.com/sets";

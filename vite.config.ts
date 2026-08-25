@@ -61,6 +61,24 @@ export default defineConfig({
       "react-you-might-not-need-an-effect/no-reset-all-state-on-prop-change": "error",
       "vite-plus/prefer-vite-plus-imports": "error",
     },
+    overrides: [
+      {
+        files: ["apps/desktop/src/**"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            {
+              patterns: [
+                {
+                  message: "Renderer code must depend on domain or desktop bridge contracts.",
+                  regex: "(^|/)electron(/|$)",
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ],
     options: { typeAware: true, typeCheck: true },
     ignorePatterns: ["apps/desktop/src/routeTree.gen.ts", ...toolingIgnorePatterns],
   },

@@ -27,12 +27,8 @@ import {
 import * as z from "zod";
 import type { JSONType } from "zod";
 
-import {
-  preferenceDefinitions,
-  type Preferences,
-  type PreferencesUpdate,
-  validatePreferences,
-} from "./preferences.ts";
+import type { Preferences, PreferencesUpdate } from "../../shared/desktop-api.ts";
+import { preferenceDefinitions, validatePreferences } from "./preferences.ts";
 import {
   serializeWorkspaceBackup,
   validateCardList,

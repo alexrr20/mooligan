@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import type { CatalogListPage, CatalogUpcomingPrintingPage } from "@mooligan/domain/catalog-search";
 import type { CatalogPrintingResult, SpoilerState } from "@mooligan/domain/spoilers";
 import { InfiniteQueryObserver, QueryClient, QueryObserver } from "@tanstack/react-query";
 
-import type { CatalogListPage, CatalogUpcomingPrintingPage } from "../electron/catalog/query.ts";
 import { catalogCardDetailQueryOptions } from "../src/features/cards/use-card-detail.ts";
 import { catalogSearchQueryOptions } from "../src/features/search/use-catalog-search.ts";
 import { catalogUpcomingPrintingsQueryOptions } from "../src/features/search/use-catalog-upcoming-printings.ts";

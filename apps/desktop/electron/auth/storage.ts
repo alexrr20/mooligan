@@ -5,6 +5,8 @@ import { dirname } from "node:path";
 import * as z from "zod";
 import type { JSONType } from "zod";
 
+import type { AuthUser } from "../../shared/desktop-api.ts";
+
 const MAX_ENCRYPTED_STATE_BYTES = 1024 * 1024;
 const MAX_PLAINTEXT_STATE_BYTES = 512 * 1024;
 
@@ -25,12 +27,7 @@ export interface PendingAuth {
   expiresAt: number;
 }
 
-export interface StoredAuthUser {
-  email: string;
-  id: string;
-  image: string | null;
-  name: string;
-}
+export type StoredAuthUser = AuthUser;
 
 export interface ProtectedAuthState {
   version: 2;
