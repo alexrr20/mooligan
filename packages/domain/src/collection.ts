@@ -169,6 +169,12 @@ export const CollectionListPageSchema = z.strictObject({
 });
 export type CollectionListPage = z.infer<typeof CollectionListPageSchema>;
 
+export const CollectionListResultSchema = z.discriminatedUnion("status", [
+  z.strictObject({ status: z.literal("not-ready") }),
+  z.strictObject({ page: CollectionListPageSchema, status: z.literal("ready") }),
+]);
+export type CollectionListResult = z.infer<typeof CollectionListResultSchema>;
+
 export const AddCollectionHoldingRequestSchema = CollectionHoldingKeySchema.extend({
   quantity: quantitySchema,
 });
@@ -193,3 +199,44 @@ export const CollectionMutationResultSchema = z.strictObject({
   lotId: identifierSchema,
 });
 export type CollectionMutationResult = z.infer<typeof CollectionMutationResultSchema>;
+
+export const CollectionPrintingValidationRequestSchema = z.strictObject({
+  existingFinish: FinishSchema.optional(),
+  finish: FinishSchema,
+  printingId: identifierSchema,
+});
+export type CollectionPrintingValidationRequest = z.infer<
+  typeof CollectionPrintingValidationRequestSchema
+>;
+
+export const CollectionProjectionConnectionSchema = z.strictObject({
+  sessionId: z.uuidv4(),
+  workspaceId: z.uuidv4(),
+});
+export type CollectionProjectionConnection = z.infer<typeof CollectionProjectionConnectionSchema>;
+
+const StrictCollectionProjectionLotSchema = CollectionLotSchema.extend({
+  unitCost: CollectionMoneySchema.strict().optional(),
+}).strict();
+const CollectionProjectionIdentity = CollectionProjectionConnectionSchema.extend({
+  revision: z.number().int().positive(),
+});
+
+export const CollectionProjectionSnapshotSchema = CollectionProjectionIdentity.extend({
+  lots: z.array(StrictCollectionProjectionLotSchema).max(100_000),
+});
+export type CollectionProjectionSnapshot = z.infer<typeof CollectionProjectionSnapshotSchema>;
+
+export const CollectionProjectionDeltaSchema = CollectionProjectionIdentity.extend({
+  deletedLotIds: z.array(identifierSchema).max(1_000),
+  upserts: z.array(StrictCollectionProjectionLotSchema).max(1_000),
+}).refine(({ deletedLotIds, upserts }) => deletedLotIds.length + upserts.length > 0, {
+  message: "A collection projection delta must contain a change.",
+});
+export type CollectionProjectionDelta = z.infer<typeof CollectionProjectionDeltaSchema>;
+
+export const CollectionProjectionResultSchema = z.discriminatedUnion("status", [
+  z.strictObject({ revision: z.number().int().positive(), status: z.literal("applied") }),
+  z.strictObject({ status: z.literal("resync-required") }),
+]);
+export type CollectionProjectionResult = z.infer<typeof CollectionProjectionResultSchema>;

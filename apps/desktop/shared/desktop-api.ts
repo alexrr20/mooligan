@@ -6,13 +6,21 @@ import type {
   CatalogUpcomingPrintingRequest,
 } from "@mooligan/domain/catalog-search";
 import type {
-  AddCollectionHoldingRequest,
+  CollectionListResult,
   CollectionLot,
-  CollectionListPage,
   CollectionListRequest,
-  CollectionMutationResult,
-  RemoveCollectionHoldingRequest,
-  UpdateCollectionHoldingRequest,
+  CollectionPrintingValidationRequest,
+  CollectionProjectionDelta,
+  CollectionProjectionResult,
+  CollectionProjectionSnapshot,
+} from "@mooligan/domain/collection";
+import {
+  CollectionListResultSchema,
+  CollectionPrintingValidationRequestSchema,
+  CollectionProjectionConnectionSchema,
+  CollectionProjectionDeltaSchema,
+  CollectionProjectionResultSchema,
+  CollectionProjectionSnapshotSchema,
 } from "@mooligan/domain/collection";
 import type { Deck } from "@mooligan/domain/decks";
 import type { CardList } from "@mooligan/domain/lists";
@@ -44,6 +52,30 @@ export type WorkspaceBootstrap = z.infer<typeof WorkspaceBootstrapSchema>;
 
 export function validateWorkspaceBootstrap(value: JSONType): WorkspaceBootstrap {
   return WorkspaceBootstrapSchema.parse(value);
+}
+
+export function validateCollectionListResult(value: JSONType) {
+  return CollectionListResultSchema.parse(value);
+}
+
+export function validateCollectionPrintingRequest(value: JSONType) {
+  return CollectionPrintingValidationRequestSchema.parse(value);
+}
+
+export function validateCollectionProjectionConnection(value: JSONType) {
+  return CollectionProjectionConnectionSchema.parse(value);
+}
+
+export function validateCollectionProjectionDelta(value: JSONType) {
+  return CollectionProjectionDeltaSchema.parse(value);
+}
+
+export function validateCollectionProjectionResult(value: JSONType) {
+  return CollectionProjectionResultSchema.parse(value);
+}
+
+export function validateCollectionProjectionSnapshot(value: JSONType) {
+  return CollectionProjectionSnapshotSchema.parse(value);
 }
 
 export function validateSpoilerProjectionConnection(value: JSONType) {
@@ -111,10 +143,9 @@ export type WorkspaceBackup = {
   version: 2;
 };
 
-export type WorkspaceLegacyBackupSnapshot = Pick<
-  WorkspaceBackup,
-  "cardLists" | "collectionLots" | "decks"
-> & { motion: MotionPreference };
+export type WorkspaceLegacyBackupSnapshot = Pick<WorkspaceBackup, "cardLists" | "decks"> & {
+  motion: MotionPreference;
+};
 
 export type Preferences = {
   motion: MotionPreference;
@@ -143,13 +174,10 @@ export type DesktopApi = {
     upcomingPrintings: (
       request?: CatalogUpcomingPrintingRequest,
     ) => Promise<CatalogUpcomingPrintingPage>;
+    validateCollectionPrinting: (request: CollectionPrintingValidationRequest) => Promise<void>;
   };
   collection: {
-    add: (request: AddCollectionHoldingRequest) => Promise<CollectionMutationResult>;
-    list: (request?: CollectionListRequest) => Promise<CollectionListPage>;
-    onChanged: (callback: () => void) => () => void;
-    remove: (request: RemoveCollectionHoldingRequest) => Promise<void>;
-    update: (request: UpdateCollectionHoldingRequest) => Promise<CollectionMutationResult>;
+    list: (request?: CollectionListRequest) => Promise<CollectionListResult>;
   };
   preferences: {
     onChanged: (callback: (preferences: Preferences) => void) => () => void;
@@ -157,9 +185,15 @@ export type DesktopApi = {
     update: (update: PreferencesUpdate) => Promise<Preferences>;
   };
   workspaceProjection: {
+    applyCollectionDelta: (delta: CollectionProjectionDelta) => Promise<CollectionProjectionResult>;
     applySpoilerDelta: (delta: SpoilerProjectionDelta) => Promise<SpoilerProjectionResult>;
+    connectCollection: (workspaceId: string) => Promise<{ sessionId: string; workspaceId: string }>;
     connectSpoilers: (workspaceId: string) => Promise<{ sessionId: string; workspaceId: string }>;
+    onCollectionResyncRequired: (callback: () => void) => () => void;
     onSpoilersChanged: (callback: () => void) => () => void;
+    replaceCollection: (
+      snapshot: CollectionProjectionSnapshot,
+    ) => Promise<CollectionProjectionResult>;
     replaceSpoilers: (snapshot: SpoilerProjectionSnapshot) => Promise<SpoilerProjectionResult>;
   };
   workspace: {

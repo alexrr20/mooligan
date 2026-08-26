@@ -18,6 +18,7 @@ import { useState } from "react";
 
 import { Button } from "../../components/button";
 import { colors } from "../../styles/tokens.stylex.js";
+import { useCollectionMutations } from "./use-collection-mutations";
 
 export type CollectionFormValue = {
   condition: CardCondition;
@@ -84,7 +85,7 @@ function CollectionForm({
       await onSubmit({ condition, finish, language, quantity });
       onOpenChange(false);
     } catch (cause) {
-      setError(cleanIpcError(cause));
+      setError(cleanCollectionError(cause));
     } finally {
       setPending(false);
     }
@@ -268,6 +269,7 @@ export function AddToCollectionButton({
   detail: suppliedDetail,
   printingId = suppliedDetail?.selectedPrinting.id,
 }: AddToCollectionButtonProps) {
+  const collection = useCollectionMutations();
   const [detail, setDetail] = useState<CatalogCardDetail | null>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -327,7 +329,7 @@ export function AddToCollectionButton({
           title="Add copies."
           onOpenChange={setOpen}
           onSubmit={async (value) => {
-            const result = await window.collection.add({
+            const result = await collection.add({
               ...value,
               printingId: selected.selectedPrinting.id,
             });
@@ -349,7 +351,7 @@ export function finishLabel(value: Finish) {
   return value === "nonfoil" ? "Nonfoil" : `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
 }
 
-export function cleanIpcError(cause: unknown) {
+export function cleanCollectionError(cause: unknown) {
   const message = cause instanceof Error ? cause.message : "The Collection could not be updated.";
   return message.replace(/^Error invoking remote method '[^']+': Error: /, "");
 }

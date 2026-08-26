@@ -6,7 +6,8 @@ import { useState } from "react";
 import { colors } from "../../styles/tokens.stylex.js";
 import { PrintingImage } from "../cards/printing-image";
 import { withCollectionOrigin, type CollectionOrigin } from "./collection-origin";
-import { cleanIpcError, CollectionFormDialog, finishLabel } from "./collection-editor";
+import { cleanCollectionError, CollectionFormDialog, finishLabel } from "./collection-editor";
+import { useCollectionMutations } from "./use-collection-mutations";
 
 type CollectionResultsProps = {
   grid: boolean;
@@ -19,6 +20,7 @@ type EditableHolding = Exclude<CollectionHolding, { status: "protected" }> & {
 };
 
 export function CollectionResults({ grid, holdings, origin }: CollectionResultsProps) {
+  const collection = useCollectionMutations();
   const [editing, setEditing] = useState<EditableHolding | null>(null);
   const [pendingLotId, setPendingLotId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -33,9 +35,9 @@ export function CollectionResults({ grid, holdings, origin }: CollectionResultsP
     setPendingLotId(holding.editableLotId);
     setError("");
     try {
-      await window.collection.remove({ lotId: holding.editableLotId });
+      await collection.remove({ lotId: holding.editableLotId });
     } catch (cause) {
-      setError(cleanIpcError(cause));
+      setError(cleanCollectionError(cause));
     } finally {
       setPendingLotId(null);
     }
@@ -138,7 +140,7 @@ export function CollectionResults({ grid, holdings, origin }: CollectionResultsP
           onOpenChange={(open) => {
             if (!open) setEditing(null);
           }}
-          onSubmit={(value) => window.collection.update({ ...value, lotId: editing.editableLotId })}
+          onSubmit={(value) => collection.update({ ...value, lotId: editing.editableLotId })}
         />
       ) : null}
     </>

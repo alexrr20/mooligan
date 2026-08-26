@@ -38,7 +38,6 @@ import {
   reconcileCatalogSearchDraft,
   validateCatalogSearch,
 } from "../src/features/search/search-state.ts";
-import { WorkspaceStore } from "../electron/workspace/store.ts";
 
 const QueryPlanRowSchema = z.object({ detail: z.string() });
 const SHOW_ALL: SpoilerVisibilitySnapshot = {
@@ -1120,9 +1119,8 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
           }),
       );
 
-      const workspace = new WorkspaceStore(join(directory, "workspace.sqlite"));
       const worker = new Worker(new URL("../electron/catalog/query-worker.ts", import.meta.url), {
-        workerData: { catalogPath: destination, workspacePath: workspace.databasePath },
+        workerData: { catalogPath: destination, collectionLots: [] },
       });
 
       try {
@@ -1254,7 +1252,6 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
         });
       } finally {
         await worker.terminate();
-        workspace.close();
       }
     } finally {
       database.close();

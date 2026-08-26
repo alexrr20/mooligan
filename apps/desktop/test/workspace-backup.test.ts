@@ -42,13 +42,12 @@ const cardList: CardList = {
 };
 const legacySnapshot: WorkspaceLegacyBackupSnapshot = {
   cardLists: [{ id: cardList.id, value: cardList }],
-  collectionLots: [{ id: collectionLot.id, value: collectionLot }],
   decks: [{ id: deck.id, value: deck }],
   motion: "reduced",
 };
 const fullBackup: WorkspaceBackup = {
   cardLists: legacySnapshot.cardLists,
-  collectionLots: legacySnapshot.collectionLots,
+  collectionLots: [{ id: collectionLot.id, value: collectionLot }],
   decks: legacySnapshot.decks,
   format: "mooligan-workspace",
   preferences: { motion: "reduced", spoilerPolicy: "show" },
@@ -71,7 +70,7 @@ void test("version 1 backups still enter the staged restore with protection enab
   const backup = parseWorkspaceBackup(
     JSON.stringify({
       cardLists: legacySnapshot.cardLists,
-      collectionLots: legacySnapshot.collectionLots,
+      collectionLots: fullBackup.collectionLots,
       decks: legacySnapshot.decks,
       format: "mooligan-workspace",
       preferences: { motion: "reduced" },
@@ -93,7 +92,6 @@ void test("staged restore creates and verifies a new workspace before activation
     const originalWorkspaceId = manager.workspaceId;
     manager.importLegacyBackupSnapshot({
       cardLists: [],
-      collectionLots: [],
       decks: [],
       motion: "full",
     });
@@ -101,7 +99,7 @@ void test("staged restore creates and verifies a new workspace before activation
     const pending = manager.beginRestore(legacySnapshot);
     assert.notEqual(pending.workspaceId, originalWorkspaceId);
     assert.equal(manager.workspaceId, originalWorkspaceId);
-    assert.deepEqual(manager.createLegacyBackupSnapshot().collectionLots, []);
+    assert.deepEqual(manager.createLegacyBackupSnapshot().cardLists, []);
 
     manager.cancelRestore(pending.workspaceId);
     const restored = manager.beginRestore(legacySnapshot);

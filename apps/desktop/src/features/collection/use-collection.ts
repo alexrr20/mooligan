@@ -15,13 +15,17 @@ export function useCollection(search: CollectionSearchState) {
 
   const pages = result.data?.pages ?? [];
   const lastPage = pages.at(-1);
+  const projectionPending = result.error instanceof CollectionProjectionNotReadyError;
 
   return {
-    error: result.isError || spoilers.error ? "The local Collection could not be read." : "",
+    error:
+      (result.isError && !projectionPending) || spoilers.error
+        ? "The local Collection could not be read."
+        : "",
     filtered: lastPage?.filtered ?? { cards: 0, copies: 0, holdings: 0 },
     hasMore: Boolean(result.hasNextPage),
     holdings: pages.flatMap((page) => page.holdings),
-    loading: result.isFetching,
+    loading: result.isFetching || projectionPending,
     loadMore() {
       if (result.hasNextPage && !result.isFetching) void result.fetchNextPage();
     },
@@ -49,12 +53,18 @@ function collectionQueryOptions(
     getNextPageParam: (lastPage, pages) =>
       lastPage.hasMore ? pages.reduce((count, page) => count + page.holdings.length, 0) : undefined,
     initialPageParam: 0,
-    queryFn: ({ pageParam }) => list({ ...request, limit: 100, offset: pageParam }),
+    queryFn: async ({ pageParam }) => {
+      const result = await list({ ...request, limit: 100, offset: pageParam });
+      if (result.status === "not-ready") throw new CollectionProjectionNotReadyError();
+      return result.page;
+    },
     queryKey: ["collection", visibilityKey, request],
     retry: false,
     staleTime: Infinity,
   });
 }
+
+class CollectionProjectionNotReadyError extends Error {}
 
 function toCollectionRequest(search: CollectionSearchState): CollectionListRequest {
   return {

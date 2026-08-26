@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { parentPort, workerData } from "node:worker_threads";
 
+import { CollectionLotSchema } from "@mooligan/domain/collection";
 import * as z from "zod";
 
 import {
@@ -18,19 +19,26 @@ import {
   createCatalogSetSymbolSourceQuery,
 } from "./detail.ts";
 import { createCollectionQuery } from "./collection-query.ts";
+import {
+  createCollectionProjection,
+  parseCollectionProjectionWorkerRequest,
+} from "./collection-projection.ts";
 
 const port = parentPort;
-const paths = z
-  .strictObject({ catalogPath: z.string().min(1), workspacePath: z.string().min(1) })
+const startup = z
+  .strictObject({
+    catalogPath: z.string().min(1),
+    collectionLots: z.array(CollectionLotSchema.strict()).max(100_000),
+  })
   .safeParse(workerData);
 
-if (!port || !paths.success) {
-  throw new Error("The catalog query worker was started without trusted database paths.");
+if (!port || !startup.success) {
+  throw new Error("The catalog query worker was started without trusted catalog state.");
 }
 
-const database = new DatabaseSync(paths.data.catalogPath, { readOnly: true });
-database.prepare("ATTACH DATABASE ? AS workspace").run(paths.data.workspacePath);
-database.exec("PRAGMA query_only = ON");
+const database = new DatabaseSync(startup.data.catalogPath, { readOnly: true });
+const collectionProjection = createCollectionProjection(database);
+collectionProjection.replace(startup.data.collectionLots);
 const listCatalog = createCatalogQuery(database);
 const listCollection = createCollectionQuery(database);
 const queryDetail = createCatalogDetailQuery(database);
@@ -42,6 +50,26 @@ const queryUpcoming = createCatalogUpcomingQuery(database);
 const queryUpcomingPrintings = createCatalogUpcomingPrintingsQuery(database);
 
 port.on("message", (message) => {
+  const projectionRequest = parseCollectionProjectionWorkerRequest(message);
+  if (projectionRequest) {
+    const { id, operation } = projectionRequest;
+    try {
+      if (operation.type === "collection-projection-replace") {
+        collectionProjection.replace(operation.lots);
+      } else {
+        collectionProjection.apply(operation);
+      }
+      port.postMessage({ id, operation: operation.type, status: "applied" });
+    } catch (error) {
+      port.postMessage({
+        error: error instanceof Error ? error.message : String(error),
+        id,
+        operation: operation.type,
+      });
+    }
+    return;
+  }
+
   const request = parseCatalogQueryWorkerRequest(message);
 
   if (!request) {

@@ -87,7 +87,7 @@ export function createCollectionQuery(database: DatabaseSync) {
                     THEN MIN(id)
                     ELSE NULL
                END AS editableLotId
-        FROM workspace.collection_lots
+        FROM collection_lots
         GROUP BY printing_id, finish, language, condition
       ), enriched AS (
         SELECT holdings.*,

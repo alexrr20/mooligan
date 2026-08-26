@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { createWorkspaceBackup, restoreSpoilerBackup } from "../workspace/workspace-backup";
+import { createWorkspaceBackup, restoreWorkspaceBackup } from "../workspace/workspace-backup";
 import { workspaceStoreOptions, workspaceStoreRegistry } from "../workspace/workspace-store";
 import { useWorkspaceStore } from "../workspace/workspace-store-context";
 
@@ -25,7 +25,6 @@ export function useWorkspaceBackup() {
 
       const legacy = {
         cardLists: backup.cardLists,
-        collectionLots: backup.collectionLots,
         decks: backup.decks,
         motion: backup.preferences.motion,
       };
@@ -35,7 +34,7 @@ export function useWorkspaceBackup() {
 
       try {
         const restored = await workspaceStoreRegistry.getOrLoadPromise(options);
-        restoreSpoilerBackup(restored, backup);
+        restoreWorkspaceBackup(restored, backup);
         await bridge.activateRestore(bootstrap.workspaceId);
       } catch (error) {
         await bridge.cancelRestore(bootstrap.workspaceId);
