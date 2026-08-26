@@ -8,6 +8,7 @@ import "./global.css";
 import { subscribeToCollectionChanges } from "./features/collection/collection-cache";
 import { subscribeToSpoilerState } from "./features/spoilers/use-spoilers";
 import { routeTree } from "./routeTree.gen";
+import { WorkspaceStartup } from "./features/workspace/workspace-startup";
 
 document.fonts.add(
   new FontFace("Mana", `url("${manaFontUrl}") format("woff2")`, {
@@ -38,7 +39,9 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <App />
+    <WorkspaceStartup>
+      <App />
+    </WorkspaceStartup>
   </StrictMode>,
 );
 

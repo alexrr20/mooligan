@@ -79,7 +79,7 @@ Relevant LiveStore references:
 
 ```text
 Renderer
-├── LiveStoreProvider
+├── StoreRegistryProvider
 ├── LiveStore web adapter
 ├── workspace event commits and reactive queries
 └── workspace projection bridge
@@ -226,7 +226,8 @@ Add:
 
 - A LiveStore worker initialized with the shared workspace schema.
 - The web adapter shared worker.
-- A root `LiveStoreProvider` keyed by the active workspace ID.
+- A root `StoreRegistryProvider` owning one `StoreRegistry`.
+- Workspace store options whose `storeId` is the active workspace ID.
 - Explicit loading and failure states before the router mounts workspace-backed
   screens.
 - Store disposal during workspace replacement and application shutdown.

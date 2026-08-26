@@ -29,6 +29,7 @@ import { SpoilerService } from "./spoilers/service";
 import { focusFirstWindow } from "./windows";
 import { registerWorkspaceIpc } from "./workspace/ipc";
 import { MutationQueue } from "./workspace/mutations";
+import { WorkspaceRegistry } from "./workspace/registry";
 import { WorkspaceManager } from "./workspace/store";
 
 app.enableSandbox();
@@ -91,7 +92,8 @@ if (!authStartup.isPrimary) {
   void app
     .whenReady()
     .then(async () => {
-      const workspace = new WorkspaceManager(app.getPath("userData"));
+      const workspaceRegistry = new WorkspaceRegistry(app.getPath("userData"));
+      const workspace = new WorkspaceManager(workspaceRegistry);
       const spoilers = new SpoilerService(workspace);
       const workspaceMutations = new MutationQueue();
 
@@ -102,6 +104,7 @@ if (!authStartup.isPrimary) {
       registerCollectionIpc(workspace, workspaceMutations);
       const spoilerIpc = registerSpoilerIpc(workspace, spoilers, workspaceMutations);
       const publishPreferences = registerWorkspaceIpc(
+        workspaceRegistry,
         workspace,
         spoilers,
         workspaceMutations,
@@ -141,6 +144,7 @@ if (!authStartup.isPrimary) {
         spoilerIpc.close();
         spoilers.close();
         workspace.close();
+        workspaceRegistry.close();
       });
 
       session.defaultSession.setPermissionCheckHandler(() => false);

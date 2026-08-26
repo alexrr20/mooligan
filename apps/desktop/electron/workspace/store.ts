@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 import {
@@ -37,6 +37,7 @@ import {
   type WorkspaceBackup,
   type WorkspaceBackupSpoilerDecision,
 } from "./backup.ts";
+import type { WorkspaceRegistry } from "./registry.ts";
 
 type WorkspaceMetadata = {
   workspaceId: string;
@@ -46,8 +47,6 @@ const PreferenceRowSchema = z.object({ key: z.string(), value: z.string() });
 const WorkspaceMetadataSchema = z.object({
   workspaceId: z.string(),
 });
-const WorkspaceIdSchema = z.uuidv4();
-const WorkspaceRegistryRowSchema = z.object({ workspaceId: WorkspaceIdSchema });
 const EntityRowSchema = z.object({ id: z.string(), payload: z.string() });
 const CollectionLotRowSchema = z.object({
   acquiredAt: z.string().nullable(),
@@ -734,43 +733,12 @@ export class WorkspaceStore {
 }
 
 export class WorkspaceManager {
-  readonly #database: DatabaseSync;
-  readonly #workspacesDirectory: string;
+  readonly #registry: WorkspaceRegistry;
   #active: WorkspaceStore;
 
-  constructor(userDataRoot: string) {
-    mkdirSync(userDataRoot, { recursive: true });
-    this.#workspacesDirectory = join(userDataRoot, "workspaces");
-    this.#database = new DatabaseSync(join(userDataRoot, "workspace-registry.sqlite"), {
-      timeout: 5_000,
-    });
-
-    try {
-      this.#database.exec(`
-        PRAGMA journal_mode = WAL;
-
-        CREATE TABLE IF NOT EXISTS workspaces (
-          workspace_id TEXT PRIMARY KEY,
-          active INTEGER NOT NULL CHECK (active IN (0, 1))
-        ) STRICT;
-
-        CREATE UNIQUE INDEX IF NOT EXISTS one_active_workspace
-          ON workspaces(active) WHERE active = 1;
-      `);
-
-      const active = this.#database
-        .prepare("SELECT workspace_id AS workspaceId FROM workspaces WHERE active = 1")
-        .get();
-
-      if (active === undefined) {
-        this.#active = this.#createWorkspace();
-      } else {
-        this.#active = this.#openWorkspace(WorkspaceRegistryRowSchema.parse(active).workspaceId);
-      }
-    } catch (error) {
-      this.#database.close();
-      throw error;
-    }
+  constructor(registry: WorkspaceRegistry) {
+    this.#registry = registry;
+    this.#active = this.#openWorkspace(registry.bootstrap().workspaceId);
   }
 
   get databasePath() {
@@ -783,7 +751,6 @@ export class WorkspaceManager {
 
   close() {
     this.#active.close();
-    this.#database.close();
   }
 
   createBackup() {
@@ -866,30 +833,13 @@ export class WorkspaceManager {
     return this.#active.protectAllSpoilers();
   }
 
-  #createWorkspace(): WorkspaceStore {
-    const workspaceId = randomUUID();
-    const workspace = new WorkspaceStore(this.#workspacePath(workspaceId), {
-      workspaceId,
-    });
-
-    try {
-      transact(this.#database, () => {
-        this.#database.prepare("UPDATE workspaces SET active = 0 WHERE active = 1").run();
-        this.#database
-          .prepare("INSERT INTO workspaces (workspace_id, active) VALUES (?, 1)")
-          .run(workspaceId);
-      });
-      return workspace;
-    } catch (error) {
-      workspace.close();
-      throw error;
-    }
-  }
-
   #openWorkspace(workspaceId: string) {
-    const path = this.#workspacePath(workspaceId);
+    const path = this.#registry.workspacePath(workspaceId);
 
     if (!existsSync(path)) {
+      if (this.#registry.isNewWorkspace(workspaceId)) {
+        return new WorkspaceStore(path, { workspaceId });
+      }
       throw new Error("The local workspace registry is invalid.");
     }
 
@@ -901,10 +851,6 @@ export class WorkspaceManager {
     }
 
     return workspace;
-  }
-
-  #workspacePath(workspaceId: string) {
-    return join(this.#workspacesDirectory, `${workspaceId}.sqlite`);
   }
 }
 
