@@ -111,6 +111,11 @@ export class CollectionProjection {
     this.#onResyncRequired();
   }
 
+  async workspaceChanged() {
+    this.#session = undefined;
+    await this.#clear();
+  }
+
   async #requireResync(): Promise<CollectionProjectionResult> {
     await this.#clear();
     return { status: "resync-required" };

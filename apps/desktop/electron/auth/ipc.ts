@@ -5,7 +5,13 @@ import { focusFirstWindow, publishRendererEvent } from "../windows";
 import type { DesktopAuth } from "./service";
 import type { AuthColdStart } from "./startup";
 
-export async function registerAuthIpc(auth: DesktopAuth, startup: AuthColdStart) {
+type AuthChanged = (snapshot: ReturnType<DesktopAuth["snapshot"]>) => Promise<void> | void;
+
+export async function registerAuthIpc(
+  auth: DesktopAuth,
+  startup: AuthColdStart,
+  authChanged: AuthChanged = () => undefined,
+) {
   let lastError: string | null = null;
 
   function applySnapshot(snapshot: ReturnType<DesktopAuth["snapshot"]>) {
@@ -16,7 +22,9 @@ export async function registerAuthIpc(auth: DesktopAuth, startup: AuthColdStart)
 
   async function run(operation: () => ReturnType<DesktopAuth["refresh"]>) {
     try {
-      return applySnapshot(await operation());
+      const snapshot = await operation();
+      await authChanged(snapshot);
+      return applySnapshot(snapshot);
     } catch (error) {
       applySnapshot(auth.snapshot());
       throw new Error(publicAuthError(error));
@@ -28,7 +36,14 @@ export async function registerAuthIpc(auth: DesktopAuth, startup: AuthColdStart)
     publishRendererEvent("auth:error", lastError);
   }
 
-  applySnapshot(await auth.restore());
+  const restored = await auth.restore();
+  try {
+    await authChanged(restored);
+    applySnapshot(restored);
+  } catch (cause) {
+    applySnapshot(auth.snapshot());
+    reportError(cause);
+  }
 
   ipcMain.handle("auth:read", (event) => {
     assertTrustedSender(event);
@@ -60,7 +75,10 @@ export async function registerAuthIpc(auth: DesktopAuth, startup: AuthColdStart)
 
     void auth
       .refresh()
-      .then(applySnapshot)
+      .then(async (snapshot) => {
+        await authChanged(snapshot);
+        applySnapshot(snapshot);
+      })
       .catch((cause: unknown) => {
         applySnapshot(auth.snapshot());
         reportError(cause);

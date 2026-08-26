@@ -99,6 +99,11 @@ export class SpoilerProjection {
     }
   }
 
+  workspaceChanged() {
+    this.#session = undefined;
+    this.#protect();
+  }
+
   rejectInvalidUpdate(rendererId: number) {
     if (this.#session?.rendererId === rendererId) {
       this.#protect();

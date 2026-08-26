@@ -56,6 +56,10 @@ const AuthUserPayloadSchema = z.object({
 const AuthUserEnvelopeSchema = z.object({ user: z.json() });
 
 type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+export type AccountWorkspaceApiPath =
+  | "/api/workspace"
+  | "/api/workspace/bind"
+  | "/api/workspace/sync-credential";
 
 export interface DesktopAuthOptions {
   filePath: string;
@@ -182,6 +186,13 @@ export class DesktopAuth {
     return this.#serialize(async () => {
       await this.#requireState();
       return await this.#refresh();
+    });
+  }
+
+  requestAccountWorkspace(path: AccountWorkspaceApiPath, init: RequestInit) {
+    return this.#serialize(async () => {
+      await this.#requireState();
+      return await this.#send(path, init);
     });
   }
 

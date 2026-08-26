@@ -10,6 +10,7 @@ catalog:
   "@cloudflare/vitest-pool-workers": 0.20.1
   "@effect/platform": 0.96.3
   "@livestore/adapter-web": 0.4.0
+  "@livestore/common": 0.4.0
   "@livestore/livestore": 0.4.0
   "@livestore/react": 0.4.0
   "@livestore/sync-cf": 0.4.0

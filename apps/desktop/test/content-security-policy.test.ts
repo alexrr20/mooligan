@@ -4,6 +4,7 @@ import { test } from "node:test";
 import {
   productionContentSecurityPolicy,
   productionServiceOrigin,
+  productionSyncOrigin,
 } from "../content-security-policy.ts";
 
 void test("production CSP permits only local workers, WebAssembly, and the sync origin", () => {
@@ -11,7 +12,10 @@ void test("production CSP permits only local workers, WebAssembly, and the sync 
   assert.match(productionContentSecurityPolicy, /worker-src 'self'/u);
   assert.match(
     productionContentSecurityPolicy,
-    new RegExp(`connect-src 'self' ${escapeRegExp(productionServiceOrigin)}`, "u"),
+    new RegExp(
+      `connect-src 'self' ${escapeRegExp(productionServiceOrigin)} ${escapeRegExp(productionSyncOrigin)}`,
+      "u",
+    ),
   );
   assert.doesNotMatch(productionContentSecurityPolicy, /(?:worker|script)-src[^;]*\*/u);
   assert.doesNotMatch(productionContentSecurityPolicy, /(?:worker|script)-src[^;]*blob:/u);

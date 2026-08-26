@@ -6,25 +6,24 @@
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
+    "clean": "node -e \"const { rmSync } = require('node:fs'); for (const output of ['dist', 'dist-electron']) rmSync(output, { force: true, recursive: true })\"",
     "dev": "vp dev",
-    "build": "tsc --noEmit && vp build",
+    "build": "tsc --noEmit && vp run clean && vp build",
     "package": "vp run build && electron-builder --dir",
     "dist": "vp run build && electron-builder",
     "start": "electron .",
     "test": "node --test test/*.test.ts"
   },
-  "dependencies": {
-    "@livestore/adapter-web": "catalog:",
-    "@livestore/livestore": "catalog:",
-    "@livestore/react": "catalog:",
-    "@livestore/wa-sqlite": "catalog:",
-    "@mooligan/workspace": "workspace:*",
-    "effect": "catalog:",
-    "zod": "catalog:"
-  },
   "devDependencies": {
     "@base-ui/react": "catalog:",
+    "@livestore/adapter-web": "catalog:",
+    "@livestore/common": "catalog:",
+    "@livestore/livestore": "catalog:",
+    "@livestore/react": "catalog:",
+    "@livestore/sync-cf": "catalog:",
+    "@livestore/wa-sqlite": "catalog:",
     "@mooligan/domain": "workspace:*",
+    "@mooligan/workspace": "workspace:*",
     "@stylexjs/stylex": "catalog:",
     "@stylexjs/unplugin": "catalog:",
     "@tanstack/react-query": "catalog:",
@@ -35,6 +34,7 @@
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "better-auth": "catalog:",
+    "effect": "catalog:",
     "electron": "catalog:",
     "electron-builder": "catalog:",
     "mana-font": "catalog:",
@@ -45,6 +45,7 @@
     "unplugin": "catalog:",
     "vite": "catalog:",
     "vite-plugin-electron": "catalog:",
-    "vite-plus": "catalog:"
+    "vite-plus": "catalog:",
+    "zod": "catalog:"
   }
 }

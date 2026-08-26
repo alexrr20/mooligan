@@ -92,6 +92,24 @@ void test("renderer replacement and workspace mismatch cannot expose stale lots"
   assert.equal(projection.isReady(), false);
 });
 
+void test("a Workspace switch clears accepted collection state before the prior Workspace returns", async () => {
+  let activeWorkspaceId = workspaceId;
+  const projection = new CollectionProjection(() => activeWorkspaceId);
+  const connection = await projection.connect(7, workspaceId);
+  await projection.replace(7, {
+    ...connection,
+    lots: [lot("lot-one", 2)],
+    revision: 1,
+  });
+
+  activeWorkspaceId = "bc8c0163-45d2-4d77-ad5e-354d514b6c3b";
+  await projection.workspaceChanged();
+  activeWorkspaceId = workspaceId;
+
+  assert.equal(projection.isReady(), false);
+  assert.deepEqual(projection.lots(), []);
+});
+
 void test("the catalog projection uses temporary tables with a read-only catalog", async () => {
   const directory = await mkdtemp(join(tmpdir(), "mooligan-collection-projection-"));
   const path = join(directory, "catalog.sqlite");

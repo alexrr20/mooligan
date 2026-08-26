@@ -101,6 +101,13 @@ void test("desktop sign-in persists PKCE first and keeps session material out of
       return jsonResponse({ session: { token: "server-only" }, user });
     }
 
+    if (url.pathname === "/api/workspace/sync-credential") {
+      assert.equal(headers.get("cookie"), "better-auth.session_token=session-one");
+      assert.equal(headers.get("origin"), null);
+      assert.equal(headers.get("authorization"), null);
+      return jsonResponse({ credential: "renderer-scoped-credential", expiresAt: 1_300 });
+    }
+
     throw new Error("unexpected request");
   };
 
@@ -166,6 +173,17 @@ void test("desktop sign-in persists PKCE first and keeps session material out of
       pendingAuth: false,
       status: "signed-in",
       user: sanitizedUser,
+    });
+    const syncCredentialResponse = await auth.requestAccountWorkspace(
+      "/api/workspace/sync-credential",
+      {
+        headers: { authorization: "must-be-removed" },
+        method: "POST",
+      },
+    );
+    assert.deepEqual(await syncCredentialResponse.json(), {
+      credential: "renderer-scoped-credential",
+      expiresAt: 1_300,
     });
 
     hangSessionRequest = true;

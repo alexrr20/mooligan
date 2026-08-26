@@ -106,6 +106,29 @@ void test("renderer replacement returns catalog and image authorization to full 
   }
 });
 
+void test("a Workspace switch discards accepted reveals before the prior Workspace returns", () => {
+  let activeWorkspaceId = workspaceId;
+  const projection = new SpoilerProjection(() => activeWorkspaceId);
+  try {
+    const connection = projection.connect(7, workspaceId);
+    projection.replace(7, {
+      ...connection,
+      decisions: [{ scope: "printing", state: "reveal", targetId: "printing-one" }],
+      policy: "show",
+      revision: 1,
+    });
+
+    activeWorkspaceId = "72aa0d46-98f5-4fd5-8b2b-77e10ecacc56";
+    projection.workspaceChanged();
+    activeWorkspaceId = workspaceId;
+
+    assert.equal(projection.visibilitySnapshot().policy, "protect");
+    assert.deepEqual(projection.visibilitySnapshot().revealedPrintingIds, []);
+  } finally {
+    projection.close();
+  }
+});
+
 void test("invalid and wrong-workspace updates discard the accepted projection", () => {
   let activeWorkspaceId = workspaceId;
   const projection = new SpoilerProjection(() => activeWorkspaceId);

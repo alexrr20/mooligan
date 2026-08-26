@@ -15,6 +15,11 @@ const WorkspaceRowSchema = z.object({
   bindingSecret: z.uuidv4().nullable(),
   workspaceId: WorkspaceIdSchema,
 });
+const ListedWorkspaceRowSchema = WorkspaceRowSchema.extend({
+  active: z.union([z.literal(0), z.literal(1)]),
+});
+
+export type RegisteredWorkspace = z.infer<typeof WorkspaceRowSchema>;
 
 export class WorkspaceRegistry {
   readonly #database: DatabaseSync;
@@ -45,6 +50,9 @@ export class WorkspaceRegistry {
 
         CREATE UNIQUE INDEX IF NOT EXISTS one_active_workspace
           ON workspaces(active) WHERE active = 1;
+
+        CREATE UNIQUE INDEX IF NOT EXISTS one_workspace_per_account
+          ON workspaces(account_id) WHERE account_id IS NOT NULL;
       `);
       this.#database
         .prepare("INSERT OR IGNORE INTO device (singleton, client_id) VALUES (1, ?)")
@@ -156,6 +164,14 @@ export class WorkspaceRegistry {
   bindWorkspace(workspaceId: string, accountId: string | null) {
     const validatedWorkspaceId = WorkspaceIdSchema.parse(workspaceId);
     const validatedAccountId = z.string().trim().min(1).nullable().parse(accountId);
+    const current = this.#workspaceRow(validatedWorkspaceId);
+    if (
+      current.accountId !== null &&
+      validatedAccountId !== null &&
+      current.accountId !== validatedAccountId
+    ) {
+      throw new Error("The workspace is already associated with another account.");
+    }
     const result = this.#database
       .prepare("UPDATE workspaces SET account_id = ? WHERE workspace_id = ?")
       .run(validatedAccountId, validatedWorkspaceId);
@@ -163,6 +179,70 @@ export class WorkspaceRegistry {
     if (result.changes !== 1) {
       throw new Error("The local workspace registry is invalid.");
     }
+  }
+
+  registerAccountWorkspace(workspaceId: string, accountId: string) {
+    const validatedWorkspaceId = WorkspaceIdSchema.parse(workspaceId);
+    const validatedAccountId = z.string().trim().min(1).parse(accountId);
+
+    transact(this.#database, () => {
+      const accountWorkspace = this.#database
+        .prepare(
+          "SELECT workspace_id AS workspaceId, account_id AS accountId, binding_secret AS bindingSecret FROM workspaces WHERE account_id = ?",
+        )
+        .get(validatedAccountId);
+      if (accountWorkspace !== undefined) {
+        const existing = WorkspaceRowSchema.parse(accountWorkspace);
+        if (existing.workspaceId !== validatedWorkspaceId) {
+          throw new Error("The account is already associated with another workspace.");
+        }
+        return;
+      }
+
+      const workspace = this.#database
+        .prepare(
+          "SELECT workspace_id AS workspaceId, account_id AS accountId, binding_secret AS bindingSecret FROM workspaces WHERE workspace_id = ?",
+        )
+        .get(validatedWorkspaceId);
+      if (workspace !== undefined) {
+        const existing = WorkspaceRowSchema.parse(workspace);
+        if (existing.accountId !== null && existing.accountId !== validatedAccountId) {
+          throw new Error("The workspace is already associated with another account.");
+        }
+        this.#database
+          .prepare("UPDATE workspaces SET account_id = ? WHERE workspace_id = ?")
+          .run(validatedAccountId, validatedWorkspaceId);
+        return;
+      }
+
+      this.#database
+        .prepare(
+          "INSERT INTO workspaces (workspace_id, active, account_id, binding_secret) VALUES (?, 0, ?, NULL)",
+        )
+        .run(validatedWorkspaceId, validatedAccountId);
+    });
+  }
+
+  workspace(workspaceId: string): RegisteredWorkspace {
+    return this.#workspaceRow(workspaceId);
+  }
+
+  workspaces() {
+    return this.#database
+      .prepare(
+        "SELECT workspace_id AS workspaceId, active, account_id AS accountId, binding_secret AS bindingSecret FROM workspaces ORDER BY rowid",
+      )
+      .all()
+      .map((row, index) => {
+        const workspace = ListedWorkspaceRowSchema.parse(row);
+        return {
+          accountAssociation:
+            workspace.accountId === null ? ("unbound" as const) : ("account" as const),
+          active: workspace.active === 1,
+          label: `Local workspace ${index + 1}`,
+          workspaceId: workspace.workspaceId,
+        };
+      });
   }
 
   accountId(workspaceId: string) {

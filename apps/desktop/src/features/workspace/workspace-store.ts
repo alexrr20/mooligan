@@ -4,7 +4,8 @@ import { StoreRegistry, storeOptions } from "@livestore/livestore";
 import { workspaceSchema, workspaceSyncPayloadSchema } from "@mooligan/workspace/schema";
 import { unstable_batchedUpdates as batchUpdates } from "react-dom";
 
-import type { WorkspaceBootstrap } from "../../../shared/desktop-api";
+import type { WorkspaceBootstrap, WorkspaceRuntime } from "../../../shared/desktop-api";
+import LiveStoreSyncWorker from "./livestore-sync.worker?worker";
 import LiveStoreWorker from "./livestore.worker?worker";
 
 export function createLiveStoreRegistry() {
@@ -17,9 +18,7 @@ export function createLiveStoreRegistry() {
   });
 }
 
-export const liveStoreRegistry = createLiveStoreRegistry();
-
-export function workspaceStoreOptions({ clientId, workspaceId }: WorkspaceBootstrap) {
+export function localWorkspaceStoreOptions({ clientId, workspaceId }: WorkspaceBootstrap) {
   return storeOptions({
     adapter: makePersistedAdapter({
       clientId,
@@ -35,10 +34,26 @@ export function workspaceStoreOptions({ clientId, workspaceId }: WorkspaceBootst
   });
 }
 
-window.addEventListener(
-  "beforeunload",
-  () => {
-    void liveStoreRegistry.dispose();
-  },
-  { once: true },
-);
+export function workspaceStoreOptions(runtime: WorkspaceRuntime) {
+  if (!runtime.sync) {
+    return localWorkspaceStoreOptions(runtime);
+  }
+
+  return storeOptions({
+    adapter: makePersistedAdapter({
+      clientId: runtime.clientId,
+      experimental: { awaitSharedWorkerTermination: true },
+      sharedWorker: LiveStoreSharedWorker,
+      storage: { type: "opfs" },
+      worker: LiveStoreSyncWorker,
+    }),
+    disableDevtools: !import.meta.env.DEV,
+    schema: workspaceSchema,
+    storeId: runtime.workspaceId,
+    syncPayload: {
+      credential: runtime.sync.credential,
+      workspaceId: runtime.sync.accountWorkspaceId,
+    },
+    syncPayloadSchema: workspaceSyncPayloadSchema,
+  });
+}
