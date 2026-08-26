@@ -15,6 +15,7 @@ import { accountOwnsWorkspace, WorkspaceIdSchema } from "./workspace.js";
 export const syncAudience = "mooligan-livestore-sync";
 export const syncCredentialLifetimeSeconds = 5 * 60;
 export const minimumWorkspaceEventSchemaVersion = workspaceEventSchemaVersion;
+export const maximumWorkspaceEventSchemaVersion = workspaceEventSchemaVersion;
 
 type WorkspaceSyncPayload = typeof workspaceSyncPayloadSchema.Type;
 type SyncWorkerEnvironment = { SYNC_BACKEND: DurableObjectNamespace };
@@ -44,6 +45,9 @@ export async function issueSyncCredential(
   const validatedEventSchemaVersion = z.number().int().nonnegative().parse(eventSchemaVersion);
   if (validatedEventSchemaVersion < minimumWorkspaceEventSchemaVersion) {
     throw new Error("The desktop client is too old to synchronize this workspace.");
+  }
+  if (validatedEventSchemaVersion > maximumWorkspaceEventSchemaVersion) {
+    throw new Error("The sync server is too old to synchronize this workspace.");
   }
 
   const issuedAt = Math.floor(Date.now() / 1_000);

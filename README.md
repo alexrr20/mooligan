@@ -127,7 +127,8 @@ local migration and sign-in setup above:
 Every sync credential lasts five minutes. The desktop requests it with its app
 version and Workspace event-schema version. The API returns HTTP 426 with
 `client_upgrade_required` when that schema version is below the supported
-minimum. The desktop pauses sync and keeps local editing available.
+minimum, or HTTP 409 with `server_upgrade_required` when it is above the
+supported maximum. The desktop pauses sync and keeps local editing available.
 
 ### Reset development data
 

@@ -5,6 +5,7 @@ import { createAuth } from "./auth.js";
 import { readCatalogRelease, refreshCatalogRelease } from "./catalog-release.js";
 import {
   issueSyncCredential,
+  maximumWorkspaceEventSchemaVersion,
   minimumWorkspaceEventSchemaVersion,
   syncWorker,
   WorkspaceSyncBackend,
@@ -109,6 +110,16 @@ api.post("/api/workspace/sync-credential", async (context) => {
         minimumEventSchemaVersion: minimumWorkspaceEventSchemaVersion,
       },
       426,
+    );
+  }
+  if (client.data.eventSchemaVersion > maximumWorkspaceEventSchemaVersion) {
+    return context.json(
+      {
+        error: "server_upgrade_required" as const,
+        maximumEventSchemaVersion: maximumWorkspaceEventSchemaVersion,
+        message: "The Workspace sync service must be updated before this version can synchronize.",
+      },
+      409,
     );
   }
 

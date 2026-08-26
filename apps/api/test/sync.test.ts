@@ -69,6 +69,45 @@ test("the workspace endpoint rejects clients below the minimum event schema vers
   });
 });
 
+test("the workspace endpoint rejects clients above the maximum event schema version", async () => {
+  const { headers } = await authenticatedTestUser("sync-new-client@example.com");
+  await exports.default.fetch(
+    new Request(`${apiOrigin}/api/workspace`, { headers, method: "POST" }),
+  );
+
+  const response = await exports.default.fetch(
+    new Request(`${apiOrigin}/api/workspace/sync-credential`, {
+      body: JSON.stringify({
+        appVersion: "newer-client",
+        eventSchemaVersion: workspaceEventSchemaVersion + 1,
+      }),
+      headers: withJsonContentType(headers),
+      method: "POST",
+    }),
+  );
+
+  assert.equal(response.status, 409);
+  assert.deepEqual(await response.json(), {
+    error: "server_upgrade_required",
+    maximumEventSchemaVersion: workspaceEventSchemaVersion,
+    message: "The Workspace sync service must be updated before this version can synchronize.",
+  });
+});
+
+test("the credential issuer rejects event schema versions outside its supported range", async () => {
+  const userId = crypto.randomUUID();
+  const workspaceId = crypto.randomUUID();
+
+  await assert.rejects(
+    issueSyncCredential(env, userId, workspaceId, "old-client", workspaceEventSchemaVersion - 1),
+    /desktop client is too old/u,
+  );
+  await assert.rejects(
+    issueSyncCredential(env, userId, workspaceId, "new-client", workspaceEventSchemaVersion + 1),
+    /sync server is too old/u,
+  );
+});
+
 test("sync rejects malformed, expired, wrong-audience, and wrongly signed credentials", async () => {
   const user = await authenticatedTestUser("sync-invalid@example.com");
   const workspaceId = await bindTestWorkspace(user.userId);
