@@ -24,9 +24,9 @@ import { registerCatalogSetSymbolProtocol } from "./catalog/set-symbol-protocol"
 import { registerCollectionIpc } from "./collection/ipc";
 import { developmentRendererUrl } from "./ipc-security";
 import { registerDesktopSchemes } from "./protocols";
-import { registerSpoilerIpc } from "./spoilers/ipc";
-import { SpoilerService } from "./spoilers/service";
-import { focusFirstWindow } from "./windows";
+import { registerSpoilerProjectionIpc } from "./spoilers/projection-ipc";
+import { SpoilerProjection } from "./spoilers/projection";
+import { focusFirstWindow, publishRendererEvent } from "./windows";
 import { registerWorkspaceIpc } from "./workspace/ipc";
 import { MutationQueue } from "./workspace/mutations";
 import { WorkspaceRegistry } from "./workspace/registry";
@@ -50,7 +50,7 @@ const authStartup = registerAuthColdStart({
     app.setAsDefaultProtocolClient(scheme, path, args),
 });
 
-async function createWindow() {
+async function createWindow(spoilerProjection: SpoilerProjection) {
   const window = new BrowserWindow({
     width: 1480,
     height: 840,
@@ -76,6 +76,9 @@ async function createWindow() {
     event.preventDefault();
   });
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  window.webContents.on("did-start-loading", () => {
+    spoilerProjection.rendererReplaced(window.webContents.id);
+  });
   window.once("ready-to-show", () => window.show());
 
   const developmentUrl = developmentRendererUrl();
@@ -94,19 +97,24 @@ if (!authStartup.isPrimary) {
     .then(async () => {
       const workspaceRegistry = new WorkspaceRegistry(app.getPath("userData"));
       const workspace = new WorkspaceManager(workspaceRegistry);
-      const spoilers = new SpoilerService(workspace);
+      const spoilers = new SpoilerProjection(() => workspace.workspaceId, {
+        onChanged: () => publishRendererEvent("workspace-projection:spoilers-changed", undefined),
+      });
       const workspaceMutations = new MutationQueue();
 
       registerCatalogIpc({
         getVisibilitySnapshot: () => spoilers.visibilitySnapshot(),
         getWorkspacePath: () => workspace.databasePath,
       });
-      registerCollectionIpc(workspace, workspaceMutations);
-      const spoilerIpc = registerSpoilerIpc(workspace, spoilers, workspaceMutations);
+      registerCollectionIpc(
+        workspace,
+        workspaceMutations,
+        () => spoilers.visibilitySnapshot().revision,
+      );
+      registerSpoilerProjectionIpc(spoilers);
       const publishPreferences = registerWorkspaceIpc(
         workspaceRegistry,
         workspace,
-        spoilers,
         workspaceMutations,
         app.getPath("documents"),
       );
@@ -141,7 +149,6 @@ if (!authStartup.isPrimary) {
       const publishAuthStateAndRefresh = await registerAuthIpc(auth, authStartup);
 
       app.once("will-quit", () => {
-        spoilerIpc.close();
         spoilers.close();
         workspace.close();
         workspaceRegistry.close();
@@ -152,14 +159,13 @@ if (!authStartup.isPrimary) {
         callback(false);
       });
 
-      await createWindow();
+      await createWindow(spoilers);
       publishAuthStateAndRefresh();
       publishPreferences();
-      spoilerIpc.publish();
 
       app.on("activate", () => {
         if (BrowserWindow.getAllWindows().length === 0) {
-          void createWindow();
+          void createWindow(spoilers);
         }
       });
       app.on("second-instance", focusFirstWindow);

@@ -13,13 +13,17 @@ import { publishRendererEvent } from "../windows";
 import { runForUnchangedRevision, type MutationQueue } from "../workspace/mutations";
 import type { WorkspaceManager } from "../workspace/store";
 
-export function registerCollectionIpc(workspace: WorkspaceManager, mutations: MutationQueue) {
+export function registerCollectionIpc(
+  workspace: WorkspaceManager,
+  mutations: MutationQueue,
+  readSpoilerRevision: () => number,
+) {
   ipcMain.handle("collection:add", (event, value) => {
     assertTrustedSender(event);
     const request = AddCollectionHoldingRequestSchema.parse(value);
 
     return mutations.run(async () => {
-      const detail = await readPrintingForMutation(workspace, request.printingId);
+      const detail = await readPrintingForMutation(readSpoilerRevision, request.printingId);
       assertPrintingCanUseFinish(detail, request);
       const result = workspace.addCollectionHolding(request);
       publishRendererEvent("collection:changed", undefined);
@@ -38,7 +42,7 @@ export function registerCollectionIpc(workspace: WorkspaceManager, mutations: Mu
         throw new Error("This Collection holding no longer exists.");
       }
 
-      const detail = await readPrintingForMutation(workspace, lot.printingId);
+      const detail = await readPrintingForMutation(readSpoilerRevision, lot.printingId);
 
       if (detail === null) {
         if (request.finish !== lot.finish) {
@@ -65,11 +69,8 @@ export function registerCollectionIpc(workspace: WorkspaceManager, mutations: Mu
   });
 }
 
-function readPrintingForMutation(workspace: WorkspaceManager, printingId: string) {
-  return runForUnchangedRevision(
-    () => workspace.readSpoilerState().revision,
-    () => queryCatalogPrintingDetail(printingId),
-  );
+function readPrintingForMutation(readSpoilerRevision: () => number, printingId: string) {
+  return runForUnchangedRevision(readSpoilerRevision, () => queryCatalogPrintingDetail(printingId));
 }
 
 function assertPrintingCanUseFinish(

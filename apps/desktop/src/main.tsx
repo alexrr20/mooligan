@@ -6,7 +6,6 @@ import manaFontUrl from "mana-font/fonts/mana.woff2?url";
 
 import "./global.css";
 import { subscribeToCollectionChanges } from "./features/collection/collection-cache";
-import { subscribeToSpoilerState } from "./features/spoilers/use-spoilers";
 import { routeTree } from "./routeTree.gen";
 import { WorkspaceStartup } from "./features/workspace/workspace-startup";
 
@@ -39,9 +38,11 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <WorkspaceStartup>
-      <App />
-    </WorkspaceStartup>
+    <QueryClientProvider client={queryClient}>
+      <WorkspaceStartup>
+        <App />
+      </WorkspaceStartup>
+    </QueryClientProvider>
   </StrictMode>,
 );
 
@@ -55,12 +56,7 @@ function App() {
     return () => window.removeEventListener("catalogready", refreshCatalog);
   }, []);
 
-  useEffect(() => subscribeToSpoilerState(queryClient), []);
   useEffect(() => subscribeToCollectionChanges(queryClient), []);
 
-  return (
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
-  );
+  return <RouterProvider router={router} />;
 }

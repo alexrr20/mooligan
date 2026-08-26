@@ -2,12 +2,14 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
+import * as z from "zod";
 
 import { validatePreferencesUpdate } from "../electron/workspace/preferences.ts";
 import { WorkspaceStore } from "../electron/workspace/store.ts";
 
-void test("a local workspace initializes, reopens, updates, and validates preferences", async () => {
+void test("the legacy workspace store retains only staged collection and motion data", async () => {
   const directory = await mkdtemp(join(tmpdir(), "mooligan-workspace-"));
   const path = join(directory, "workspace.sqlite");
 
@@ -19,77 +21,46 @@ void test("a local workspace initializes, reopens, updates, and validates prefer
       workspaceId,
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
     );
-    assert.deepEqual(initial.readPreferences(), { motion: "system", spoilerPolicy: "protect" });
+    assert.deepEqual(initial.readPreferences(), { motion: "system" });
+    assert.deepEqual(initial.updatePreferences({ motion: "reduced" }), { motion: "reduced" });
     initial.close();
 
-    const updated = new WorkspaceStore(path);
-
-    assert.equal(updated.workspaceId, workspaceId);
-    assert.deepEqual(updated.updatePreferences({ motion: "reduced" }), {
-      motion: "reduced",
-      spoilerPolicy: "protect",
-    });
-    updated.close();
-
     const reopened = new WorkspaceStore(path);
-
-    try {
-      assert.equal(reopened.workspaceId, workspaceId);
-      assert.deepEqual(reopened.readPreferences(), { motion: "reduced", spoilerPolicy: "protect" });
-      assert.throws(
-        () => validatePreferencesUpdate({ currency: "EUR" }),
-        /Unknown preference: currency/,
-      );
-      assert.throws(
-        () => validatePreferencesUpdate({ motion: "sometimes" }),
-        /Invalid motion preference/,
-      );
-      assert.deepEqual(reopened.readPreferences(), { motion: "reduced", spoilerPolicy: "protect" });
-    } finally {
-      reopened.close();
-    }
-  } finally {
-    await rm(directory, { force: true, recursive: true });
-  }
-});
-
-void test("spoiler decisions persist, remain narrow, and reset by generation", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "mooligan-spoiler-state-"));
-  const path = join(directory, "workspace.sqlite");
-
-  try {
-    const store = new WorkspaceStore(path);
-
-    assert.deepEqual(store.readSpoilerState(), {
-      activePrintingIds: [],
-      activeRootSetIds: [],
-      policy: "protect",
-      revision: 0,
-    });
-
-    store.revealSpoilerPrinting("printing-a");
-    store.revealSpoilerRelease("release-a");
-    assert.deepEqual(store.readSpoilerState().activePrintingIds, ["printing-a"]);
-    assert.deepEqual(store.readSpoilerState().activeRootSetIds, ["release-a"]);
-
-    store.protectSpoilerPrinting("printing-a");
-    assert.deepEqual(store.readSpoilerState().activePrintingIds, []);
-
-    store.setSpoilerPolicy("show");
-    assert.deepEqual(store.protectAllSpoilers(), {
-      activePrintingIds: [],
-      activeRootSetIds: [],
-      policy: "protect",
-      revision: 5,
-    });
-
-    store.revealSpoilerPrinting("printing-a");
-    assert.deepEqual(store.readSpoilerState().activePrintingIds, ["printing-a"]);
-    store.close();
-
-    const reopened = new WorkspaceStore(path);
-    assert.deepEqual(reopened.readSpoilerState().activePrintingIds, ["printing-a"]);
+    assert.equal(reopened.workspaceId, workspaceId);
+    assert.deepEqual(reopened.readPreferences(), { motion: "reduced" });
     reopened.close();
+
+    const database = new DatabaseSync(path, { readOnly: true });
+    try {
+      const tableNames = z
+        .array(z.object({ name: z.string() }))
+        .parse(
+          database
+            .prepare("SELECT name FROM sqlite_schema WHERE type = 'table' ORDER BY name")
+            .all(),
+        )
+        .map(({ name }) => name);
+      assert.equal(tableNames.includes("spoiler_state"), false);
+      assert.equal(tableNames.includes("spoiler_decisions"), false);
+      assert.deepEqual(
+        database
+          .prepare("SELECT key FROM preferences ORDER BY key")
+          .all()
+          .map((row) => row.key),
+        ["motion"],
+      );
+    } finally {
+      database.close();
+    }
+
+    assert.throws(
+      () => validatePreferencesUpdate({ currency: "EUR" }),
+      /Unknown preference: currency/,
+    );
+    assert.throws(
+      () => validatePreferencesUpdate({ motion: "sometimes" }),
+      /Invalid motion preference/,
+    );
   } finally {
     await rm(directory, { force: true, recursive: true });
   }

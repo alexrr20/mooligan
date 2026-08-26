@@ -1,13 +1,19 @@
-import { readFile, stat, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { BrowserWindow, dialog, ipcMain, type OpenDialogOptions } from "electron";
+import * as z from "zod";
 
 import { validateWorkspaceBootstrap } from "../../shared/desktop-api.ts";
 import { assertTrustedSender } from "../ipc-security";
-import type { SpoilerService } from "../spoilers/service";
 import { publishRendererEvent } from "../windows";
-import { parseWorkspaceBackup, type WorkspaceBackup } from "./backup";
+import {
+  parseWorkspaceBackup,
+  serializeWorkspaceBackup,
+  validateWorkspaceBackup,
+  validateWorkspaceLegacyBackupSnapshot,
+} from "./backup";
 import type { MutationQueue } from "./mutations";
 import { validatePreferencesUpdate } from "./preferences";
 import type { WorkspaceRegistry } from "./registry";
@@ -18,7 +24,6 @@ const MAX_WORKSPACE_BACKUP_BYTES = 50 * 1024 * 1024;
 export function registerWorkspaceIpc(
   registry: WorkspaceRegistry,
   workspace: WorkspaceManager,
-  spoilers: SpoilerService,
   mutations: MutationQueue,
   documentsPath: string,
 ) {
@@ -32,24 +37,17 @@ export function registerWorkspaceIpc(
   });
   ipcMain.handle("preferences:update", (event, update) => {
     assertTrustedSender(event);
-    const validated = validatePreferencesUpdate(update);
-    const applyUpdate = () => {
-      if (validated.spoilerPolicy !== undefined) {
-        spoilers.setPolicy(validated.spoilerPolicy);
-      }
-      workspace.updatePreferences(
-        validated.motion === undefined ? {} : { motion: validated.motion },
-      );
-      const preferences = workspace.readPreferences();
-      publishRendererEvent("preferences:changed", preferences);
-      return preferences;
-    };
-
-    return validated.spoilerPolicy === undefined ? applyUpdate() : mutations.run(applyUpdate);
+    const preferences = workspace.updatePreferences(validatePreferencesUpdate(update));
+    publishRendererEvent("preferences:changed", preferences);
+    return preferences;
   });
-
-  ipcMain.handle("workspace:export", async (event) => {
+  ipcMain.handle("workspace:backup-snapshot", (event) => {
     assertTrustedSender(event);
+    return workspace.createLegacyBackupSnapshot();
+  });
+  ipcMain.handle("workspace:export", async (event, value) => {
+    assertTrustedSender(event);
+    const backup = validateWorkspaceBackup(value);
     const owner = BrowserWindow.fromWebContents(event.sender);
     const options = {
       defaultPath: join(
@@ -68,14 +66,13 @@ export function registerWorkspaceIpc(
     }
 
     try {
-      await writeFile(result.filePath, workspace.createBackup(), "utf8");
+      await atomicWrite(result.filePath, serializeWorkspaceBackup(backup));
       return "exported" as const;
     } catch {
       throw new Error("The workspace backup could not be exported.");
     }
   });
-
-  ipcMain.handle("workspace:import", async (event) => {
+  ipcMain.handle("workspace:select-backup", async (event) => {
     assertTrustedSender(event);
     const owner = BrowserWindow.fromWebContents(event.sender);
     const options: OpenDialogOptions = {
@@ -88,10 +85,10 @@ export function registerWorkspaceIpc(
       : await dialog.showOpenDialog(options);
 
     if (result.canceled || !result.filePaths[0]) {
-      return "cancelled" as const;
+      return null;
     }
 
-    let backup: WorkspaceBackup;
+    let backup;
     try {
       const info = await stat(result.filePaths[0]);
       if (!info.isFile() || info.size > MAX_WORKSPACE_BACKUP_BYTES) {
@@ -103,11 +100,11 @@ export function registerWorkspaceIpc(
     }
 
     const confirmationOptions = {
-      buttons: ["Cancel", "Replace local workspace"],
+      buttons: ["Cancel", "Restore as new workspace"],
       cancelId: 0,
       defaultId: 0,
       detail:
-        "Preferences, spoiler choices, collection lots, decks, and lists in this workspace will be replaced. Your local workspace and account binding will stay the same.",
+        "Mooligan will keep this workspace and restore the backup into a separate local workspace.",
       message: "Import this backup?",
       noLink: true,
       type: "warning" as const,
@@ -116,18 +113,33 @@ export function registerWorkspaceIpc(
       ? await dialog.showMessageBox(owner, confirmationOptions)
       : await dialog.showMessageBox(confirmationOptions);
 
-    if (confirmation.response !== 1) {
-      return "cancelled" as const;
-    }
-
-    return mutations.run(() => {
-      workspace.importBackup(backup);
-      publishRendererEvent("collection:changed", undefined);
-      publishRendererEvent("preferences:changed", workspace.readPreferences());
-      spoilers.refresh();
-      return "imported" as const;
-    });
+    return confirmation.response === 1 ? backup : null;
+  });
+  ipcMain.handle("workspace:begin-restore", (event, value) => {
+    assertTrustedSender(event);
+    const backup = validateWorkspaceLegacyBackupSnapshot(value);
+    return mutations.run(() => workspace.beginRestore(backup));
+  });
+  ipcMain.handle("workspace:activate-restore", (event, value) => {
+    assertTrustedSender(event);
+    const workspaceId = z.uuidv4().parse(value);
+    return mutations.run(() => workspace.activateRestore(workspaceId));
+  });
+  ipcMain.handle("workspace:cancel-restore", (event, value) => {
+    assertTrustedSender(event);
+    const workspaceId = z.uuidv4().parse(value);
+    return mutations.run(() => workspace.cancelRestore(workspaceId));
   });
 
   return () => publishRendererEvent("preferences:changed", workspace.readPreferences());
+}
+
+async function atomicWrite(path: string, contents: string) {
+  const partial = `${path}.tmp-${randomUUID()}`;
+  try {
+    await writeFile(partial, contents, "utf8");
+    await rename(partial, path);
+  } finally {
+    await rm(partial, { force: true });
+  }
 }

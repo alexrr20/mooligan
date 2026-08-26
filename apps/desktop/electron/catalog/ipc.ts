@@ -104,6 +104,10 @@ export function registerCatalogIpc(options: CatalogIpcOptions) {
     assertTrustedSender(event);
     return queryCatalogPrintingDetail(printingId);
   });
+  ipcMain.handle("catalog:root-set", async (event, targetId) => {
+    assertTrustedSender(event);
+    return resolveCatalogRootSetId(targetId);
+  });
   ipcMain.handle("collection:list", async (event, request) => {
     assertTrustedSender(event);
     const workspacePath = readWorkspacePath();

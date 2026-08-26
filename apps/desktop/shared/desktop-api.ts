@@ -7,18 +7,31 @@ import type {
 } from "@mooligan/domain/catalog-search";
 import type {
   AddCollectionHoldingRequest,
+  CollectionLot,
   CollectionListPage,
   CollectionListRequest,
   CollectionMutationResult,
   RemoveCollectionHoldingRequest,
   UpdateCollectionHoldingRequest,
 } from "@mooligan/domain/collection";
+import type { Deck } from "@mooligan/domain/decks";
+import type { CardList } from "@mooligan/domain/lists";
 import type {
   CatalogPrintingResult,
   CatalogReleaseSummary,
+  SpoilerProjectionDelta,
+  SpoilerProjectionResult,
+  SpoilerProjectionSnapshot,
+  SpoilerDecisionState,
   SpoilerPolicy,
+  SpoilerRevealScope,
   SpoilerRevealSummaries,
-  SpoilerState,
+} from "@mooligan/domain/spoilers";
+import {
+  SpoilerProjectionConnectionSchema,
+  SpoilerProjectionDeltaSchema,
+  SpoilerProjectionResultSchema,
+  SpoilerProjectionSnapshotSchema,
 } from "@mooligan/domain/spoilers";
 import * as z from "zod";
 import type { JSONType } from "zod";
@@ -31,6 +44,22 @@ export type WorkspaceBootstrap = z.infer<typeof WorkspaceBootstrapSchema>;
 
 export function validateWorkspaceBootstrap(value: JSONType): WorkspaceBootstrap {
   return WorkspaceBootstrapSchema.parse(value);
+}
+
+export function validateSpoilerProjectionConnection(value: JSONType) {
+  return SpoilerProjectionConnectionSchema.parse(value);
+}
+
+export function validateSpoilerProjectionDelta(value: JSONType) {
+  return SpoilerProjectionDeltaSchema.parse(value);
+}
+
+export function validateSpoilerProjectionResult(value: JSONType) {
+  return SpoilerProjectionResultSchema.parse(value);
+}
+
+export function validateSpoilerProjectionSnapshot(value: JSONType) {
+  return SpoilerProjectionSnapshotSchema.parse(value);
 }
 
 export type AuthStatus =
@@ -64,9 +93,31 @@ export type CatalogStatus =
 
 export type MotionPreference = "system" | "reduced" | "full";
 
+type BackupEntity<Entity> = { id: string; value: Entity };
+
+export type WorkspaceBackupSpoilerDecision = {
+  scope: SpoilerRevealScope;
+  state: SpoilerDecisionState;
+  targetId: string;
+};
+
+export type WorkspaceBackup = {
+  cardLists: BackupEntity<CardList>[];
+  collectionLots: BackupEntity<CollectionLot>[];
+  decks: BackupEntity<Deck>[];
+  format: "mooligan-workspace";
+  preferences: { motion: MotionPreference; spoilerPolicy: SpoilerPolicy };
+  spoilerDecisions: WorkspaceBackupSpoilerDecision[];
+  version: 2;
+};
+
+export type WorkspaceLegacyBackupSnapshot = Pick<
+  WorkspaceBackup,
+  "cardLists" | "collectionLots" | "decks"
+> & { motion: MotionPreference };
+
 export type Preferences = {
   motion: MotionPreference;
-  spoilerPolicy: SpoilerPolicy;
 };
 
 export type PreferencesUpdate = Partial<Preferences>;
@@ -85,6 +136,7 @@ export type DesktopApi = {
     download: () => Promise<CatalogStatus>;
     list: (request?: CatalogListRequest) => Promise<CatalogListPage>;
     onProgress: (callback: (progress: CatalogProgress) => void) => () => void;
+    resolveRootSetId: (targetId: string) => Promise<string | null>;
     spoilerRevealSummaries: () => Promise<SpoilerRevealSummaries>;
     status: () => Promise<CatalogStatus>;
     upcoming: () => Promise<CatalogReleaseSummary[]>;
@@ -104,19 +156,19 @@ export type DesktopApi = {
     read: () => Promise<Preferences>;
     update: (update: PreferencesUpdate) => Promise<Preferences>;
   };
-  spoilers: {
-    onChanged: (callback: (state: SpoilerState) => void) => () => void;
-    protectAll: () => Promise<SpoilerState>;
-    protectPrinting: (printingId: string) => Promise<SpoilerState>;
-    protectRelease: (setId: string) => Promise<SpoilerState>;
-    read: () => Promise<SpoilerState>;
-    revealPrinting: (printingId: string) => Promise<SpoilerState>;
-    revealRelease: (setId: string) => Promise<SpoilerState>;
-    setPolicy: (policy: SpoilerPolicy) => Promise<SpoilerState>;
+  workspaceProjection: {
+    applySpoilerDelta: (delta: SpoilerProjectionDelta) => Promise<SpoilerProjectionResult>;
+    connectSpoilers: (workspaceId: string) => Promise<{ sessionId: string; workspaceId: string }>;
+    onSpoilersChanged: (callback: () => void) => () => void;
+    replaceSpoilers: (snapshot: SpoilerProjectionSnapshot) => Promise<SpoilerProjectionResult>;
   };
   workspace: {
+    activateRestore: (workspaceId: string) => Promise<void>;
+    beginRestore: (snapshot: WorkspaceLegacyBackupSnapshot) => Promise<WorkspaceBootstrap>;
     bootstrap: () => Promise<WorkspaceBootstrap>;
-    exportBackup: () => Promise<"cancelled" | "exported">;
-    importBackup: () => Promise<"cancelled" | "imported">;
+    cancelRestore: (workspaceId: string) => Promise<void>;
+    exportBackup: (backup: WorkspaceBackup) => Promise<"cancelled" | "exported">;
+    readLegacyBackupSnapshot: () => Promise<WorkspaceLegacyBackupSnapshot>;
+    selectBackup: () => Promise<WorkspaceBackup | null>;
   };
 };

@@ -4,7 +4,9 @@ import { Component, Suspense, use, useMemo, type ErrorInfo, type ReactNode } fro
 
 import { Button } from "../../components/button";
 import { typography } from "../../styles/typography";
+import { SpoilerProjectionStartup } from "./spoiler-projection";
 import { workspaceStoreOptions, workspaceStoreRegistry } from "./workspace-store";
+import { WorkspaceStoreProvider } from "./workspace-store-context";
 
 const bootstrapPromise = window.workspace.bootstrap();
 
@@ -39,8 +41,17 @@ function OpenWorkspace({
   children: ReactNode;
   options: ReturnType<typeof workspaceStoreOptions>;
 }) {
-  useStore(options);
-  return children;
+  const store = useStore(options);
+  return (
+    <WorkspaceStoreProvider store={store}>
+      <SpoilerProjectionStartup
+        loading={<WorkspaceStatus status="loading" />}
+        workspaceId={options.storeId}
+      >
+        {children}
+      </SpoilerProjectionStartup>
+    </WorkspaceStoreProvider>
+  );
 }
 
 class WorkspaceFailureBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {

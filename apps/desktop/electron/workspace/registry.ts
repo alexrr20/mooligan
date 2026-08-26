@@ -108,6 +108,18 @@ export class WorkspaceRegistry {
     });
   }
 
+  removeWorkspace(workspaceId: string) {
+    const validatedWorkspaceId = z.uuidv4().parse(workspaceId);
+    const result = this.#database
+      .prepare("DELETE FROM workspaces WHERE workspace_id = ? AND active = 0")
+      .run(validatedWorkspaceId);
+
+    if (result.changes !== 1) {
+      throw new Error("The local workspace registry is invalid.");
+    }
+    this.#newWorkspaceIds.delete(validatedWorkspaceId);
+  }
+
   bindWorkspace(workspaceId: string, accountId: string | null) {
     const validatedWorkspaceId = z.uuidv4().parse(workspaceId);
     const validatedAccountId = z.string().trim().min(1).nullable().parse(accountId);

@@ -9,16 +9,19 @@ import {
 import { MoneySchema } from "@mooligan/domain/market";
 import {
   SpoilerDecisionStateSchema,
+  SpoilerPolicySchema,
   SpoilerRevealScopeSchema,
   SpoilerTargetIdSchema,
-  type SpoilerDecisionState,
-  type SpoilerRevealScope,
 } from "@mooligan/domain/spoilers";
 import * as z from "zod";
 import type { JSONType } from "zod";
 
-import type { Preferences } from "../../shared/desktop-api.ts";
-import { MotionPreferenceSchema, PreferencesSchema } from "./preferences.ts";
+import type {
+  WorkspaceBackup,
+  WorkspaceBackupSpoilerDecision,
+  WorkspaceLegacyBackupSnapshot,
+} from "../../shared/desktop-api.ts";
+import { MotionPreferenceSchema } from "./preferences.ts";
 
 const BACKUP_FORMAT = "mooligan-workspace";
 const BACKUP_VERSION = 2;
@@ -28,27 +31,6 @@ const MAX_DECKS = 10_000;
 const MAX_CARD_LISTS = 10_000;
 const MAX_ENTRIES = 10_000;
 const MAX_SPOILER_DECISIONS = 100_000;
-
-export type WorkspaceBackupSpoilerDecision = {
-  scope: SpoilerRevealScope;
-  state: SpoilerDecisionState;
-  targetId: string;
-};
-
-type BackupEntity<Entity> = {
-  id: string;
-  value: Entity;
-};
-
-export type WorkspaceBackup = {
-  cardLists: BackupEntity<CardList>[];
-  collectionLots: BackupEntity<CollectionLot>[];
-  decks: BackupEntity<Deck>[];
-  format: typeof BACKUP_FORMAT;
-  preferences: Preferences;
-  spoilerDecisions: WorkspaceBackupSpoilerDecision[];
-  version: typeof BACKUP_VERSION;
-};
 
 const StrictCollectionLotSchema = CollectionLotSchema.extend({
   unitCost: MoneySchema.strict().optional(),
@@ -109,7 +91,10 @@ const BackupCollections = {
 
 const WorkspaceBackupSchema = z.strictObject({
   ...BackupCollections,
-  preferences: PreferencesSchema,
+  preferences: z.strictObject({
+    motion: MotionPreferenceSchema,
+    spoilerPolicy: SpoilerPolicySchema,
+  }),
   spoilerDecisions: z
     .array(BackupSpoilerDecisionSchema)
     .max(MAX_SPOILER_DECISIONS)
@@ -120,6 +105,12 @@ const LegacyWorkspaceBackupSchema = z.strictObject({
   ...BackupCollections,
   preferences: z.strictObject({ motion: MotionPreferenceSchema }),
   version: z.literal(1),
+});
+const WorkspaceLegacyBackupSnapshotSchema = z.strictObject({
+  cardLists: BackupCollections.cardLists,
+  collectionLots: BackupCollections.collectionLots,
+  decks: BackupCollections.decks,
+  motion: MotionPreferenceSchema,
 });
 
 export function parseWorkspaceBackup(serialized: string): WorkspaceBackup {
@@ -162,6 +153,16 @@ export function parseWorkspaceBackup(serialized: string): WorkspaceBackup {
   throw new TypeError("The workspace backup is invalid or exceeds a limit.");
 }
 
+export function validateWorkspaceBackup(value: JSONType): WorkspaceBackup {
+  return WorkspaceBackupSchema.parse(value);
+}
+
+export function validateWorkspaceLegacyBackupSnapshot(
+  value: JSONType,
+): WorkspaceLegacyBackupSnapshot {
+  return WorkspaceLegacyBackupSnapshotSchema.parse(value);
+}
+
 export function serializeWorkspaceBackup(
   value: Omit<WorkspaceBackup, "format" | "version">,
 ): string {
@@ -174,6 +175,15 @@ export function serializeWorkspaceBackup(
     null,
     2,
   )}\n`;
+}
+
+export function legacyBackupSnapshot(backup: WorkspaceBackup): WorkspaceLegacyBackupSnapshot {
+  return {
+    cardLists: backup.cardLists,
+    collectionLots: backup.collectionLots,
+    decks: backup.decks,
+    motion: backup.preferences.motion,
+  };
 }
 
 export function validateCollectionLot(value: CollectionLot | JSONType): CollectionLot {
