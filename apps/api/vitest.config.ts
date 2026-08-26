@@ -7,6 +7,7 @@ const testSecrets = {
   BETTER_AUTH_SECRET: "test-only-".repeat(6),
   GOOGLE_CLIENT_ID: "test-google-client-id",
   GOOGLE_CLIENT_SECRET: "test-google-client-secret",
+  SYNC_CREDENTIAL_SECRET: "test-sync-credential-secret-".repeat(2),
 };
 
 Object.assign(process.env, testSecrets);

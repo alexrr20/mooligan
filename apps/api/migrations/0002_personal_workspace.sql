@@ -1,0 +1,5 @@
+CREATE TABLE personal_workspace (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL UNIQUE REFERENCES "user" (id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL
+) STRICT;
