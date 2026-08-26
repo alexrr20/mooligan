@@ -9,7 +9,7 @@ import * as z from "zod";
 import { validatePreferencesUpdate } from "../electron/workspace/preferences.ts";
 import { WorkspaceStore } from "../electron/workspace/store.ts";
 
-void test("the legacy workspace store retains only staged collection and motion data", async () => {
+void test("the legacy workspace store retains only staged entities and motion data", async () => {
   const directory = await mkdtemp(join(tmpdir(), "mooligan-workspace-"));
   const path = join(directory, "workspace.sqlite");
 
@@ -42,6 +42,7 @@ void test("the legacy workspace store retains only staged collection and motion 
         .map(({ name }) => name);
       assert.equal(tableNames.includes("spoiler_state"), false);
       assert.equal(tableNames.includes("spoiler_decisions"), false);
+      assert.equal(tableNames.includes("collection_lots"), false);
       assert.deepEqual(
         database
           .prepare("SELECT key FROM preferences ORDER BY key")

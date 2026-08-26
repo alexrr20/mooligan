@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { makeInMemoryAdapter } from "@livestore/adapter-web";
 import { createStorePromise } from "@livestore/livestore";
 import {
+  collectionLotsQuery,
   events,
   spoilerDecisionsQuery,
   spoilerSettingsQuery,
@@ -13,17 +14,16 @@ import {
 import type { WorkspaceLegacyBackupSnapshot } from "../shared/desktop-api.ts";
 import {
   createWorkspaceBackup,
-  restoreSpoilerBackup,
+  restoreWorkspaceBackup,
 } from "../src/features/workspace/workspace-backup.ts";
 
 const emptyLegacySnapshot: WorkspaceLegacyBackupSnapshot = {
   cardLists: [],
-  collectionLots: [],
   decks: [],
   motion: "reduced",
 };
 
-void test("staged backup export reads policy and explicit decisions from LiveStore", async () => {
+void test("staged backup export reads collection and spoiler state from LiveStore", async () => {
   const store = await openStore("backup-source");
   try {
     store.commit(events.spoilerPolicyChanged({ policy: "show" }));
@@ -38,11 +38,41 @@ void test("staged backup export reads policy and explicit decisions from LiveSto
         targetId: "printing-one",
       }),
     );
+    store.commit(
+      events.collectionCopiesAdded({
+        additionId: "addition-one",
+        lot: {
+          acquiredAt: null,
+          condition: "near-mint",
+          finish: "foil",
+          id: "lot-one",
+          language: "en",
+          locationId: null,
+          notes: null,
+          printingId: "printing-one",
+          quantity: 2,
+          unitCost: null,
+        },
+      }),
+    );
 
     const backup = createWorkspaceBackup(store, emptyLegacySnapshot);
     assert.deepEqual(backup.preferences, { motion: "reduced", spoilerPolicy: "show" });
     assert.deepEqual(backup.spoilerDecisions, [
       { scope: "printing", state: "reveal", targetId: "printing-one" },
+    ]);
+    assert.deepEqual(backup.collectionLots, [
+      {
+        id: "lot-one",
+        value: {
+          condition: "near-mint",
+          finish: "foil",
+          id: "lot-one",
+          language: "en",
+          printingId: "printing-one",
+          quantity: 2,
+        },
+      },
     ]);
   } finally {
     await store.shutdownPromise();
@@ -52,9 +82,21 @@ void test("staged backup export reads policy and explicit decisions from LiveSto
 void test("staged restore commits and verifies spoiler events in a new LiveStore", async () => {
   const store = await openStore("backup-target");
   try {
-    restoreSpoilerBackup(store, {
+    restoreWorkspaceBackup(store, {
       cardLists: [],
-      collectionLots: [],
+      collectionLots: [
+        {
+          id: "lot-one",
+          value: {
+            condition: "near-mint",
+            finish: "nonfoil",
+            id: "lot-one",
+            language: "en",
+            printingId: "printing-one",
+            quantity: 4,
+          },
+        },
+      ],
       decks: [],
       format: "mooligan-workspace",
       preferences: { motion: "system", spoilerPolicy: "protect" },
@@ -66,6 +108,10 @@ void test("staged restore commits and verifies spoiler events in a new LiveStore
     });
 
     assert.equal(store.query(spoilerSettingsQuery).policy, "protect");
+    assert.deepEqual(
+      store.query(collectionLotsQuery).map(({ id, quantity }) => ({ id, quantity })),
+      [{ id: "lot-one", quantity: 4 }],
+    );
     assert.deepEqual(
       store
         .query(spoilerDecisionsQuery)

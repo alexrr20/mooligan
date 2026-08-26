@@ -3,6 +3,12 @@ import { SpoilerTargetIdSchema } from "@mooligan/domain/spoilers";
 import * as z from "zod";
 
 import {
+  validateCollectionListResult,
+  validateCollectionPrintingRequest,
+  validateCollectionProjectionConnection,
+  validateCollectionProjectionDelta,
+  validateCollectionProjectionResult,
+  validateCollectionProjectionSnapshot,
   validateSpoilerProjectionConnection,
   validateSpoilerProjectionDelta,
   validateSpoilerProjectionResult,
@@ -26,11 +32,8 @@ function subscribe<Value>(channel: string, callback: (value: Value) => void) {
 
 export const desktopApi = {
   collection: {
-    add: (request) => ipcRenderer.invoke("collection:add", request),
-    list: (request) => ipcRenderer.invoke("collection:list", request),
-    onChanged: (callback: () => void) => subscribe<void>("collection:changed", callback),
-    remove: (request) => ipcRenderer.invoke("collection:remove", request),
-    update: (request) => ipcRenderer.invoke("collection:update", request),
+    list: async (request) =>
+      validateCollectionListResult(await ipcRenderer.invoke("collection:list", request)),
   },
 
   catalog: {
@@ -45,9 +48,21 @@ export const desktopApi = {
     status: () => ipcRenderer.invoke("catalog:status"),
     upcoming: () => ipcRenderer.invoke("catalog:upcoming"),
     upcomingPrintings: (request) => ipcRenderer.invoke("catalog:upcoming-printings", request),
+    validateCollectionPrinting: (request) =>
+      ipcRenderer.invoke(
+        "catalog:validate-collection-printing",
+        validateCollectionPrintingRequest(request),
+      ),
   },
 
   workspaceProjection: {
+    applyCollectionDelta: async (delta) =>
+      validateCollectionProjectionResult(
+        await ipcRenderer.invoke(
+          "workspace-projection:collection-apply",
+          validateCollectionProjectionDelta(delta),
+        ),
+      ),
     applySpoilerDelta: async (delta) =>
       validateSpoilerProjectionResult(
         await ipcRenderer.invoke(
@@ -62,7 +77,23 @@ export const desktopApi = {
           z.uuidv4().parse(workspaceId),
         ),
       ),
+    connectCollection: async (workspaceId) =>
+      validateCollectionProjectionConnection(
+        await ipcRenderer.invoke(
+          "workspace-projection:collection-connect",
+          z.uuidv4().parse(workspaceId),
+        ),
+      ),
+    onCollectionResyncRequired: (callback) =>
+      subscribe("workspace-projection:collection-resync-required", callback),
     onSpoilersChanged: (callback) => subscribe("workspace-projection:spoilers-changed", callback),
+    replaceCollection: async (snapshot) =>
+      validateCollectionProjectionResult(
+        await ipcRenderer.invoke(
+          "workspace-projection:collection-replace",
+          validateCollectionProjectionSnapshot(snapshot),
+        ),
+      ),
     replaceSpoilers: async (snapshot) =>
       validateSpoilerProjectionResult(
         await ipcRenderer.invoke(

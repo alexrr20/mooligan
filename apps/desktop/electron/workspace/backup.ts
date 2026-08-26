@@ -108,7 +108,6 @@ const LegacyWorkspaceBackupSchema = z.strictObject({
 });
 const WorkspaceLegacyBackupSnapshotSchema = z.strictObject({
   cardLists: BackupCollections.cardLists,
-  collectionLots: BackupCollections.collectionLots,
   decks: BackupCollections.decks,
   motion: MotionPreferenceSchema,
 });
@@ -180,7 +179,6 @@ export function serializeWorkspaceBackup(
 export function legacyBackupSnapshot(backup: WorkspaceBackup): WorkspaceLegacyBackupSnapshot {
   return {
     cardLists: backup.cardLists,
-    collectionLots: backup.collectionLots,
     decks: backup.decks,
     motion: backup.preferences.motion,
   };

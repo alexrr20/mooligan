@@ -5,10 +5,14 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
 
+import { makeInMemoryAdapter } from "@livestore/adapter-web";
+import { createStorePromise } from "@livestore/livestore";
 import type { SpoilerVisibilitySnapshot } from "@mooligan/domain/spoilers";
+import { collectionLotsQuery, workspaceSchema } from "@mooligan/workspace/schema";
 
+import { createCollectionProjection } from "../electron/catalog/collection-projection.ts";
 import { createCollectionQuery } from "../electron/catalog/collection-query.ts";
-import { WorkspaceStore } from "../electron/workspace/store.ts";
+import { createCollectionMutations } from "../src/features/collection/collection-mutations.ts";
 
 const visibility: SpoilerVisibilitySnapshot = {
   currentDate: "2026-08-21",
@@ -19,18 +23,26 @@ const visibility: SpoilerVisibilitySnapshot = {
 };
 
 void test("collection mutations merge Holding collisions and preserve the target lot", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "mooligan-collection-store-"));
-
+  const store = await createStorePromise({
+    adapter: makeInMemoryAdapter({ clientId: "collection-mutations-client" }),
+    disableDevtools: true,
+    schema: workspaceSchema,
+    storeId: "collection-mutations",
+  });
+  const validatedPrintingIds: string[] = [];
+  const collection = createCollectionMutations(store, (request) => {
+    validatedPrintingIds.push(request.printingId);
+    return Promise.resolve();
+  });
   try {
-    const store = new WorkspaceStore(join(directory, "workspace.sqlite"));
-    const first = store.addCollectionHolding({
+    const first = await collection.add({
       condition: "near-mint",
       finish: "foil",
       language: "en",
       printingId: "printing-1",
       quantity: 2,
     });
-    const repeated = store.addCollectionHolding({
+    const repeated = await collection.add({
       condition: "near-mint",
       finish: "foil",
       language: "en",
@@ -41,14 +53,14 @@ void test("collection mutations merge Holding collisions and preserve the target
     assert.equal(repeated.lotId, first.lotId);
     assert.equal(repeated.holdingQuantity, 5);
 
-    const target = store.addCollectionHolding({
+    const target = await collection.add({
       condition: "lightly-played",
       finish: "foil",
       language: "en",
       printingId: "printing-1",
       quantity: 4,
     });
-    const merged = store.updateCollectionHolding({
+    const merged = await collection.update({
       condition: "lightly-played",
       finish: "foil",
       language: "en",
@@ -58,15 +70,23 @@ void test("collection mutations merge Holding collisions and preserve the target
 
     assert.equal(merged.lotId, target.lotId);
     assert.equal(merged.holdingQuantity, 10);
-    assert.equal(store.readCollectionLot(first.lotId), null);
-    assert.equal(store.readCollectionLots().length, 1);
+    assert.equal(
+      store.query(collectionLotsQuery).some(({ id }) => id === first.lotId),
+      false,
+    );
+    assert.equal(store.query(collectionLotsQuery).length, 1);
 
-    store.removeCollectionHolding(target.lotId);
-    assert.deepEqual(store.readCollectionLots(), []);
-    assert.throws(() => store.removeCollectionHolding(target.lotId), /cannot be removed/);
-    store.close();
+    await collection.remove({ lotId: target.lotId });
+    assert.deepEqual(store.query(collectionLotsQuery), []);
+    await assert.rejects(collection.remove({ lotId: target.lotId }), /cannot be removed/);
+    assert.deepEqual(validatedPrintingIds, [
+      "printing-1",
+      "printing-1",
+      "printing-1",
+      "printing-1",
+    ]);
   } finally {
-    await rm(directory, { force: true, recursive: true });
+    await store.shutdownPromise();
   }
 });
 
@@ -75,29 +95,6 @@ void test("collection reads separate visible, protected, and unavailable Holding
   const catalogPath = join(directory, "catalog.sqlite");
 
   try {
-    const store = new WorkspaceStore(join(directory, "workspace.sqlite"));
-    store.addCollectionHolding({
-      condition: "near-mint",
-      finish: "nonfoil",
-      language: "en",
-      printingId: "visible-printing",
-      quantity: 2,
-    });
-    store.addCollectionHolding({
-      condition: "near-mint",
-      finish: "foil",
-      language: "ja",
-      printingId: "future-printing",
-      quantity: 3,
-    });
-    store.addCollectionHolding({
-      condition: "damaged",
-      finish: "etched",
-      language: "de",
-      printingId: "missing-printing",
-      quantity: 4,
-    });
-
     const database = new DatabaseSync(catalogPath);
     database.exec(`
       CREATE TABLE cards (
@@ -147,8 +144,33 @@ void test("collection reads separate visible, protected, and unavailable Holding
       "2026-10-01",
       JSON.stringify({ digital: false, finishes: ["foil"] }),
     );
-    database.prepare("ATTACH DATABASE ? AS workspace").run(store.databasePath);
-    database.exec("PRAGMA query_only = ON");
+    const projection = createCollectionProjection(database);
+    projection.replace([
+      {
+        condition: "near-mint",
+        finish: "nonfoil",
+        id: "visible-lot",
+        language: "en",
+        printingId: "visible-printing",
+        quantity: 2,
+      },
+      {
+        condition: "near-mint",
+        finish: "foil",
+        id: "future-lot",
+        language: "ja",
+        printingId: "future-printing",
+        quantity: 3,
+      },
+      {
+        condition: "damaged",
+        finish: "etched",
+        id: "missing-lot",
+        language: "de",
+        printingId: "missing-printing",
+        quantity: 4,
+      },
+    ]);
 
     const list = createCollectionQuery(database);
     const page = list({}, visibility);
@@ -214,7 +236,6 @@ void test("collection reads separate visible, protected, and unavailable Holding
     assert.equal(secondBatch.holdings[0]?.status, "unavailable");
 
     database.close();
-    store.close();
   } finally {
     await rm(directory, { force: true, recursive: true });
   }

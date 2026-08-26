@@ -7,7 +7,11 @@ import { Worker } from "node:worker_threads";
 import { CatalogSnapshotSchema, type CatalogSnapshot } from "@mooligan/domain/catalog";
 import type { CatalogImageDescriptor } from "@mooligan/domain/catalog-detail";
 import type { CatalogListPage, CatalogUpcomingPrintingPage } from "@mooligan/domain/catalog-search";
-import type { CollectionListPage } from "@mooligan/domain/collection";
+import {
+  CollectionPrintingValidationRequestSchema,
+  type CollectionListPage,
+  type CollectionLot,
+} from "@mooligan/domain/collection";
 import {
   CatalogReleaseSchema,
   ScryfallSetListSchema,
@@ -42,6 +46,11 @@ import {
   readWithStableCatalogVisibility,
 } from "./stable-visibility";
 import { assertTrustedSender } from "../ipc-security";
+import {
+  parseCollectionProjectionWorkerResponse,
+  type CollectionProjectionWorkerOperation,
+  type CollectionProjectionWorkerRequest,
+} from "./collection-projection";
 
 const apiBaseUrl = process.env.MOOLIGAN_API_URL ?? "http://127.0.0.1:3000";
 const scryfallSetsUrl = "https://api.scryfall.com/sets";
@@ -61,7 +70,9 @@ let catalogQueryId = 0;
 let catalogQueryWorker: Worker | undefined;
 let catalogQueryWorkerIdentity: string | undefined;
 let getCatalogVisibilitySnapshot: (() => SpoilerVisibilitySnapshot) | undefined;
-let getWorkspacePath: (() => string) | undefined;
+let getCollectionProjectionLots: (() => CollectionLot[]) | undefined;
+let isCollectionProjectionReady: (() => boolean) | undefined;
+let onCollectionProjectionInvalidated: (() => void) | undefined;
 type CatalogQueryResult =
   | CatalogListPage
   | CollectionListPage
@@ -79,15 +90,27 @@ const catalogQueries = new Map<
     resolve: (result: CatalogQueryResult) => void;
   }
 >();
+const collectionProjectionRequests = new Map<
+  number,
+  {
+    operation: CollectionProjectionWorkerOperation["type"];
+    reject: (error: Error) => void;
+    resolve: () => void;
+  }
+>();
 
 export type CatalogIpcOptions = {
+  getCollectionProjectionLots: () => CollectionLot[];
   getVisibilitySnapshot: () => SpoilerVisibilitySnapshot;
-  getWorkspacePath: () => string;
+  isCollectionProjectionReady: () => boolean;
+  onCollectionProjectionInvalidated: () => void;
 };
 
 export function registerCatalogIpc(options: CatalogIpcOptions) {
   getCatalogVisibilitySnapshot = options.getVisibilitySnapshot;
-  getWorkspacePath = options.getWorkspacePath;
+  getCollectionProjectionLots = options.getCollectionProjectionLots;
+  isCollectionProjectionReady = options.isCollectionProjectionReady;
+  onCollectionProjectionInvalidated = options.onCollectionProjectionInvalidated;
   ipcMain.handle("catalog:status", (event) => {
     assertTrustedSender(event);
     return getCatalogStatus();
@@ -104,24 +127,35 @@ export function registerCatalogIpc(options: CatalogIpcOptions) {
     assertTrustedSender(event);
     return queryCatalogPrintingDetail(printingId);
   });
+  ipcMain.handle("catalog:validate-collection-printing", async (event, value) => {
+    assertTrustedSender(event);
+    const request = CollectionPrintingValidationRequestSchema.parse(value);
+    const result = await queryCatalogPrintingDetail(request.printingId);
+    assertPrintingCanUseFinish(result, request);
+  });
   ipcMain.handle("catalog:root-set", async (event, targetId) => {
     assertTrustedSender(event);
     return resolveCatalogRootSetId(targetId);
   });
   ipcMain.handle("collection:list", async (event, request) => {
     assertTrustedSender(event);
-    const workspacePath = readWorkspacePath();
+    if (!readCollectionProjectionReady()) {
+      return { status: "not-ready" } as const;
+    }
     const validRequest = validateCollectionListRequest(request);
     await catalogQueriesAvailable;
+    if (!readCollectionProjectionReady()) {
+      return { status: "not-ready" } as const;
+    }
     const result = await queryCatalogWithStableVisibility((visibility) =>
       queryCatalog({ request: validRequest, type: "collection-list", visibility }),
     );
 
-    if (workspacePath !== readWorkspacePath()) {
-      throw new Error("The active workspace changed before the Collection was read.");
+    if (!readCollectionProjectionReady()) {
+      return { status: "not-ready" } as const;
     }
 
-    return result;
+    return { page: result, status: "ready" } as const;
   });
   ipcMain.handle("catalog:upcoming", async (event) => {
     assertTrustedSender(event);
@@ -157,6 +191,20 @@ export function registerCatalogIpc(options: CatalogIpcOptions) {
 
     return activeDownload;
   });
+}
+
+export function replaceCatalogCollectionProjection(lots: CollectionLot[]) {
+  return catalogQueryWorker
+    ? sendCollectionProjectionOperation({ lots, type: "collection-projection-replace" })
+    : Promise.resolve();
+}
+
+export function applyCatalogCollectionProjection(
+  delta: Readonly<{ deletedLotIds: string[]; upserts: CollectionLot[] }>,
+) {
+  return catalogQueryWorker
+    ? sendCollectionProjectionOperation({ ...delta, type: "collection-projection-apply" })
+    : Promise.resolve();
 }
 
 async function getCatalogStatus(): Promise<CatalogStatus> {
@@ -554,16 +602,22 @@ function readCatalogVisibilitySnapshot() {
   return getCatalogVisibilitySnapshot();
 }
 
-function readWorkspacePath() {
-  if (!getWorkspacePath) {
-    throw new Error("The active workspace has not been initialized.");
+function readCollectionProjectionReady() {
+  if (!isCollectionProjectionReady) {
+    throw new Error("The Collection projection has not been initialized.");
   }
-  return getWorkspacePath();
+  return isCollectionProjectionReady();
 }
 
 function getCatalogQueryWorker() {
-  const paths = { catalogPath: catalogPath(), workspacePath: readWorkspacePath() };
-  const identity = JSON.stringify(paths);
+  if (!getCollectionProjectionLots) {
+    throw new Error("The Collection projection has not been initialized.");
+  }
+  const startup = {
+    catalogPath: catalogPath(),
+    collectionLots: getCollectionProjectionLots(),
+  };
+  const identity = startup.catalogPath;
 
   if (catalogQueryWorker && catalogQueryWorkerIdentity === identity) {
     return catalogQueryWorker;
@@ -575,7 +629,7 @@ function getCatalogQueryWorker() {
 
   const worker = new Worker(
     new URL(/* @vite-ignore */ "./catalog-query-worker.js", import.meta.url),
-    { workerData: paths },
+    { workerData: startup },
   );
 
   worker.on("message", (value) => {
@@ -586,8 +640,20 @@ function getCatalogQueryWorker() {
       return;
     }
 
-    const pending = catalogQueries.get(envelope.data.id);
+    const projectionPending = collectionProjectionRequests.get(envelope.data.id);
+    if (projectionPending) {
+      const response = parseCollectionProjectionWorkerResponse(value, projectionPending.operation);
+      if (!response) {
+        failCatalogQueryWorker(worker);
+        return;
+      }
+      collectionProjectionRequests.delete(envelope.data.id);
+      if ("error" in response) projectionPending.reject(catalogReadError());
+      else projectionPending.resolve();
+      return;
+    }
 
+    const pending = catalogQueries.get(envelope.data.id);
     if (!pending) {
       failCatalogQueryWorker(worker);
       return;
@@ -628,9 +694,51 @@ function failCatalogQueryWorker(worker: Worker, terminate = true) {
   }
 
   catalogQueries.clear();
+  for (const pending of collectionProjectionRequests.values()) {
+    pending.reject(catalogReadError());
+  }
+  collectionProjectionRequests.clear();
+  onCollectionProjectionInvalidated?.();
 
   if (terminate) {
     void worker.terminate().catch(() => undefined);
+  }
+}
+
+function sendCollectionProjectionOperation(operation: CollectionProjectionWorkerOperation) {
+  const worker = catalogQueryWorker;
+  if (!worker) return Promise.resolve();
+  const id = ++catalogQueryId;
+  return new Promise<void>((resolve, reject) => {
+    collectionProjectionRequests.set(id, { operation: operation.type, reject, resolve });
+    try {
+      worker.postMessage({ id, operation } satisfies CollectionProjectionWorkerRequest);
+    } catch {
+      collectionProjectionRequests.delete(id);
+      reject(catalogReadError());
+    }
+  });
+}
+
+function assertPrintingCanUseFinish(
+  result: CatalogPrintingResult | null,
+  request: {
+    existingFinish?: "etched" | "foil" | "glossy" | "nonfoil";
+    finish: "etched" | "foil" | "glossy" | "nonfoil";
+  },
+) {
+  if (!result) {
+    if (request.existingFinish === request.finish) return;
+    throw new Error("This printing is not present in the installed catalog.");
+  }
+  if (result.status === "protected") {
+    throw new Error("Reveal this printing before adding it to the Collection.");
+  }
+  if (result.detail.selectedPrinting.isDigital) {
+    throw new Error("Digital printings cannot be added to the Collection.");
+  }
+  if (!result.detail.selectedPrinting.finishes?.includes(request.finish)) {
+    throw new Error("This finish is not available for the selected printing.");
   }
 }
 

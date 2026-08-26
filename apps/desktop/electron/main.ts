@@ -15,13 +15,16 @@ import {
 } from "./catalog/image-cache-directory";
 import { registerCatalogImageProtocol } from "./catalog/image-protocol";
 import {
+  applyCatalogCollectionProjection,
   queryCatalogImageSource,
   queryCatalogSetSymbolSource,
   registerCatalogIpc,
+  replaceCatalogCollectionProjection,
 } from "./catalog/ipc";
 import { createCatalogSetSymbolCache } from "./catalog/set-symbol-cache";
 import { registerCatalogSetSymbolProtocol } from "./catalog/set-symbol-protocol";
-import { registerCollectionIpc } from "./collection/ipc";
+import { registerCollectionProjectionIpc } from "./collection/projection-ipc";
+import { CollectionProjection } from "./collection/projection";
 import { developmentRendererUrl } from "./ipc-security";
 import { registerDesktopSchemes } from "./protocols";
 import { registerSpoilerProjectionIpc } from "./spoilers/projection-ipc";
@@ -50,7 +53,10 @@ const authStartup = registerAuthColdStart({
     app.setAsDefaultProtocolClient(scheme, path, args),
 });
 
-async function createWindow(spoilerProjection: SpoilerProjection) {
+async function createWindow(
+  collectionProjection: CollectionProjection,
+  spoilerProjection: SpoilerProjection,
+) {
   const window = new BrowserWindow({
     width: 1480,
     height: 840,
@@ -77,6 +83,7 @@ async function createWindow(spoilerProjection: SpoilerProjection) {
   });
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("did-start-loading", () => {
+    collectionProjection.rendererReplaced(window.webContents.id);
     spoilerProjection.rendererReplaced(window.webContents.id);
   });
   window.once("ready-to-show", () => window.show());
@@ -100,17 +107,21 @@ if (!authStartup.isPrimary) {
       const spoilers = new SpoilerProjection(() => workspace.workspaceId, {
         onChanged: () => publishRendererEvent("workspace-projection:spoilers-changed", undefined),
       });
+      const collection = new CollectionProjection(() => workspace.workspaceId, {
+        applyDelta: applyCatalogCollectionProjection,
+        onResyncRequired: () =>
+          publishRendererEvent("workspace-projection:collection-resync-required", undefined),
+        replace: replaceCatalogCollectionProjection,
+      });
       const workspaceMutations = new MutationQueue();
 
       registerCatalogIpc({
+        getCollectionProjectionLots: () => collection.lots(),
         getVisibilitySnapshot: () => spoilers.visibilitySnapshot(),
-        getWorkspacePath: () => workspace.databasePath,
+        isCollectionProjectionReady: () => collection.isReady(),
+        onCollectionProjectionInvalidated: () => collection.workerInvalidated(),
       });
-      registerCollectionIpc(
-        workspace,
-        workspaceMutations,
-        () => spoilers.visibilitySnapshot().revision,
-      );
+      registerCollectionProjectionIpc(collection);
       registerSpoilerProjectionIpc(spoilers);
       const publishPreferences = registerWorkspaceIpc(
         workspaceRegistry,
@@ -159,13 +170,13 @@ if (!authStartup.isPrimary) {
         callback(false);
       });
 
-      await createWindow(spoilers);
+      await createWindow(collection, spoilers);
       publishAuthStateAndRefresh();
       publishPreferences();
 
       app.on("activate", () => {
         if (BrowserWindow.getAllWindows().length === 0) {
-          void createWindow(spoilers);
+          void createWindow(collection, spoilers);
         }
       });
       app.on("second-instance", focusFirstWindow);

@@ -5,6 +5,7 @@ import { Component, Suspense, use, useMemo, type ErrorInfo, type ReactNode } fro
 import { Button } from "../../components/button";
 import { typography } from "../../styles/typography";
 import { SpoilerProjectionStartup } from "./spoiler-projection";
+import { CollectionProjectionStartup } from "./collection-projection";
 import { workspaceStoreOptions, workspaceStoreRegistry } from "./workspace-store";
 import { WorkspaceStoreProvider } from "./workspace-store-context";
 
@@ -44,12 +45,17 @@ function OpenWorkspace({
   const store = useStore(options);
   return (
     <WorkspaceStoreProvider store={store}>
-      <SpoilerProjectionStartup
+      <CollectionProjectionStartup
         loading={<WorkspaceStatus status="loading" />}
         workspaceId={options.storeId}
       >
-        {children}
-      </SpoilerProjectionStartup>
+        <SpoilerProjectionStartup
+          loading={<WorkspaceStatus status="loading" />}
+          workspaceId={options.storeId}
+        >
+          {children}
+        </SpoilerProjectionStartup>
+      </CollectionProjectionStartup>
     </WorkspaceStoreProvider>
   );
 }

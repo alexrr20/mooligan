@@ -1,4 +1,5 @@
 export {
+  collectionLotsQuery,
   events,
   initialSpoilerResetId,
   spoilerDecisionsQuery,
