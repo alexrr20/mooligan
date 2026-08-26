@@ -77,11 +77,13 @@ first request bootstraps it from Scryfall:
 curl "http://127.0.0.1:3000/catalog/release"
 ```
 
-The Worker repeats that check every six hours in production. It stores only the
-current Scryfall release metadata in D1. The desktop downloads Scryfall's
-`default_cards` JSONL gzip archive directly, streams it into a temporary SQLite
-database, validates it, and atomically replaces the installed catalog. A failed
-check or import leaves the existing offline catalog untouched.
+The Worker checks Scryfall whenever the desktop requests the current catalog
+release and every six hours in production. It stores only the current Scryfall
+release metadata in D1. If Scryfall is temporarily unavailable, the Worker
+returns its cached release. The desktop downloads Scryfall's `default_cards`
+JSONL gzip archive directly, streams it into a temporary SQLite database,
+validates it, and atomically replaces the installed catalog. A failed import
+leaves the existing offline catalog untouched.
 
 Desktop builds read the catalog service from `MOOLIGAN_API_URL`, the auth
 service from `MOOLIGAN_AUTH_ORIGIN`, and the LiveStore endpoint from
