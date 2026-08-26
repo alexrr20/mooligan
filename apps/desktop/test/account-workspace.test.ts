@@ -163,6 +163,13 @@ void test("switching Accounts never reuses the previous Account credential or Wo
     assert.equal(switched.workspaces.length, 3);
     assert.equal(registry.accountId(firstWorkspaceId), "account-first");
     assert.equal(registry.accountId(secondWorkspaceId), "account-second");
+
+    await assert.rejects(
+      accountWorkspace.selectWorkspace(firstWorkspaceId),
+      /associated with another Account/u,
+    );
+    assert.equal(accountWorkspace.runtime().workspaceId, secondWorkspaceId);
+    assert.equal(accountWorkspace.runtime().sync?.credential, "credential-second");
   });
 });
 
@@ -191,10 +198,11 @@ void test("Account service failure pauses sync without replacing the local Works
   });
 });
 
-void test("a failed new-Account binding keeps the prior Account Workspace active", async () => {
+void test("a failed new-Account binding switches away from the prior Account Workspace", async () => {
   await withRegistry(async (registry) => {
     const priorWorkspaceId = registry.bootstrap().workspaceId;
     registry.bindWorkspace(priorWorkspaceId, "account-prior");
+    const changes: boolean[] = [];
     const auth = new FakeAccountAuth(signedIn("account-new"), async (path) => {
       if (path === "/api/workspace") {
         return jsonResponse({ error: "workspace_not_found" }, 404);
@@ -207,18 +215,60 @@ void test("a failed new-Account binding keeps the prior Account Workspace active
     const accountWorkspace = new AccountWorkspace(
       auth,
       registry,
-      () => undefined,
+      (workspaceChanged) => {
+        changes.push(workspaceChanged);
+      },
       () => now,
     );
 
     await accountWorkspace.authChanged(auth.snapshot());
     const runtime = accountWorkspace.runtime();
 
-    assert.equal(runtime.workspaceId, priorWorkspaceId);
+    assert.notEqual(runtime.workspaceId, priorWorkspaceId);
     assert.equal(runtime.sync, null);
     assert.equal(runtime.syncIssue, "workspace-unavailable");
-    assert.equal(runtime.workspaces.length, 1);
+    assert.equal(runtime.workspaces.length, 2);
+    assert.equal(registry.accountId(runtime.workspaceId), null);
     assert.equal(registry.accountId(priorWorkspaceId), "account-prior");
+    assert.deepEqual(changes, [true, false]);
+  });
+});
+
+void test("switching Accounts leaves the prior Account Workspace before connecting", async () => {
+  await withRegistry(async (registry) => {
+    const priorWorkspaceId = registry.bootstrap().workspaceId;
+    registry.bindWorkspace(priorWorkspaceId, "account-prior");
+    const events: string[] = [];
+    let resolveRequest: ((response: Response) => void) | undefined;
+    const pendingResponse = new Promise<Response>((resolve) => {
+      resolveRequest = resolve;
+    });
+    const auth = new FakeAccountAuth(signedIn("account-new"), async () => {
+      events.push("request");
+      return await pendingResponse;
+    });
+    const accountWorkspace = new AccountWorkspace(
+      auth,
+      registry,
+      (workspaceChanged) => {
+        events.push(`workspace:${String(workspaceChanged)}`);
+      },
+      () => now,
+    );
+
+    const connecting = accountWorkspace.authChanged(auth.snapshot());
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    assert.notEqual(registry.bootstrap().workspaceId, priorWorkspaceId);
+    assert.deepEqual(events, ["workspace:true", "request"]);
+
+    assert.ok(resolveRequest);
+    resolveRequest(jsonResponse({ error: "service_unavailable" }, 503));
+    await connecting;
+
+    assert.notEqual(accountWorkspace.runtime().workspaceId, priorWorkspaceId);
+    assert.equal(accountWorkspace.runtime().syncIssue, "account-service-unavailable");
+    assert.deepEqual(events, ["workspace:true", "request", "workspace:false"]);
   });
 });
 

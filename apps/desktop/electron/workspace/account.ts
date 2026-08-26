@@ -50,17 +50,27 @@ export class AccountWorkspace {
 
   authChanged(snapshot: AuthSnapshot) {
     return this.#serialize(async () => {
-      const previousWorkspaceId = this.#registry.bootstrap().workspaceId;
       this.#sync = null;
 
       if (snapshot.status !== "signed-in" || snapshot.user === null) {
         this.#syncIssue = snapshot.status === "session-unavailable" ? "session-unavailable" : null;
-        await this.#runtimeChanged(false);
+        const workspaceChanged =
+          snapshot.user === null
+            ? false
+            : this.#activateWorkspaceForAccount(snapshot.user.id).changed;
+        await this.#runtimeChanged(workspaceChanged);
         return;
       }
 
-      await this.#connectAccount(snapshot.user.id);
-      await this.#runtimeChanged(previousWorkspaceId !== this.#registry.bootstrap().workspaceId);
+      this.#syncIssue = null;
+      const transition = this.#activateWorkspaceForAccount(snapshot.user.id);
+      if (transition.changed) {
+        await this.#runtimeChanged(true);
+      }
+
+      const connectingWorkspaceId = this.#registry.bootstrap().workspaceId;
+      await this.#connectAccount(snapshot.user.id, transition.disposableWorkspaceId);
+      await this.#runtimeChanged(connectingWorkspaceId !== this.#registry.bootstrap().workspaceId);
     });
   }
 
@@ -89,11 +99,19 @@ export class AccountWorkspace {
     return this.#serialize(async () => {
       const previousWorkspaceId = this.#registry.bootstrap().workspaceId;
       const workspace = this.#registry.workspace(workspaceId);
+      const snapshot = this.#auth.snapshot();
+      if (
+        snapshot.user !== null &&
+        workspace.accountId !== null &&
+        workspace.accountId !== snapshot.user.id
+      ) {
+        throw new Error("The Workspace is associated with another Account.");
+      }
+
       this.#registry.activateWorkspace(workspace.workspaceId);
       this.#sync = null;
       this.#syncIssue = null;
 
-      const snapshot = this.#auth.snapshot();
       if (
         snapshot.status === "signed-in" &&
         snapshot.user !== null &&
@@ -126,7 +144,22 @@ export class AccountWorkspace {
     });
   }
 
-  async #connectAccount(accountId: string) {
+  #activateWorkspaceForAccount(accountId: string) {
+    const activeWorkspace = this.#registry.workspace(this.#registry.bootstrap().workspaceId);
+    if (activeWorkspace.accountId === null || activeWorkspace.accountId === accountId) {
+      return { changed: false, disposableWorkspaceId: null };
+    }
+
+    const retainedWorkspace = this.#registry
+      .workspaces()
+      .find(({ workspaceId }) => this.#registry.accountId(workspaceId) === accountId);
+    const targetWorkspaceId = retainedWorkspace?.workspaceId ?? this.#registry.createWorkspace();
+    const disposableWorkspaceId = retainedWorkspace ? null : targetWorkspaceId;
+    this.#registry.activateWorkspace(targetWorkspaceId);
+    return { changed: true, disposableWorkspaceId };
+  }
+
+  async #connectAccount(accountId: string, disposableWorkspaceId: string | null) {
     this.#syncIssue = null;
 
     try {
@@ -134,6 +167,9 @@ export class AccountWorkspace {
       const workspace = remote ?? (await this.#bindLocalWorkspace(accountId));
       this.#registry.registerAccountWorkspace(workspace.workspaceId, accountId);
       this.#registry.activateWorkspace(workspace.workspaceId);
+      if (disposableWorkspaceId && disposableWorkspaceId !== workspace.workspaceId) {
+        this.#registry.removeWorkspace(disposableWorkspaceId);
+      }
       await this.#issueCredential(workspace.workspaceId);
     } catch (error) {
       this.#sync = null;

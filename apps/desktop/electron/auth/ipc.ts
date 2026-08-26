@@ -22,9 +22,9 @@ export async function registerAuthIpc(
 
   async function run(operation: () => ReturnType<DesktopAuth["refresh"]>) {
     try {
-      const snapshot = applySnapshot(await operation());
+      const snapshot = await operation();
       await authChanged(snapshot);
-      return snapshot;
+      return applySnapshot(snapshot);
     } catch (error) {
       applySnapshot(auth.snapshot());
       throw new Error(publicAuthError(error));
@@ -36,8 +36,14 @@ export async function registerAuthIpc(
     publishRendererEvent("auth:error", lastError);
   }
 
-  const restored = applySnapshot(await auth.restore());
-  void Promise.resolve(authChanged(restored)).catch(reportError);
+  const restored = await auth.restore();
+  try {
+    await authChanged(restored);
+    applySnapshot(restored);
+  } catch (cause) {
+    applySnapshot(auth.snapshot());
+    reportError(cause);
+  }
 
   ipcMain.handle("auth:read", (event) => {
     assertTrustedSender(event);
@@ -70,8 +76,8 @@ export async function registerAuthIpc(
     void auth
       .refresh()
       .then(async (snapshot) => {
-        const applied = applySnapshot(snapshot);
-        await authChanged(applied);
+        await authChanged(snapshot);
+        applySnapshot(snapshot);
       })
       .catch((cause: unknown) => {
         applySnapshot(auth.snapshot());

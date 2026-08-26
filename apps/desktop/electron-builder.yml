@@ -1,6 +1,8 @@
 appId: com.mooligan.app
 productName: Mooligan
 asar: true
+electronLanguages:
+  - en
 directories:
   output: release
 files:

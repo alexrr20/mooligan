@@ -405,8 +405,14 @@ importers:
         version: 4.113.0
 
   apps/desktop:
-    dependencies:
+    devDependencies:
+      '@base-ui/react':
+        specifier: 'catalog:'
+        version: 1.6.0(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@livestore/adapter-web':
+        specifier: 'catalog:'
+        version: 0.4.0(d76199156dc224cc14eb8a73e0070160)
+      '@livestore/common':
         specifier: 'catalog:'
         version: 0.4.0(d76199156dc224cc14eb8a73e0070160)
       '@livestore/livestore':
@@ -421,25 +427,12 @@ importers:
       '@livestore/wa-sqlite':
         specifier: 'catalog:'
         version: 0.4.0
-      '@mooligan/workspace':
-        specifier: workspace:*
-        version: link:../../packages/workspace
-      effect:
-        specifier: 'catalog:'
-        version: 3.22.1
-      zod:
-        specifier: 'catalog:'
-        version: 4.4.3
-    devDependencies:
-      '@base-ui/react':
-        specifier: 'catalog:'
-        version: 1.6.0(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@livestore/common':
-        specifier: 'catalog:'
-        version: 0.4.0(d76199156dc224cc14eb8a73e0070160)
       '@mooligan/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@mooligan/workspace':
+        specifier: workspace:*
+        version: link:../../packages/workspace
       '@stylexjs/stylex':
         specifier: 'catalog:'
         version: 0.19.0
@@ -470,6 +463,9 @@ importers:
       better-auth:
         specifier: 'catalog:'
         version: 1.6.25(@cloudflare/workers-types@4.20251118.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@3.2.7(@types/debug@4.1.13)(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.7.0)(supports-color@10.2.2)(typescript@7.0.2)(yaml@2.9.0))
+      effect:
+        specifier: 'catalog:'
+        version: 3.22.1
       electron:
         specifier: 'catalog:'
         version: 43.2.0(supports-color@10.2.2)
@@ -503,6 +499,9 @@ importers:
       vite-plus:
         specifier: 'catalog:'
         version: 0.2.6(@opentelemetry/api@1.9.1)(@types/node@22.20.1)(@voidzero-dev/vite-plus-core@0.2.6(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))(esbuild@0.28.1)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
 
   packages/domain:
     dependencies:
