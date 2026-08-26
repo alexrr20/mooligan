@@ -105,9 +105,11 @@ function WorkspaceRuntimeRoot({ children }: { children: ReactNode }) {
   const options = workspaceStoreOptions(session.runtime);
   return (
     <StoreRegistryProvider storeRegistry={session.registry}>
-      <OpenWorkspace options={options} runtime={session.runtime}>
-        {children}
-      </OpenWorkspace>
+      <Suspense fallback={<WorkspaceStatus status="loading" />}>
+        <OpenWorkspace options={options} runtime={session.runtime}>
+          {children}
+        </OpenWorkspace>
+      </Suspense>
     </StoreRegistryProvider>
   );
 }

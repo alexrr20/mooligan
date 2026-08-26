@@ -83,14 +83,14 @@ current Scryfall release metadata in D1. The desktop downloads Scryfall's
 database, validates it, and atomically replaces the installed catalog. A failed
 check or import leaves the existing offline catalog untouched.
 
-Desktop builds read the catalog service from `MOOLIGAN_API_URL` and the auth
-service from `MOOLIGAN_AUTH_ORIGIN`. Local development defaults both to
-`http://127.0.0.1:3000`; release builds default both to the production Worker.
-Explicit values present while building override those defaults and are embedded
-in the packaged main process, so installed apps do not depend on shell
-configuration. The auth value must be an origin with no path, query,
-credentials, or fragment. It must use HTTPS except for the loopback hosts
-`127.0.0.1`, `localhost`, and `[::1]` during development.
+Desktop builds read the catalog service from `MOOLIGAN_API_URL`, the auth
+service from `MOOLIGAN_AUTH_ORIGIN`, and the LiveStore endpoint from
+`MOOLIGAN_SYNC_URL`. Local development defaults them to the local Worker;
+release builds default them to the production Worker. Explicit values present
+while building override those defaults and are embedded in the packaged app, so
+installed apps do not depend on shell configuration. The auth value must be an
+origin with no path, query, credentials, or fragment. It must use HTTPS except
+for the loopback hosts `127.0.0.1`, `localhost`, and `[::1]` during development.
 
 ### Verify sign-in locally
 
@@ -236,11 +236,12 @@ returns `503` only if that bootstrap check fails.
 
 The desktop packaging configuration registers the exact `com.mooligan.app` URL
 scheme and defaults release builds to the production Worker. Override the
-service origins only when targeting another deployment:
+service URLs only when targeting another deployment:
 
 ```bash
 MOOLIGAN_API_URL=https://mooligan-api.bessa.workers.dev \
   MOOLIGAN_AUTH_ORIGIN=https://mooligan-api.bessa.workers.dev \
+  MOOLIGAN_SYNC_URL=wss://mooligan-api.bessa.workers.dev/api/sync \
   vp run desktop#dist
 ```
 
