@@ -15,14 +15,19 @@
   },
   "dependencies": {
     "@better-auth/electron": "catalog:",
+    "@livestore/sync-cf": "catalog:",
     "@mooligan/domain": "workspace:*",
+    "@mooligan/workspace": "workspace:*",
     "better-auth": "catalog:",
+    "effect": "catalog:",
     "hono": "catalog:",
+    "jose": "catalog:",
     "uuid": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "catalog:",
+    "@effect/platform": "catalog:",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:",

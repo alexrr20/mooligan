@@ -3,13 +3,18 @@
   "name": "mooligan-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-07-28",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": ["enable_request_signal", "nodejs_compat"],
   "vars": {
     "BETTER_AUTH_URL": "https://mooligan-api.bessa.workers.dev",
     "BETTER_AUTH_TRUSTED_ORIGINS": "[\"https://mooligan-api.bessa.workers.dev\",\"com.mooligan.app:/\"]",
   },
   "secrets": {
-    "required": ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
+    "required": [
+      "BETTER_AUTH_SECRET",
+      "GOOGLE_CLIENT_ID",
+      "GOOGLE_CLIENT_SECRET",
+      "SYNC_CREDENTIAL_SECRET",
+    ],
   },
   "assets": {
     "directory": "./auth-dist",
@@ -28,6 +33,20 @@
       "database_name": "prod-moo",
       "database_id": "600a4a28-3079-407c-94c9-606194bef82c",
       "migrations_dir": "migrations",
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SYNC_BACKEND",
+        "class_name": "WorkspaceSyncBackend",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["WorkspaceSyncBackend"],
     },
   ],
 }

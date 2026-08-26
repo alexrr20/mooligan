@@ -11,7 +11,7 @@ import type { SpoilerProjection } from "./projection";
 export function registerSpoilerProjectionIpc(projection: SpoilerProjection) {
   ipcMain.handle("workspace-projection:spoilers-connect", (event, value) => {
     assertTrustedSender(event);
-    return projection.connect(event.sender.id, z.uuidv4().parse(value));
+    return projection.connect(event.sender.id, z.uuid().parse(value));
   });
   ipcMain.handle("workspace-projection:spoilers-replace", (event, value) => {
     assertTrustedSender(event);

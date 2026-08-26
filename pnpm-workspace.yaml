@@ -8,9 +8,11 @@ catalog:
   "@base-ui/react": ^1.6.0
   "@better-auth/electron": 1.6.25
   "@cloudflare/vitest-pool-workers": 0.20.1
+  "@effect/platform": 0.96.3
   "@livestore/adapter-web": 0.4.0
   "@livestore/livestore": 0.4.0
   "@livestore/react": 0.4.0
+  "@livestore/sync-cf": 0.4.0
   "@livestore/wa-sqlite": 0.4.0
   "@oxlint/plugins": 1.78.0
   "@stylexjs/stylex": ^0.19.0
@@ -28,6 +30,7 @@ catalog:
   effect: 3.22.1
   eslint-plugin-react-you-might-not-need-an-effect: ^1.0.1
   hono: ^4.12.32
+  jose: 6.2.8
   mana-font: ^1.18.0
   motion: ^12.42.2
   oxlint: 1.78.0

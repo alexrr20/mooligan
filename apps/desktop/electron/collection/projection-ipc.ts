@@ -11,7 +11,7 @@ import type { CollectionProjection } from "./projection";
 export function registerCollectionProjectionIpc(projection: CollectionProjection) {
   ipcMain.handle("workspace-projection:collection-connect", (event, value) => {
     assertTrustedSender(event);
-    return projection.connect(event.sender.id, z.uuidv4().parse(value));
+    return projection.connect(event.sender.id, z.uuid().parse(value));
   });
   ipcMain.handle("workspace-projection:collection-replace", async (event, value) => {
     assertTrustedSender(event);

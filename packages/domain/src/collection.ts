@@ -211,7 +211,7 @@ export type CollectionPrintingValidationRequest = z.infer<
 
 export const CollectionProjectionConnectionSchema = z.strictObject({
   sessionId: z.uuidv4(),
-  workspaceId: z.uuidv4(),
+  workspaceId: z.uuid(),
 });
 export type CollectionProjectionConnection = z.infer<typeof CollectionProjectionConnectionSchema>;
 
