@@ -211,6 +211,9 @@ small `WorkspaceRegistry` owned by Electron main. The registry stores:
 - Every known workspace ID.
 - The active workspace ID.
 - An optional account ID binding for each workspace.
+- A private binding secret for each locally created workspace. Its UUIDv5
+  derivative is the workspace ID, so the API can verify control without
+  exposing the secret to the renderer or including it in a backup.
 
 Keep SQLite for this registry. It must exist before the renderer knows which
 LiveStore to open, and it is device infrastructure rather than synchronized
@@ -702,6 +705,8 @@ Binding must fail if:
 - The account already owns another workspace.
 - The requested workspace belongs to another account.
 - The workspace ID is malformed.
+- The caller does not supply the private binding secret that derives the
+  requested workspace ID.
 
 The sync credential should contain only the user ID, workspace ID, audience,
 issued-at time, expiry, and a token identifier if replay tracking becomes

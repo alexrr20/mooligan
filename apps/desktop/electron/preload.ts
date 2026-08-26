@@ -72,14 +72,14 @@ export const desktopApi = {
       validateSpoilerProjectionConnection(
         await ipcRenderer.invoke(
           "workspace-projection:spoilers-connect",
-          z.uuidv4().parse(workspaceId),
+          z.uuid().parse(workspaceId),
         ),
       ),
     connectCollection: async (workspaceId) =>
       validateCollectionProjectionConnection(
         await ipcRenderer.invoke(
           "workspace-projection:collection-connect",
-          z.uuidv4().parse(workspaceId),
+          z.uuid().parse(workspaceId),
         ),
       ),
     onCollectionResyncRequired: (callback) =>
@@ -103,13 +103,13 @@ export const desktopApi = {
 
   workspace: {
     activateRestore: (workspaceId) =>
-      ipcRenderer.invoke("workspace:activate-restore", z.uuidv4().parse(workspaceId)),
+      ipcRenderer.invoke("workspace:activate-restore", z.uuid().parse(workspaceId)),
     beginRestore: async () =>
       validateWorkspaceBootstrap(await ipcRenderer.invoke("workspace:begin-restore")),
     bootstrap: async () =>
       validateWorkspaceBootstrap(await ipcRenderer.invoke("workspace:bootstrap")),
     cancelRestore: (workspaceId) =>
-      ipcRenderer.invoke("workspace:cancel-restore", z.uuidv4().parse(workspaceId)),
+      ipcRenderer.invoke("workspace:cancel-restore", z.uuid().parse(workspaceId)),
     exportBackup: (backup) =>
       ipcRenderer.invoke("workspace:export", validateWorkspaceBackup(backup)),
     selectBackup: async () => {

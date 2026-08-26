@@ -15,7 +15,8 @@
   },
   "dependencies": {
     "@livestore/livestore": "catalog:",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "uuid": "catalog:"
   },
   "devDependencies": {
     "@livestore/adapter-web": "catalog:",

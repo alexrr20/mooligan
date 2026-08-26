@@ -4,6 +4,7 @@ import { Buffer } from "node:buffer";
 import { FetchHttpClient, KeyValueStore } from "@effect/platform";
 import { makeHttpSync } from "@livestore/sync-cf/client";
 import { SyncMessage } from "@livestore/sync-cf/common";
+import { workspaceIdForBindingSecret } from "@mooligan/workspace";
 import { env, exports } from "cloudflare:workers";
 import { Chunk, Effect, Option, Schema, Stream } from "effect";
 import { SignJWT } from "jose";
@@ -41,8 +42,7 @@ test("the workspace endpoint issues a five-minute credential with dedicated clai
 
 test("sync rejects malformed, expired, wrong-audience, and wrongly signed credentials", async () => {
   const user = await authenticatedTestUser("sync-invalid@example.com");
-  const workspaceId = crypto.randomUUID();
-  await bindPersonalWorkspace(env.DB, user.userId, workspaceId);
+  const workspaceId = await bindTestWorkspace(user.userId);
   const now = Math.floor(Date.now() / 1_000);
   const invalidCredentials = [
     "not-a-jwt",
@@ -81,10 +81,8 @@ test("sync rejects malformed, expired, wrong-audience, and wrongly signed creden
 test("a credential cannot authorize another LiveStore store ID", async () => {
   const first = await authenticatedTestUser("sync-first@example.com");
   const second = await authenticatedTestUser("sync-second@example.com");
-  const firstWorkspaceId = crypto.randomUUID();
-  const secondWorkspaceId = crypto.randomUUID();
-  await bindPersonalWorkspace(env.DB, first.userId, firstWorkspaceId);
-  await bindPersonalWorkspace(env.DB, second.userId, secondWorkspaceId);
+  const firstWorkspaceId = await bindTestWorkspace(first.userId);
+  const secondWorkspaceId = await bindTestWorkspace(second.userId);
   const { credential } = await issueSyncCredential(env, first.userId, firstWorkspaceId);
   const authorized = await openSync(firstWorkspaceId, {
     credential,
@@ -105,8 +103,7 @@ test("a credential cannot authorize another LiveStore store ID", async () => {
 
 test("authorized push and pull survive Durable Object eviction", async () => {
   const user = await authenticatedTestUser("sync-round-trip@example.com");
-  const workspaceId = crypto.randomUUID();
-  await bindPersonalWorkspace(env.DB, user.userId, workspaceId);
+  const workspaceId = await bindTestWorkspace(user.userId);
   const payload = {
     ...(await issueSyncCredential(env, user.userId, workspaceId)),
     workspaceId,
@@ -154,10 +151,8 @@ test("authorized push and pull survive Durable Object eviction", async () => {
 test("cross-account push and pull are rejected", async () => {
   const owner = await authenticatedTestUser("sync-owner@example.com");
   const other = await authenticatedTestUser("sync-cross-account@example.com");
-  const ownerWorkspaceId = crypto.randomUUID();
-  const otherWorkspaceId = crypto.randomUUID();
-  await bindPersonalWorkspace(env.DB, owner.userId, ownerWorkspaceId);
-  await bindPersonalWorkspace(env.DB, other.userId, otherWorkspaceId);
+  const ownerWorkspaceId = await bindTestWorkspace(owner.userId);
+  const otherWorkspaceId = await bindTestWorkspace(other.userId);
   const { credential } = await issueSyncCredential(env, owner.userId, ownerWorkspaceId);
   const payload = { credential, workspaceId: ownerWorkspaceId };
   const event = Schema.decodeUnknownSync(SyncMessage.PushRequest)({
@@ -228,6 +223,13 @@ function openSync(storeId: string, payload: { credential: string; workspaceId: s
       headers: { upgrade: "websocket" },
     }),
   );
+}
+
+async function bindTestWorkspace(userId: string) {
+  const bindingSecret = crypto.randomUUID();
+  const workspaceId = workspaceIdForBindingSecret(bindingSecret);
+  await bindPersonalWorkspace(env.DB, userId, workspaceId, bindingSecret);
+  return workspaceId;
 }
 
 function customCredential({

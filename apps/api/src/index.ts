@@ -8,7 +8,9 @@ import {
   bindPersonalWorkspace,
   createPersonalWorkspace,
   readPersonalWorkspace,
+  WorkspaceBindingSecretSchema,
   WorkspaceBindingError,
+  WorkspaceIdSchema,
 } from "./workspace.js";
 
 const api = new Hono<{ Bindings: Env }>();
@@ -47,17 +49,27 @@ api.post("/api/workspace/bind", async (context) => {
   }
 
   const body = z
-    .object({ workspaceId: z.uuidv4() })
+    .object({ bindingSecret: WorkspaceBindingSecretSchema, workspaceId: WorkspaceIdSchema })
     .strict()
     .safeParse(await context.req.json().catch(() => undefined));
   if (!body.success) {
-    return context.json({ error: "invalid_workspace_id" as const }, 400);
+    return context.json({ error: "invalid_workspace_binding" as const }, 400);
   }
 
   try {
-    return context.json(await bindPersonalWorkspace(context.env.DB, userId, body.data.workspaceId));
+    return context.json(
+      await bindPersonalWorkspace(
+        context.env.DB,
+        userId,
+        body.data.workspaceId,
+        body.data.bindingSecret,
+      ),
+    );
   } catch (error) {
     if (error instanceof WorkspaceBindingError) {
+      if (error.reason === "workspace_control_required") {
+        return context.json({ error: error.reason }, 403);
+      }
       return context.json({ error: error.reason }, 409);
     }
     throw error;

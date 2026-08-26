@@ -92,11 +92,11 @@ export function registerWorkspaceIpc(registry: WorkspaceRegistry, documentsPath:
   });
   ipcMain.handle("workspace:activate-restore", (event, value) => {
     assertTrustedSender(event);
-    registry.activateRestore(z.uuidv4().parse(value));
+    registry.activateRestore(z.uuid().parse(value));
   });
   ipcMain.handle("workspace:cancel-restore", (event, value) => {
     assertTrustedSender(event);
-    registry.cancelRestore(z.uuidv4().parse(value));
+    registry.cancelRestore(z.uuid().parse(value));
   });
 }
 

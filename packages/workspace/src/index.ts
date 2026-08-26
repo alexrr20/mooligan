@@ -19,3 +19,4 @@ export {
   type WorkspaceBackupCollectionLot,
   type WorkspaceBackupSpoilerDecision,
 } from "./backup.ts";
+export { workspaceIdForBindingSecret } from "./identity.ts";

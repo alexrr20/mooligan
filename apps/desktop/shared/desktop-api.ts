@@ -43,7 +43,7 @@ export type { WorkspaceBackup } from "@mooligan/workspace/backup";
 
 export const WorkspaceBootstrapSchema = z.strictObject({
   clientId: z.uuidv4(),
-  workspaceId: z.uuidv4(),
+  workspaceId: z.uuid(),
 });
 export type WorkspaceBootstrap = z.infer<typeof WorkspaceBootstrapSchema>;
 

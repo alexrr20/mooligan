@@ -1,6 +1,8 @@
+import { workspaceIdForBindingSecret } from "@mooligan/workspace";
 import * as z from "zod";
 
-export const WorkspaceIdSchema = z.uuidv4();
+export const WorkspaceBindingSecretSchema = z.uuidv4();
+export const WorkspaceIdSchema = z.uuid();
 
 export type PersonalWorkspace = {
   createdAt: string;
@@ -13,9 +15,12 @@ type PersonalWorkspaceRow = {
 };
 
 export class WorkspaceBindingError extends Error {
-  readonly reason: "account_has_workspace" | "workspace_owned_by_another_account";
+  readonly reason:
+    | "account_has_workspace"
+    | "workspace_control_required"
+    | "workspace_owned_by_another_account";
 
-  constructor(reason: "account_has_workspace" | "workspace_owned_by_another_account") {
+  constructor(reason: WorkspaceBindingError["reason"]) {
     super(reason);
     this.reason = reason;
   }
@@ -61,8 +66,14 @@ export async function bindPersonalWorkspace(
   database: D1Database,
   userId: string,
   workspaceId: string,
+  bindingSecret: string,
 ): Promise<PersonalWorkspace> {
   const validatedWorkspaceId = WorkspaceIdSchema.parse(workspaceId);
+  const validatedBindingSecret = WorkspaceBindingSecretSchema.parse(bindingSecret);
+  if (workspaceIdForBindingSecret(validatedBindingSecret) !== validatedWorkspaceId) {
+    throw new WorkspaceBindingError("workspace_control_required");
+  }
+
   const existing = await readPersonalWorkspace(database, userId);
 
   if (existing) {

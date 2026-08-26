@@ -20,7 +20,7 @@ const CredentialClaimsSchema = z
     exp: z.number().int(),
     iat: z.number().int(),
     sub: z.uuid(),
-    workspaceId: z.uuidv4(),
+    workspaceId: z.uuid(),
   })
   .strict();
 

@@ -3,14 +3,17 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
+import { workspaceIdForBindingSecret } from "@mooligan/workspace";
 import * as z from "zod";
 
 import { validateWorkspaceBootstrap, type WorkspaceBootstrap } from "../../shared/desktop-api.ts";
 
 const DeviceRowSchema = z.object({ clientId: z.uuidv4() });
+const WorkspaceIdSchema = z.uuid();
 const WorkspaceRowSchema = z.object({
   accountId: z.string().nullable(),
-  workspaceId: z.uuidv4(),
+  bindingSecret: z.uuidv4().nullable(),
+  workspaceId: WorkspaceIdSchema,
 });
 
 export class WorkspaceRegistry {
@@ -20,7 +23,7 @@ export class WorkspaceRegistry {
 
   constructor(userDataRoot: string) {
     mkdirSync(userDataRoot, { recursive: true });
-    this.#database = new DatabaseSync(join(userDataRoot, "workspace-registry-v2.sqlite"), {
+    this.#database = new DatabaseSync(join(userDataRoot, "workspace-registry-v3.sqlite"), {
       timeout: 5_000,
     });
 
@@ -36,7 +39,8 @@ export class WorkspaceRegistry {
         CREATE TABLE IF NOT EXISTS workspaces (
           workspace_id TEXT PRIMARY KEY,
           active INTEGER NOT NULL CHECK (active IN (0, 1)),
-          account_id TEXT
+          account_id TEXT,
+          binding_secret TEXT UNIQUE
         ) STRICT;
 
         CREATE UNIQUE INDEX IF NOT EXISTS one_active_workspace
@@ -53,10 +57,12 @@ export class WorkspaceRegistry {
       ).clientId;
 
       if (this.#activeWorkspaceRow() === undefined) {
-        const workspaceId = randomUUID();
+        const { bindingSecret, workspaceId } = createWorkspaceIdentity();
         this.#database
-          .prepare("INSERT INTO workspaces (workspace_id, active, account_id) VALUES (?, 1, NULL)")
-          .run(workspaceId);
+          .prepare(
+            "INSERT INTO workspaces (workspace_id, active, account_id, binding_secret) VALUES (?, 1, NULL, ?)",
+          )
+          .run(workspaceId, bindingSecret);
       }
     } catch (error) {
       this.#database.close();
@@ -78,10 +84,12 @@ export class WorkspaceRegistry {
   }
 
   createWorkspace() {
-    const workspaceId = randomUUID();
+    const { bindingSecret, workspaceId } = createWorkspaceIdentity();
     this.#database
-      .prepare("INSERT INTO workspaces (workspace_id, active, account_id) VALUES (?, 0, NULL)")
-      .run(workspaceId);
+      .prepare(
+        "INSERT INTO workspaces (workspace_id, active, account_id, binding_secret) VALUES (?, 0, NULL, ?)",
+      )
+      .run(workspaceId, bindingSecret);
     return workspaceId;
   }
 
@@ -96,7 +104,7 @@ export class WorkspaceRegistry {
   }
 
   activateRestore(workspaceId: string) {
-    const validatedWorkspaceId = z.uuidv4().parse(workspaceId);
+    const validatedWorkspaceId = WorkspaceIdSchema.parse(workspaceId);
     if (this.#pendingRestoreWorkspaceId !== validatedWorkspaceId) {
       throw new Error("The workspace restore is no longer active.");
     }
@@ -106,7 +114,7 @@ export class WorkspaceRegistry {
   }
 
   cancelRestore(workspaceId: string) {
-    const validatedWorkspaceId = z.uuidv4().parse(workspaceId);
+    const validatedWorkspaceId = WorkspaceIdSchema.parse(workspaceId);
     if (this.#pendingRestoreWorkspaceId !== validatedWorkspaceId) {
       return;
     }
@@ -116,7 +124,7 @@ export class WorkspaceRegistry {
   }
 
   activateWorkspace(workspaceId: string) {
-    const validatedWorkspaceId = z.uuidv4().parse(workspaceId);
+    const validatedWorkspaceId = WorkspaceIdSchema.parse(workspaceId);
 
     transact(this.#database, () => {
       const known = this.#database
@@ -135,7 +143,7 @@ export class WorkspaceRegistry {
   }
 
   removeWorkspace(workspaceId: string) {
-    const validatedWorkspaceId = z.uuidv4().parse(workspaceId);
+    const validatedWorkspaceId = WorkspaceIdSchema.parse(workspaceId);
     const result = this.#database
       .prepare("DELETE FROM workspaces WHERE workspace_id = ? AND active = 0")
       .run(validatedWorkspaceId);
@@ -146,7 +154,7 @@ export class WorkspaceRegistry {
   }
 
   bindWorkspace(workspaceId: string, accountId: string | null) {
-    const validatedWorkspaceId = z.uuidv4().parse(workspaceId);
+    const validatedWorkspaceId = WorkspaceIdSchema.parse(workspaceId);
     const validatedAccountId = z.string().trim().min(1).nullable().parse(accountId);
     const result = this.#database
       .prepare("UPDATE workspaces SET account_id = ? WHERE workspace_id = ?")
@@ -158,15 +166,15 @@ export class WorkspaceRegistry {
   }
 
   accountId(workspaceId: string) {
-    const validatedWorkspaceId = z.uuidv4().parse(workspaceId);
-    const row = WorkspaceRowSchema.parse(
-      this.#database
-        .prepare(
-          "SELECT workspace_id AS workspaceId, account_id AS accountId FROM workspaces WHERE workspace_id = ?",
-        )
-        .get(validatedWorkspaceId),
-    );
-    return row.accountId;
+    return this.#workspaceRow(workspaceId).accountId;
+  }
+
+  bindingSecret(workspaceId: string) {
+    const bindingSecret = this.#workspaceRow(workspaceId).bindingSecret;
+    if (!bindingSecret) {
+      throw new Error("The workspace was not created on this device.");
+    }
+    return bindingSecret;
   }
 
   close() {
@@ -180,11 +188,26 @@ export class WorkspaceRegistry {
   #activeWorkspaceRow() {
     const row = this.#database
       .prepare(
-        "SELECT workspace_id AS workspaceId, account_id AS accountId FROM workspaces WHERE active = 1",
+        "SELECT workspace_id AS workspaceId, account_id AS accountId, binding_secret AS bindingSecret FROM workspaces WHERE active = 1",
       )
       .get();
     return row === undefined ? undefined : WorkspaceRowSchema.parse(row);
   }
+
+  #workspaceRow(workspaceId: string) {
+    return WorkspaceRowSchema.parse(
+      this.#database
+        .prepare(
+          "SELECT workspace_id AS workspaceId, account_id AS accountId, binding_secret AS bindingSecret FROM workspaces WHERE workspace_id = ?",
+        )
+        .get(WorkspaceIdSchema.parse(workspaceId)),
+    );
+  }
+}
+
+function createWorkspaceIdentity() {
+  const bindingSecret = randomUUID();
+  return { bindingSecret, workspaceId: workspaceIdForBindingSecret(bindingSecret) };
 }
 
 function transact<Result>(database: DatabaseSync, callback: () => Result): Result {

@@ -36,7 +36,7 @@ const SpoilerProjectionDecisionsSchema = z
 const SpoilerProjectionIdentitySchema = z.strictObject({
   revision: z.number().int().positive(),
   sessionId: z.uuidv4(),
-  workspaceId: z.uuidv4(),
+  workspaceId: z.uuid(),
 });
 
 export const SpoilerProjectionSnapshotSchema = SpoilerProjectionIdentitySchema.extend({
@@ -53,7 +53,7 @@ export type SpoilerProjectionDelta = z.infer<typeof SpoilerProjectionDeltaSchema
 
 export const SpoilerProjectionConnectionSchema = z.strictObject({
   sessionId: z.uuidv4(),
-  workspaceId: z.uuidv4(),
+  workspaceId: z.uuid(),
 });
 export type SpoilerProjectionConnection = z.infer<typeof SpoilerProjectionConnectionSchema>;
 
