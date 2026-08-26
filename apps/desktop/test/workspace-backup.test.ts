@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { access, mkdtemp, readFile, readdir, rm, truncate, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
 
+import { workspaceIdForBindingSecret } from "@mooligan/workspace";
 import { workspaceBackupMaxBytes, type WorkspaceBackup } from "@mooligan/workspace/backup";
 
 import {
@@ -91,6 +93,34 @@ void test("restore registry entries stay inactive until verification succeeds", 
     registry.activateRestore(restored.workspaceId);
     assert.equal(registry.bootstrap().workspaceId, restored.workspaceId);
     registry.close();
+  } finally {
+    await rm(directory, { force: true, recursive: true });
+  }
+});
+
+void test("an interrupted restore is discarded on restart without changing the active Workspace", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "mooligan-backup-interruption-"));
+
+  try {
+    const registry = new WorkspaceRegistry(directory);
+    const original = registry.bootstrap();
+    registry.close();
+
+    const bindingSecret = "74bc9e3d-579e-4b6c-8ca7-8b4ea66bc75e";
+    const interruptedWorkspaceId = workspaceIdForBindingSecret(bindingSecret);
+    const database = new DatabaseSync(join(directory, "workspace-registry-v4.sqlite"));
+    database
+      .prepare(
+        "INSERT INTO workspaces (workspace_id, active, account_id, binding_secret, restore_pending) VALUES (?, 0, NULL, ?, 1)",
+      )
+      .run(interruptedWorkspaceId, bindingSecret);
+    database.close();
+
+    const reopened = new WorkspaceRegistry(directory);
+    assert.deepEqual(reopened.bootstrap(), original);
+    assert.equal(reopened.workspaces().length, 1);
+    assert.throws(() => reopened.workspace(interruptedWorkspaceId));
+    reopened.close();
   } finally {
     await rm(directory, { force: true, recursive: true });
   }

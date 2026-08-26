@@ -4,7 +4,7 @@ import { Buffer } from "node:buffer";
 import { FetchHttpClient, KeyValueStore } from "@effect/platform";
 import { makeHttpSync } from "@livestore/sync-cf/client";
 import { SyncMessage } from "@livestore/sync-cf/common";
-import { workspaceIdForBindingSecret } from "@mooligan/workspace";
+import { workspaceEventSchemaVersion, workspaceIdForBindingSecret } from "@mooligan/workspace";
 import { env, exports } from "cloudflare:workers";
 import { Chunk, Effect, Option, Schema, Stream } from "effect";
 import { SignJWT } from "jose";
@@ -26,7 +26,14 @@ test("the workspace endpoint issues a five-minute credential with dedicated clai
   );
 
   const response = await exports.default.fetch(
-    new Request(`${apiOrigin}/api/workspace/sync-credential`, { headers, method: "POST" }),
+    new Request(`${apiOrigin}/api/workspace/sync-credential`, {
+      body: JSON.stringify({
+        appVersion: "0.0.0",
+        eventSchemaVersion: workspaceEventSchemaVersion,
+      }),
+      headers: withJsonContentType(headers),
+      method: "POST",
+    }),
   );
   const body = await response.json<{ credential: string; expiresAt: number }>();
   const claims = JSON.parse(
@@ -38,6 +45,28 @@ test("the workspace endpoint issues a five-minute credential with dedicated clai
   assert.equal(claims.exp - claims.iat, syncCredentialLifetimeSeconds);
   assert.equal(body.expiresAt, claims.exp);
   assert.deepEqual(Object.keys(claims).sort(), ["aud", "exp", "iat", "sub", "workspaceId"]);
+});
+
+test("the workspace endpoint rejects clients below the minimum event schema version", async () => {
+  const { headers } = await authenticatedTestUser("sync-old-client@example.com");
+  await exports.default.fetch(
+    new Request(`${apiOrigin}/api/workspace`, { headers, method: "POST" }),
+  );
+
+  const response = await exports.default.fetch(
+    new Request(`${apiOrigin}/api/workspace/sync-credential`, {
+      body: JSON.stringify({ appVersion: "0.0.0", eventSchemaVersion: 0 }),
+      headers: withJsonContentType(headers),
+      method: "POST",
+    }),
+  );
+
+  assert.equal(response.status, 426);
+  assert.deepEqual(await response.json(), {
+    error: "client_upgrade_required",
+    message: "Update Mooligan before using Workspace sync.",
+    minimumEventSchemaVersion: workspaceEventSchemaVersion,
+  });
 });
 
 test("sync rejects malformed, expired, wrong-audience, and wrongly signed credentials", async () => {
@@ -83,7 +112,7 @@ test("a credential cannot authorize another LiveStore store ID", async () => {
   const second = await authenticatedTestUser("sync-second@example.com");
   const firstWorkspaceId = await bindTestWorkspace(first.userId);
   const secondWorkspaceId = await bindTestWorkspace(second.userId);
-  const { credential } = await issueSyncCredential(env, first.userId, firstWorkspaceId);
+  const { credential } = await issueCurrentCredential(first.userId, firstWorkspaceId);
   const authorized = await openSync(firstWorkspaceId, {
     credential,
     workspaceId: firstWorkspaceId,
@@ -105,7 +134,7 @@ test("authorized push and pull survive Durable Object eviction", async () => {
   const user = await authenticatedTestUser("sync-round-trip@example.com");
   const workspaceId = await bindTestWorkspace(user.userId);
   const payload = {
-    ...(await issueSyncCredential(env, user.userId, workspaceId)),
+    ...(await issueCurrentCredential(user.userId, workspaceId)),
     workspaceId,
   };
   const syncPayload = { credential: payload.credential, workspaceId };
@@ -148,12 +177,53 @@ test("authorized push and pull survive Durable Object eviction", async () => {
   }
 });
 
+test("invalid Workspace events are rejected before they enter the remote event log", async () => {
+  const user = await authenticatedTestUser("sync-invalid-event@example.com");
+  const workspaceId = await bindTestWorkspace(user.userId);
+  const { credential } = await issueCurrentCredential(user.userId, workspaceId);
+  const payload = { credential, workspaceId };
+  const invalidEvent = Schema.decodeUnknownSync(SyncMessage.PushRequest)({
+    backendId: { _tag: "None" },
+    batch: [
+      {
+        args: { policy: "invalid-policy" },
+        clientId: "invalid-event-client",
+        name: "v1.SpoilerPolicyChanged",
+        parentSeqNum: 0,
+        seqNum: 1,
+        sessionId: "invalid-event-session",
+      },
+    ],
+  }).batch;
+  const fetchMock = routeFetchThroughWorker();
+
+  try {
+    await assert.rejects(
+      runSync(workspaceId, payload, (backend) =>
+        Effect.gen(function* () {
+          yield* backend.push(invalidEvent);
+        }),
+      ),
+    );
+
+    const pulled = await runSync(workspaceId, payload, (backend) =>
+      Effect.gen(function* () {
+        const pages = yield* backend.pull(Option.none()).pipe(Stream.runCollect);
+        return Chunk.toReadonlyArray(pages).flatMap((page) => page.batch);
+      }),
+    );
+    assert.deepEqual(pulled, []);
+  } finally {
+    fetchMock.mockRestore();
+  }
+});
+
 test("cross-account push and pull are rejected", async () => {
   const owner = await authenticatedTestUser("sync-owner@example.com");
   const other = await authenticatedTestUser("sync-cross-account@example.com");
   const ownerWorkspaceId = await bindTestWorkspace(owner.userId);
   const otherWorkspaceId = await bindTestWorkspace(other.userId);
-  const { credential } = await issueSyncCredential(env, owner.userId, ownerWorkspaceId);
+  const { credential } = await issueCurrentCredential(owner.userId, ownerWorkspaceId);
   const payload = { credential, workspaceId: ownerWorkspaceId };
   const event = Schema.decodeUnknownSync(SyncMessage.PushRequest)({
     backendId: { _tag: "None" },
@@ -230,6 +300,16 @@ async function bindTestWorkspace(userId: string) {
   const workspaceId = workspaceIdForBindingSecret(bindingSecret);
   await bindPersonalWorkspace(env.DB, userId, workspaceId, bindingSecret);
   return workspaceId;
+}
+
+function issueCurrentCredential(userId: string, workspaceId: string) {
+  return issueSyncCredential(env, userId, workspaceId, "0.0.0", workspaceEventSchemaVersion);
+}
+
+function withJsonContentType(headers: Headers) {
+  const next = new Headers(headers);
+  next.set("content-type", "application/json");
+  return next;
 }
 
 function customCredential({

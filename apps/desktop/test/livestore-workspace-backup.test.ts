@@ -85,7 +85,7 @@ void test("backup v3 reads only collection and spoiler state from LiveStore", as
 void test("backup v3 restore commits and verifies normal LiveStore events", async () => {
   const store = await openStore("backup-target");
   try {
-    restoreWorkspaceBackup(store, backupFixture);
+    await restoreWorkspaceBackup(store, backupFixture);
 
     const settings = store.query(spoilerSettingsQuery);
     assert.deepEqual(
@@ -137,7 +137,7 @@ void test("restore verification rejects a non-empty target store", async () => {
       }),
     );
 
-    assert.throws(() => restoreWorkspaceBackup(store, backupFixture), /could not be verified/u);
+    await assert.rejects(restoreWorkspaceBackup(store, backupFixture), /could not be verified/u);
   } finally {
     await store.shutdownPromise();
   }

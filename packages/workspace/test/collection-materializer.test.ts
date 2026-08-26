@@ -4,9 +4,18 @@ import { test } from "node:test";
 import { makeInMemoryAdapter } from "@livestore/adapter-web";
 import { createStorePromise, type Store } from "@livestore/livestore";
 
-import { collectionLotsQuery, events, workspaceSchema } from "../src/schema.ts";
+import { collectionLotsQuery, events, tables, workspaceSchema } from "../src/schema.ts";
 
 type WorkspaceLiveStore = Store<typeof workspaceSchema>;
+
+void test("collection materializers have a Holding-key index for large replays", () => {
+  assert.deepEqual(tables.collectionLots.sqliteDef.indexes, [
+    {
+      columns: ["printingId", "finish", "language", "condition"],
+      name: "collection_lots_holding",
+    },
+  ]);
+});
 
 void test("offline additions to the same Holding are additive", async () => {
   await withStore("additive", (store) => {

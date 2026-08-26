@@ -1,6 +1,8 @@
 # Read collection holdings through a temporary catalog projection
 
-Status: superseded on 2026-08-26
+Status: accepted
+
+Date: 2026-08-26
 
 The renderer now commits collection events to LiveStore. It sends a validated
 snapshot followed by ordered lot changes to a temporary table in the catalog

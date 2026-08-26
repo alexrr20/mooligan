@@ -1,6 +1,11 @@
 import { env } from "cloudflare:workers";
 import { type CallbackContext, makeDurableObject, makeWorker } from "@livestore/sync-cf/cf-worker";
-import { workspaceSyncPayloadSchema } from "@mooligan/workspace";
+import type { SyncMessage } from "@livestore/sync-cf/common";
+import {
+  workspaceEventSchemaVersion,
+  workspaceSyncedEventSchema,
+  workspaceSyncPayloadSchema,
+} from "@mooligan/workspace";
 import { Schema } from "effect";
 import { jwtVerify, SignJWT } from "jose";
 import * as z from "zod";
@@ -9,10 +14,14 @@ import { accountOwnsWorkspace, WorkspaceIdSchema } from "./workspace.js";
 
 export const syncAudience = "mooligan-livestore-sync";
 export const syncCredentialLifetimeSeconds = 5 * 60;
+export const minimumWorkspaceEventSchemaVersion = workspaceEventSchemaVersion;
 
 type WorkspaceSyncPayload = typeof workspaceSyncPayloadSchema.Type;
 type SyncWorkerEnvironment = { SYNC_BACKEND: DurableObjectNamespace };
 const SyncPayloadSchema: Schema.Schema<WorkspaceSyncPayload> = workspaceSyncPayloadSchema;
+const decodeWorkspaceSyncedEvent = Schema.decodeUnknownPromise(workspaceSyncedEventSchema, {
+  onExcessProperty: "error",
+});
 
 const CredentialClaimsSchema = z
   .object({
@@ -28,7 +37,15 @@ export async function issueSyncCredential(
   environment: Pick<Env, "SYNC_CREDENTIAL_SECRET">,
   userId: string,
   workspaceId: string,
+  appVersion: string,
+  eventSchemaVersion: number,
 ) {
+  z.string().trim().min(1).max(64).parse(appVersion);
+  const validatedEventSchemaVersion = z.number().int().nonnegative().parse(eventSchemaVersion);
+  if (validatedEventSchemaVersion < minimumWorkspaceEventSchemaVersion) {
+    throw new Error("The desktop client is too old to synchronize this workspace.");
+  }
+
   const issuedAt = Math.floor(Date.now() / 1_000);
   const expiresAt = issuedAt + syncCredentialLifetimeSeconds;
   const credential = await new SignJWT({ workspaceId })
@@ -78,11 +95,18 @@ async function authorizeSyncOperation({ headers, payload, storeId }: CallbackCon
   await authorizeSyncPayload(env, decodedPayload, storeId);
 }
 
+async function authorizePush(message: SyncMessage.PushRequest, context: CallbackContext) {
+  await authorizeSyncOperation(context);
+  await Promise.all(
+    message.batch.map(({ args, name }) => decodeWorkspaceSyncedEvent({ args, name })),
+  );
+}
+
 export class WorkspaceSyncBackend extends makeDurableObject({
   enabledTransports: new Set(["http", "ws"]),
   forwardHeaders: ["authorization"],
   onPull: async (_message, context) => authorizeSyncOperation(context),
-  onPush: async (_message, context) => authorizeSyncOperation(context),
+  onPush: authorizePush,
   storage: { _tag: "do-sqlite" },
 }) {}
 

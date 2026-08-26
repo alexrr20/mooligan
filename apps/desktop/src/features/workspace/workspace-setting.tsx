@@ -146,6 +146,9 @@ function connectionDescription(status: ReturnType<typeof useWorkspaceRuntime>["c
 }
 
 function syncIssueMessage(issue: WorkspaceSyncIssue | null) {
+  if (issue === "client-upgrade-required") {
+    return "Update Mooligan before resuming sync. Local edits are still saved on this device.";
+  }
   if (issue === "session-unavailable") {
     return "Sync is paused until the Account session reconnects. Local edits still work.";
   }

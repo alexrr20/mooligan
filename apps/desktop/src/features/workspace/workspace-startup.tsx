@@ -18,6 +18,7 @@ import { CollectionProjectionStartup } from "./collection-projection";
 import { SpoilerProjectionStartup } from "./spoiler-projection";
 import { createLiveStoreRegistry, workspaceStoreOptions } from "./workspace-store";
 import { WorkspaceLiveStoreProvider, type WorkspaceLiveStore } from "./workspace-store-context";
+import { requirePersistentWorkspaceStorage } from "./workspace-storage";
 import {
   WorkspaceRuntimeProvider,
   type WorkspaceConnectionStatus,
@@ -147,6 +148,7 @@ function OpenWorkspace({
   runtime: WorkspaceRuntime;
 }) {
   const store = useStore(options);
+  requirePersistentWorkspaceStorage(store.storageMode);
   const connectionStatus = useConnectionStatus(store, runtime);
 
   useEffect(() => {

@@ -77,6 +77,40 @@ void test("a revision gap clears collection state and requires a full replacemen
   assert.equal(resyncs, 1);
 });
 
+void test("an interrupted projection update cannot publish partial temporary state", async () => {
+  const projected = new Map<string, CollectionLot>();
+  let rejectUpdate: ((error: Error) => void) | undefined;
+  const projection = new CollectionProjection(() => workspaceId, {
+    applyDelta: () =>
+      new Promise<void>((_resolve, reject) => {
+        rejectUpdate = reject;
+      }),
+    replace: (lots) => {
+      projected.clear();
+      for (const lot of lots) projected.set(lot.id, lot);
+      return Promise.resolve();
+    },
+  });
+  const connection = await projection.connect(7, workspaceId);
+  const confirmed = lot("lot-one", 2);
+  await projection.replace(7, { ...connection, lots: [confirmed], revision: 1 });
+
+  const updating = projection.apply(7, {
+    ...connection,
+    deletedLotIds: [],
+    revision: 2,
+    upserts: [lot("lot-one", 9)],
+  });
+  assert.ok(rejectUpdate);
+  rejectUpdate(new Error("catalog worker stopped"));
+  await assert.rejects(updating, /catalog worker stopped/u);
+  projection.rejectInvalidUpdate(7);
+
+  assert.deepEqual([...projected.values()], []);
+  assert.equal(projection.isReady(), false);
+  assert.deepEqual(projection.lots(), []);
+});
+
 void test("renderer replacement and workspace mismatch cannot expose stale lots", async () => {
   let activeWorkspaceId = workspaceId;
   const projection = new CollectionProjection(() => activeWorkspaceId);

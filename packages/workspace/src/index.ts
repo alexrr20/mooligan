@@ -5,7 +5,9 @@ export {
   spoilerDecisionsQuery,
   spoilerSettingsQuery,
   tables,
+  workspaceEventSchemaVersion,
   workspaceSchema,
+  workspaceSyncedEventSchema,
   workspaceSyncPayloadSchema,
 } from "./schema.ts";
 export {

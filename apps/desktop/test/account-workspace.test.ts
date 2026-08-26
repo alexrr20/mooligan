@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import * as z from "zod";
 import type { JSONType } from "zod";
+import { workspaceEventSchemaVersion } from "@mooligan/workspace";
 
 import type { AuthSnapshot } from "../shared/desktop-api.ts";
 import type { AccountWorkspaceApiPath } from "../electron/auth/service.ts";
@@ -33,6 +34,11 @@ void test("sign-in binds the active unbound Workspace and refreshes its in-memor
         return jsonResponse(workspaceResponse(initial.workspaceId));
       }
       if (path === "/api/workspace/sync-credential") {
+        assert.deepEqual(JSON.parse(z.string().parse(init.body)), {
+          appVersion: "0.0.0",
+          eventSchemaVersion: workspaceEventSchemaVersion,
+        });
+        assert.equal(new Headers(init.headers).get("content-type"), "application/json");
         credentialNumber += 1;
         return jsonResponse({ credential: `credential-${credentialNumber}`, expiresAt: 1_300 });
       }
@@ -69,6 +75,42 @@ void test("sign-in binds the active unbound Workspace and refreshes its in-memor
     assert.equal(signedOutRuntime.workspaceId, initial.workspaceId);
     assert.equal(signedOutRuntime.sync, null);
     assert.equal(signedOutRuntime.syncIssue, null);
+  });
+});
+
+void test("an old desktop client keeps local data open when sync requires an upgrade", async () => {
+  await withRegistry(async (registry) => {
+    const workspaceId = registry.bootstrap().workspaceId;
+    const auth = new FakeAccountAuth(signedIn("account-old-client"), async (path) => {
+      if (path === "/api/workspace") {
+        return jsonResponse(workspaceResponse(workspaceId));
+      }
+      if (path === "/api/workspace/sync-credential") {
+        return jsonResponse(
+          {
+            error: "client_upgrade_required",
+            message: "Update Mooligan before using Workspace sync.",
+            minimumEventSchemaVersion: workspaceEventSchemaVersion + 1,
+          },
+          426,
+        );
+      }
+      throw new Error(`Unexpected Account Workspace request: ${path}`);
+    });
+    const accountWorkspace = new AccountWorkspace(
+      auth,
+      registry,
+      () => undefined,
+      () => now,
+    );
+
+    await accountWorkspace.authChanged(auth.snapshot());
+    const runtime = accountWorkspace.runtime();
+
+    assert.equal(runtime.workspaceId, workspaceId);
+    assert.equal(runtime.sync, null);
+    assert.equal(runtime.syncIssue, "client-upgrade-required");
+    assert.equal(runtime.workspaces[0]?.active, true);
   });
 });
 

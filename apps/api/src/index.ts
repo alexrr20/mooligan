@@ -3,7 +3,12 @@ import * as z from "zod";
 
 import { createAuth } from "./auth.js";
 import { readCatalogRelease, refreshCatalogRelease } from "./catalog-release.js";
-import { issueSyncCredential, syncWorker, WorkspaceSyncBackend } from "./sync.js";
+import {
+  issueSyncCredential,
+  minimumWorkspaceEventSchemaVersion,
+  syncWorker,
+  WorkspaceSyncBackend,
+} from "./sync.js";
 import {
   bindPersonalWorkspace,
   createPersonalWorkspace,
@@ -87,7 +92,35 @@ api.post("/api/workspace/sync-credential", async (context) => {
     return context.json({ error: "workspace_not_found" as const }, 404);
   }
 
-  return context.json(await issueSyncCredential(context.env, userId, workspace.workspaceId));
+  const client = z
+    .strictObject({
+      appVersion: z.string().trim().min(1).max(64),
+      eventSchemaVersion: z.number().int().nonnegative(),
+    })
+    .safeParse(await context.req.json().catch(() => undefined));
+  if (!client.success) {
+    return context.json({ error: "invalid_sync_client" as const }, 400);
+  }
+  if (client.data.eventSchemaVersion < minimumWorkspaceEventSchemaVersion) {
+    return context.json(
+      {
+        error: "client_upgrade_required" as const,
+        message: "Update Mooligan before using Workspace sync.",
+        minimumEventSchemaVersion: minimumWorkspaceEventSchemaVersion,
+      },
+      426,
+    );
+  }
+
+  return context.json(
+    await issueSyncCredential(
+      context.env,
+      userId,
+      workspace.workspaceId,
+      client.data.appVersion,
+      client.data.eventSchemaVersion,
+    ),
+  );
 });
 
 api.get("/catalog/release", async (context) => {
