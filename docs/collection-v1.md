@@ -1,6 +1,6 @@
 # Collection v1
 
-Status: ready for implementation
+Status: implemented
 
 Agreed: 2026-08-21
 
@@ -17,29 +17,21 @@ The smallest useful loop is:
 3. See the resulting Holding in Collection.
 4. Adjust its quantity or properties, or remove it.
 
-## Current foundation
+## Current implementation
 
-The repository already has the pieces needed for this work:
+LiveStore in the Electron renderer is the only durable source for Collection
+lots. The renderer commits versioned collection events and reads their
+materialized `collection_lots` state. Optional Account synchronization carries
+the same event log to another device.
 
-- `/collection` exists as a placeholder route.
-- `CollectionLot` already retains printing, finish, language, condition,
-  quantity, acquisition time, unit cost, location, and notes.
-- Workspace backups already serialize collection lots as domain objects.
-- The catalog detail contract exposes paper status, language, and available
-  finishes for the selected printing.
-- The catalog query worker already owns spoiler-safe catalog reads.
-- Workspace switching already exposes the active workspace database path and
-  serializes mutations against the selected workspace.
+The renderer projects a validated lot snapshot and ordered deltas into a
+temporary table in the catalog query worker. That table exists only for
+spoiler-safe catalog joins and is rebuilt after a renderer reload, Workspace
+switch, revision gap, or worker restart. It is not backed up or synchronized.
 
-The current `collection_lots` table is only an early persistence stub. It stores
-an ID and a JSON payload and exposes generic put and read methods. Collection v1
-replaces that table with the normalized schema below and removes the generic
-collection entity path.
-
-There will be no dual-read path or conversion code for the early payload table.
-Development workspace databases created with that table must be reset when the
-normalized schema lands. The workspace backup shape does not change because it
-already represents lots rather than database rows.
+The earlier Workspace SQLite store, generic collection entity methods, mutation
+IPC, and SQL attachment path have been removed. There is no conversion path for
+those development-era databases.
 
 ## Scope
 
@@ -57,6 +49,7 @@ Collection v1 includes:
 - Quantity changes, property changes, collision merging, and confirmed removal.
 - Spoiler-safe rows and totals.
 - Durable workspace backups containing every collection lot field.
+- Optional Account synchronization of collection events.
 
 Collection v1 does not include:
 
@@ -67,7 +60,6 @@ Collection v1 does not include:
 - A UI for acquisition date, cost, storage location, or notes.
 - Binder, page, slot, or card-position management.
 - Collection import or export outside the existing workspace backup.
-- Collection cloud synchronization.
 - Collection pricing or value totals.
 
 ## Domain model
@@ -111,32 +103,29 @@ unavailable printing also falls back to its printing ID.
 
 ## Stored data
 
-`collection_lots` uses ordinary SQLite columns:
+LiveStore materializes `collection_lots` with these fields:
 
-| Column                   | Storage   | Rule                                                                               |
-| ------------------------ | --------- | ---------------------------------------------------------------------------------- |
-| `id`                     | `TEXT`    | Primary key containing a stable UUID                                               |
-| `printing_id`            | `TEXT`    | Required exact catalog printing ID                                                 |
-| `finish`                 | `TEXT`    | `nonfoil`, `foil`, `etched`, or `glossy`                                           |
-| `language`               | `TEXT`    | Required known card-language code                                                  |
-| `condition`              | `TEXT`    | `near-mint`, `lightly-played`, `moderately-played`, `heavily-played`, or `damaged` |
-| `quantity`               | `INTEGER` | Greater than zero                                                                  |
-| `acquired_at`            | `TEXT`    | Optional ISO 8601 timestamp                                                        |
-| `unit_cost_amount_minor` | `INTEGER` | Optional nonnegative amount in minor currency units                                |
-| `unit_cost_currency`     | `TEXT`    | Optional uppercase ISO 4217 code paired with the amount                            |
-| `location_id`            | `TEXT`    | Optional future storage-location ID                                                |
-| `notes`                  | `TEXT`    | Optional user notes                                                                |
+| Field                 | Rule                                                                               |
+| --------------------- | ---------------------------------------------------------------------------------- |
+| `id`                  | Primary key containing a stable ID                                                 |
+| `printingId`          | Required exact catalog printing ID                                                 |
+| `finish`              | `nonfoil`, `foil`, `etched`, or `glossy`                                           |
+| `language`            | Required known card-language code                                                  |
+| `condition`           | `near-mint`, `lightly-played`, `moderately-played`, `heavily-played`, or `damaged` |
+| `quantity`            | Positive safe integer                                                              |
+| `acquiredAt`          | Optional ISO 8601 timestamp                                                        |
+| `unitCostAmountMinor` | Optional nonnegative safe integer                                                  |
+| `unitCostCurrency`    | Optional uppercase ISO 4217 code paired with the amount                            |
+| `locationId`          | Optional future storage-location ID                                                |
+| `notes`               | Optional user notes                                                                |
 
-The database repeats the enum, quantity, and paired-cost constraints. Empty
-optional text becomes null before storage.
+The shared event schema checks the enums, quantities, IDs, and paired cost
+values before an event enters local or remote history. Materializers merge
+unattributed lots by Holding key. Tests cover concurrent offline additions,
+collision merges, stale edits after removal, and deterministic replay.
 
-A partial unique index covers the Holding key when acquisition time, both cost
-columns, location, and notes are null. This enforces one unattributed lot per
-Holding even if two writes race. A second index starts with printing, finish,
-language, and condition to support Holding aggregation.
-
-There is no `workspace_id` column. Each workspace already owns a separate
-database.
+There is no `workspaceId` field. One personal Workspace maps to one LiveStore
+`storeId`.
 
 ## Supported values
 
@@ -144,7 +133,7 @@ database.
 
 The shared finish model adds `glossy` to the current `nonfoil`, `foil`, and
 `etched` values. The catalog importer, catalog details, collection schemas, and
-database checks use the same set.
+LiveStore event schemas use the same set.
 
 ### Language
 
@@ -178,8 +167,8 @@ schema.
 
 ### Query ownership
 
-The catalog query worker opens the catalog read-only and attaches the active
-workspace database read-only. One SQL query performs:
+The catalog query worker opens the catalog read-only and maintains a temporary
+copy of the active Workspace's projected lots. One SQL query performs:
 
 - Lot grouping and quantity sums.
 - Catalog enrichment.
@@ -189,9 +178,10 @@ workspace database read-only. One SQL query performs:
 - Visible and protected totals.
 - Pagination.
 
-The worker receives trusted workspace and catalog paths when it starts. It
-restarts when either path changes. A workspace switch must not allow an old
-worker response to appear in the new workspace.
+Electron main accepts the projection only from the active renderer, active
+Workspace, and current projection session. It rejects revision gaps and clears
+the temporary table before asking the renderer for a full replacement. A
+Workspace switch cannot return an old worker response.
 
 The join from lots to cards is a left join. A missing catalog record never
 deletes or hides ownership data.
@@ -264,21 +254,19 @@ active search and filters rather than replacing the Collection total.
 
 ## Mutation contract
 
-The preload exposes a narrow `collection` namespace. It provides list, add,
-update, and remove operations. The renderer never receives a generic lot write
-method or direct database access.
-
-The Electron main process validates every request, binds it to the workspace
-that was active when the operation began, and serializes writes through the
-workspace mutation queue. Each mutation uses one SQLite transaction.
+The preload exposes Collection reads and printing validation. It exposes no
+Collection write IPC and no storage access. The renderer validates the action,
+asks Electron main to verify catalog-owned facts, then commits one of the
+versioned LiveStore events. LiveStore is the sole write path.
 
 ### Add
 
 Add accepts a printing ID, finish, language, condition, and positive whole-number
 quantity.
 
-Before writing, the main process asks the catalog query worker for the trusted
-facts needed to validate the printing. The printing must:
+Before committing, the renderer asks the catalog query worker through the
+preload bridge for the trusted facts needed to validate the printing. The
+printing must:
 
 - Exist in the installed catalog.
 - Be visible under the current spoiler policy.
@@ -289,20 +277,20 @@ The language must belong to the known list but does not have to match the
 catalog record. If catalog finish data is missing, the write fails because the
 application cannot prove that the requested finish exists.
 
-The transaction inserts a new unattributed lot with a random UUID. If the
-partial unique index finds the same Holding key, it increments the existing
-lot instead. The existing lot ID survives.
+`v1.CollectionCopiesAdded` carries a new lot and addition ID. Its materializer
+inserts a new unattributed lot or increments the existing lot with the same
+Holding key. The existing lot ID survives.
 
 ### Update
 
 Update identifies the editable lot by its stable UUID and supplies a positive
 quantity, finish, language, and condition. It cannot change the printing ID.
 
-The mutation validates the target properties with the same rules as Add. If the
-target key already has an unattributed lot, the target lot survives, its quantity
-increases by the requested source quantity, and the source lot is deleted in the
-same transaction. Otherwise the source lot keeps its UUID and receives the new
-values.
+`v1.CollectionLotChanged` validates the target properties with the same rules as
+Add. If the target key already has an unattributed lot, the target lot survives,
+its quantity increases by the requested source quantity, and the materializer
+removes the source lot atomically. Otherwise the source lot keeps its ID and
+receives the new values.
 
 An unavailable lot is the exception to catalog validation. Its update may
 change quantity, language, and condition after applying the normal domain
@@ -316,9 +304,9 @@ later lot-management workflow can preserve those details during edits.
 
 ### Remove
 
-Remove identifies the editable lot by its stable UUID. After a confirmation in
-the renderer, the main process deletes its first-version unattributed lot in one
-transaction. Quantity zero is not an update shortcut.
+Remove identifies the editable lot by its stable ID. After confirmation, the
+renderer commits `v1.CollectionLotRemoved`. Its materializer deletes only an
+unattributed lot. Quantity zero is not an update shortcut.
 
 An attributed or otherwise read-only Holding cannot be removed through the v1
 Holding action. Workspace backup import remains the only v1 operation that can
@@ -330,9 +318,9 @@ A failed mutation changes nothing. The form stays open, keeps the entered
 values, and shows a plain error message. Controls remain disabled while a write
 is pending so a double action cannot submit twice.
 
-After success, the renderer invalidates the current Collection query. The user
-stays on the current Search, card detail, or Collection page and sees a brief
-confirmation.
+LiveStore refreshes the Collection query after success, then the projection
+bridge sends the change to the catalog worker. The user stays on the current
+Search, card detail, or Collection page and sees a brief confirmation.
 
 ## Interface behavior
 
@@ -415,18 +403,14 @@ existing image placeholder and does not remove the rest of the row.
 
 ## Backup behavior
 
-Workspace backup JSON continues to store complete `CollectionLot` objects. It
-retains stable lot IDs and every optional metadata field. Normalized database
-columns are mapped back to the existing domain object during export and rebuilt
-from that object during import.
+Workspace backup version 3 reads complete Collection lots from materialized
+LiveStore state. It retains stable lot IDs and every optional metadata field.
 
-Backup import validates every lot before changing the workspace. It rejects
-duplicate lot IDs and duplicate unattributed Holding keys. The replacement is
-transactional.
-
-Collection cloud sync stays out of this version. The stable lot IDs and lot-based
-backup model leave room for a future synchronization contract without adding a
-sync abstraction now.
+Import validates the complete file, creates a new unbound Workspace, commits
+ordinary versioned events, and verifies the resulting materialized state before
+activation. An invalid, interrupted, or failed restore leaves the previously
+active Workspace untouched. Optional Account synchronization uses the same
+collection events and is not part of the backup format.
 
 ## Future binders
 
@@ -439,40 +423,14 @@ the Collection page continues to show the total across every binder and box. A
 later Holding detail can expose the lot breakdown. Binder pages and slots can be
 added beside storage locations when their product behavior is known.
 
-## Delivery slices
+## Implemented boundaries
 
-Each slice ends with a working product path.
-
-### Slice 1: own a card
-
-- Add `glossy`, the known language schema, and collection request and response
-  contracts to the shared domain package.
-- Replace the payload table with normalized `collection_lots` columns and
-  transaction-specific store methods.
-- Attach the active workspace read-only in the catalog worker.
-- Add the simplest name-sorted Collection query.
-- Add from a visible card detail page and render the resulting list row.
-- Keep workspace backups round-tripping every lot field.
-
-### Slice 2: manage a Holding
-
-- Add edit, merge, and remove mutations.
-- Add confirmations, pending states, errors, and post-write query refresh.
-- Cover missing catalog records and read-only attributed Holdings.
-
-### Slice 3: browse a real Collection
-
-- Add route-backed search and single-value filters.
-- Add set and quantity sorting, stable tie breakers, totals, and batches of 100.
-- Add empty, filtered-empty, loading, and retry states.
-- Prove that protected content cannot cross the query boundary.
-
-### Slice 4: finish the entry points
-
-- Add the grid view and its Collection-specific local preference.
-- Add the Search result action and compact add modal.
-- Add exact-detail links with a return to the current Collection route.
-- Finish keyboard, screen-reader, narrow-window, and reduced-motion behavior.
+- `@mooligan/workspace` owns versioned events and materializers.
+- Renderer Collection mutations validate catalog facts and commit those events.
+- Electron main owns the session-bound disposable projection.
+- The catalog worker owns spoiler-safe Holding reads and never opens LiveStore.
+- Backup version 3 exports materialized state and restores through events.
+- The Cloudflare Durable Object stores authorized event logs for optional sync.
 
 ## Acceptance scenarios
 
@@ -504,27 +462,24 @@ cover these scenarios:
     unattributed-lot uniqueness.
 14. Add, edit, and remove all work while the network is unavailable.
 
-## Files expected to change during implementation
-
-The exact split may move as the code takes shape, but the work should stay near
-these existing boundaries:
+## Main implementation files
 
 - `packages/domain/src/catalog.ts`
 - `packages/domain/src/collection.ts`
 - `packages/domain/src/catalog-detail.ts`
-- `apps/desktop/electron/workspace/store.ts`
 - `apps/desktop/electron/workspace/backup.ts`
+- `apps/desktop/electron/collection/projection.ts`
+- `apps/desktop/electron/collection/projection-ipc.ts`
 - `apps/desktop/electron/catalog/query.ts`
 - `apps/desktop/electron/catalog/query-worker.ts`
 - `apps/desktop/electron/catalog/ipc.ts`
-- `apps/desktop/electron/main.ts`
-- `apps/desktop/electron/preload.ts`
-- `apps/desktop/src/electron.d.ts`
+- `apps/desktop/src/features/collection/collection-mutations.ts`
+- `apps/desktop/src/features/workspace/collection-projection.tsx`
+- `apps/desktop/src/features/workspace/workspace-backup.ts`
+- `packages/workspace/src/schema.ts`
 - `apps/desktop/src/routes/collection.tsx`
-- New focused files below `apps/desktop/src/features/collection/`
-- Existing Search and card-detail components for their Add actions and return
-  origins
 
 Do not add an ORM, a second collection database, a separate Holdings table, or
-a generic repository layer for this work. The existing SQLite, Zod, IPC, query
-worker, TanStack Router, Base UI, StyleX, and test setup are enough.
+a generic repository layer for this work. LiveStore, the existing catalog
+SQLite database, Zod, IPC, TanStack Router, Base UI, StyleX, and the current test
+setup cover the required boundaries.

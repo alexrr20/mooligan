@@ -64,6 +64,7 @@ export type WorkspaceSyncSession = z.infer<typeof WorkspaceSyncSessionSchema>;
 
 export const WorkspaceSyncIssueSchema = z.enum([
   "account-service-unavailable",
+  "client-upgrade-required",
   "session-unavailable",
   "workspace-unavailable",
 ]);

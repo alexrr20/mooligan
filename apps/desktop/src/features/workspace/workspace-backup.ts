@@ -37,21 +37,14 @@ export function createWorkspaceBackup(store: WorkspaceLiveStore): WorkspaceBacku
   };
 }
 
-export function restoreWorkspaceBackup(store: WorkspaceLiveStore, backup: WorkspaceBackup) {
+export async function restoreWorkspaceBackup(store: WorkspaceLiveStore, backup: WorkspaceBackup) {
   const restoreResetId =
     backup.spoilers.resetGeneration === 0 ? initialSpoilerResetId : crypto.randomUUID();
   let batch: RestoreEvent[] = [];
-  const enqueue = (event: RestoreEvent) => {
-    batch.push(event);
-    if (batch.length === RESTORE_EVENT_BATCH_SIZE) {
-      commitRestoreBatch(store, batch);
-      batch = [];
-    }
-  };
 
-  enqueue(events.spoilerPolicyChanged({ policy: backup.spoilers.policy }));
+  batch.push(events.spoilerPolicyChanged({ policy: backup.spoilers.policy }));
   if (backup.spoilers.resetGeneration > 0) {
-    enqueue(
+    batch.push(
       events.spoilerProtectionReset({
         generation: backup.spoilers.resetGeneration,
         resetId: restoreResetId,
@@ -60,7 +53,7 @@ export function restoreWorkspaceBackup(store: WorkspaceLiveStore, backup: Worksp
   }
 
   for (const lot of backup.collectionLots) {
-    enqueue(
+    batch.push(
       events.collectionCopiesAdded({
         additionId: crypto.randomUUID(),
         lot: {
@@ -77,10 +70,14 @@ export function restoreWorkspaceBackup(store: WorkspaceLiveStore, backup: Worksp
         },
       }),
     );
+    if (batch.length === RESTORE_EVENT_BATCH_SIZE) {
+      await commitRestoreBatch(store, batch);
+      batch = [];
+    }
   }
 
   for (const decision of backup.spoilers.decisions) {
-    enqueue(
+    batch.push(
       events.spoilerDecisionChanged({
         ...decision,
         decisionId: crypto.randomUUID(),
@@ -89,9 +86,13 @@ export function restoreWorkspaceBackup(store: WorkspaceLiveStore, backup: Worksp
         resetId: restoreResetId,
       }),
     );
+    if (batch.length === RESTORE_EVENT_BATCH_SIZE) {
+      await commitRestoreBatch(store, batch);
+      batch = [];
+    }
   }
 
-  commitRestoreBatch(store, batch);
+  await commitRestoreBatch(store, batch);
   store.manualRefresh();
 
   const settings = store.query(spoilerSettingsQuery);
@@ -107,9 +108,12 @@ export function restoreWorkspaceBackup(store: WorkspaceLiveStore, backup: Worksp
   }
 }
 
-function commitRestoreBatch(store: WorkspaceLiveStore, batch: readonly RestoreEvent[]) {
+async function commitRestoreBatch(store: WorkspaceLiveStore, batch: readonly RestoreEvent[]) {
   if (batch.length > 0) {
     store.commit({ skipRefresh: true }, ...batch);
+    while (!store.syncStatus().isSynced) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
   }
 }
 

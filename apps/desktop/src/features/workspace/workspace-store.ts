@@ -13,7 +13,6 @@ export function createLiveStoreRegistry() {
     defaultOptions: {
       batchUpdates,
       confirmUnsavedChanges: false,
-      unusedCacheTime: 100,
     },
   });
 }

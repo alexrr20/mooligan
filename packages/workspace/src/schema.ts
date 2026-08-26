@@ -1,6 +1,7 @@
 import { Events, makeSchema, queryDb, Schema, State } from "@livestore/livestore";
 
 export const initialSpoilerResetId = "initial";
+export const workspaceEventSchemaVersion = 1;
 
 const TargetId = Schema.String.pipe(Schema.minLength(1), Schema.maxLength(128));
 const DecisionId = Schema.String.pipe(Schema.minLength(1), Schema.maxLength(128));
@@ -97,7 +98,16 @@ const CollectionLot = Schema.Struct({
 });
 
 export const tables = {
-  collectionLots: State.SQLite.table({ name: "collection_lots", schema: CollectionLot }),
+  collectionLots: State.SQLite.table({
+    indexes: [
+      {
+        columns: ["printingId", "finish", "language", "condition"],
+        name: "collection_lots_holding",
+      },
+    ],
+    name: "collection_lots",
+    schema: CollectionLot,
+  }),
   spoilerDecisions: State.SQLite.table({ name: "spoiler_decisions", schema: SpoilerDecision }),
   spoilerSettings: State.SQLite.table({ name: "spoiler_settings", schema: SpoilerSettings }),
 };
@@ -149,6 +159,33 @@ export const events = {
     }),
   }),
 } as const;
+
+export const workspaceSyncedEventSchema = Schema.Union(
+  Schema.Struct({
+    args: events.collectionCopiesAdded.schema,
+    name: Schema.Literal(events.collectionCopiesAdded.name),
+  }),
+  Schema.Struct({
+    args: events.collectionLotChanged.schema,
+    name: Schema.Literal(events.collectionLotChanged.name),
+  }),
+  Schema.Struct({
+    args: events.collectionLotRemoved.schema,
+    name: Schema.Literal(events.collectionLotRemoved.name),
+  }),
+  Schema.Struct({
+    args: events.spoilerDecisionChanged.schema,
+    name: Schema.Literal(events.spoilerDecisionChanged.name),
+  }),
+  Schema.Struct({
+    args: events.spoilerPolicyChanged.schema,
+    name: Schema.Literal(events.spoilerPolicyChanged.name),
+  }),
+  Schema.Struct({
+    args: events.spoilerProtectionReset.schema,
+    name: Schema.Literal(events.spoilerProtectionReset.name),
+  }),
+);
 
 const defaultSpoilerSettings = {
   id: "spoilers",

@@ -1,4 +1,5 @@
 import * as z from "zod";
+import { workspaceEventSchemaVersion } from "@mooligan/workspace";
 
 import {
   validateWorkspaceRuntime,
@@ -29,6 +30,7 @@ export interface AccountWorkspaceAuth {
 
 export class AccountWorkspace {
   readonly #auth: AccountWorkspaceAuth;
+  readonly #appVersion: string;
   readonly #now: () => number;
   readonly #registry: WorkspaceRegistry;
   readonly #runtimeChanged: RuntimeChanged;
@@ -41,8 +43,10 @@ export class AccountWorkspace {
     registry: WorkspaceRegistry,
     runtimeChanged: RuntimeChanged = () => undefined,
     now: () => number = Date.now,
+    appVersion = "0.0.0",
   ) {
     this.#auth = auth;
+    this.#appVersion = z.string().trim().min(1).max(64).parse(appVersion);
     this.#registry = registry;
     this.#runtimeChanged = runtimeChanged;
     this.#now = now;
@@ -231,6 +235,11 @@ export class AccountWorkspace {
   async #issueCredential(workspaceId: string) {
     try {
       const response = await this.#auth.requestAccountWorkspace("/api/workspace/sync-credential", {
+        body: JSON.stringify({
+          appVersion: this.#appVersion,
+          eventSchemaVersion: workspaceEventSchemaVersion,
+        }),
+        headers: { "content-type": "application/json" },
         method: "POST",
       });
       await requireSuccessfulResponse(response);
@@ -244,9 +253,7 @@ export class AccountWorkspace {
     } catch (error) {
       this.#sync = null;
       this.#syncIssue =
-        error instanceof AccountWorkspaceRequestError && error.sessionUnavailable
-          ? "session-unavailable"
-          : "account-service-unavailable";
+        error instanceof AccountWorkspaceRequestError ? error.issue : "account-service-unavailable";
     }
   }
 
@@ -261,26 +268,32 @@ export class AccountWorkspace {
 }
 
 class AccountWorkspaceRequestError extends Error {
-  readonly sessionUnavailable: boolean;
+  readonly issue: "account-service-unavailable" | "client-upgrade-required" | "session-unavailable";
 
-  constructor(sessionUnavailable: boolean) {
+  constructor(
+    issue: "account-service-unavailable" | "client-upgrade-required" | "session-unavailable",
+  ) {
     super("The account workspace service is unavailable.");
     this.name = "AccountWorkspaceRequestError";
-    this.sessionUnavailable = sessionUnavailable;
+    this.issue = issue;
   }
 }
 
 async function requireSuccessfulResponse(response: Response) {
   if (!response.ok) {
-    throw new AccountWorkspaceRequestError(response.status === 401 || response.status === 403);
+    const issue =
+      response.status === 401 || response.status === 403
+        ? "session-unavailable"
+        : response.status === 426
+          ? "client-upgrade-required"
+          : "account-service-unavailable";
+    throw new AccountWorkspaceRequestError(issue);
   }
 }
 
 function syncIssueForError(error: Error) {
   if (error instanceof AccountWorkspaceRequestError) {
-    return error.sessionUnavailable
-      ? ("session-unavailable" as const)
-      : ("account-service-unavailable" as const);
+    return error.issue;
   }
   return error.name === "AuthRequestError"
     ? ("account-service-unavailable" as const)

@@ -29,7 +29,7 @@ export function useWorkspaceBackup() {
       try {
         try {
           const restored = await restoreRegistry.getOrLoadPromise(options);
-          restoreWorkspaceBackup(restored, backup);
+          await restoreWorkspaceBackup(restored, backup);
         } finally {
           release();
           await restoreRegistry.dispose();

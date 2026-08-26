@@ -1,8 +1,8 @@
 # Mooligan
 
-A local-first Electron app for managing Magic: The Gathering cards, with an
-optional Better Auth account foundation for future synchronization. Creating
-an account is not a prerequisite for using the desktop app.
+A local-first Electron app for managing Magic: The Gathering cards. A Better
+Auth account can synchronize one personal Workspace, but an account is not a
+prerequisite for using the desktop app.
 
 - `apps/desktop`: Electron, React 19, TanStack Router, StyleX, and Motion
 - `apps/api`: Hono 4 for Cloudflare Workers, served locally by Wrangler on
@@ -19,6 +19,11 @@ that persists to OPFS. A small Electron-owned SQLite registry stores the stable
 device ID, known workspace IDs, account bindings, and the active workspace. The
 workspace remains usable without signing in, without the API running, and after
 signing out. Its stable local ID is not an anonymous online account.
+
+Mooligan refuses LiveStore's in-memory fallback if OPFS cannot open. It shows a
+reload screen and leaves the last persistent event log untouched. This is
+deliberate. Collection or spoiler changes must never appear saved when they
+would disappear after a restart.
 
 The user-owned workspace is separate from the replaceable Scryfall catalog
 database. Motion and view preferences stay in renderer local storage on the
@@ -52,8 +57,9 @@ cp apps/api/.dev.vars.example apps/api/.dev.vars
 openssl rand -base64 32
 ```
 
-Use the generated value for `BETTER_AUTH_SECRET`, then add a Google OAuth web
-client's ID and secret. Register this exact local redirect URI with Google:
+Use separate generated values for `BETTER_AUTH_SECRET` and
+`SYNC_CREDENTIAL_SECRET`, then add a Google OAuth web client's ID and secret.
+Register this exact local redirect URI with Google:
 
 ```text
 http://127.0.0.1:3000/api/auth/callback/google
@@ -77,14 +83,14 @@ current Scryfall release metadata in D1. The desktop downloads Scryfall's
 database, validates it, and atomically replaces the installed catalog. A failed
 check or import leaves the existing offline catalog untouched.
 
-Desktop builds read the catalog service from `MOOLIGAN_API_URL` and the auth
-service from `MOOLIGAN_AUTH_ORIGIN`. Local development defaults both to
-`http://127.0.0.1:3000`; release builds default both to the production Worker.
-Explicit values present while building override those defaults and are embedded
-in the packaged main process, so installed apps do not depend on shell
-configuration. The auth value must be an origin with no path, query,
-credentials, or fragment. It must use HTTPS except for the loopback hosts
-`127.0.0.1`, `localhost`, and `[::1]` during development.
+Desktop builds read the catalog service from `MOOLIGAN_API_URL`, the auth
+service from `MOOLIGAN_AUTH_ORIGIN`, and the LiveStore endpoint from
+`MOOLIGAN_SYNC_URL`. Local development defaults them to the local Worker;
+release builds default them to the production Worker. Explicit values present
+while building override those defaults and are embedded in the packaged app, so
+installed apps do not depend on shell configuration. The auth value must be an
+origin with no path, query, credentials, or fragment. It must use HTTPS except
+for the loopback hosts `127.0.0.1`, `localhost`, and `[::1]` during development.
 
 ### Verify sign-in locally
 
@@ -101,6 +107,50 @@ Also disconnect the Worker while editing collection or spoiler state. Local
 reads and writes should continue. Session cookies, PKCE material, and
 authorization codes must never appear in renderer storage or the
 renderer-facing API.
+
+### Verify synchronization locally
+
+The development desktop connects to `ws://127.0.0.1:3000/api/sync`. After the
+local migration and sign-in setup above:
+
+1. Start the API and desktop with `vp run dev`.
+2. Sign in on one desktop profile. If the Account has no Workspace, Mooligan
+   binds the active unbound Workspace. Otherwise it opens the Account's existing
+   Workspace and retains the prior local Workspace.
+3. Start a second Electron profile against the same Worker, sign in to the same
+   Account, and confirm collection and spoiler edits arrive in both directions.
+4. Stop Wrangler, edit on both profiles, restart Wrangler, and confirm the
+   changes converge. Local reads and writes must work while Wrangler is stopped.
+5. Sign out. The active Workspace and its local data must remain available with
+   synchronization disabled.
+
+Every sync credential lasts five minutes. The desktop requests it with its app
+version and Workspace event-schema version. The API returns HTTP 426 with
+`client_upgrade_required` when that schema version is below the supported
+minimum, or HTTP 409 with `server_upgrade_required` when it is above the
+supported maximum. The desktop pauses sync and keeps local editing available.
+
+### Reset development data
+
+Workspace backup version 3 is the only supported backup format. Export a backup
+from Settings before resetting any data you care about.
+
+For an unbound development Workspace, quit Mooligan, clear the renderer origin's
+site data from Electron DevTools, and reopen the app. This removes LiveStore's
+OPFS data and device-local renderer preferences. It does not remove the card
+catalog, protected Account session, or Electron-owned Workspace registry.
+
+For a complete pre-release reset, quit Mooligan and move its operating-system
+user-data directory aside before relaunching. The usual directory is
+`~/Library/Application Support/Mooligan` on macOS, `%APPDATA%\Mooligan` on
+Windows, and `$XDG_CONFIG_HOME/Mooligan` or `~/.config/Mooligan` on Linux. Moving
+the directory keeps the old files recoverable. The project does not migrate
+development-era Workspace registries or backup versions 1 and 2.
+
+Deleting local Wrangler Durable Object state changes the sync backend identity.
+Mooligan shuts down that sync connection without clearing its local event log.
+Do this only for development. Clear or replace each affected client Workspace
+explicitly before connecting it to the new backend.
 
 The Worker and hosted page use the official `@better-auth/electron` plugin. The
 desktop side intentionally uses a narrow main-process client over that plugin's
@@ -130,6 +180,17 @@ the system-browser round trip. `vp run desktop#package` creates an unpacked
 platform build with the `com.mooligan.app` scheme metadata for smoke testing;
 test the deep-link path in a signed installer on every supported platform
 before release.
+
+Run the repeatable LiveStore scale measurement separately:
+
+```bash
+vp run desktop#measure:livestore
+```
+
+It measures the configured 100,000-lot and 100,000-spoiler-decision backup
+limits, cold state open, initial projection, a one-lot edit, a 100,000-event
+remote pull, and event-log growth under repeated edits. The checked-in release
+gate record explains which measurements have stable automated thresholds.
 
 ## Production build
 
@@ -176,11 +237,12 @@ returns `503` only if that bootstrap check fails.
 
 The desktop packaging configuration registers the exact `com.mooligan.app` URL
 scheme and defaults release builds to the production Worker. Override the
-service origins only when targeting another deployment:
+service URLs only when targeting another deployment:
 
 ```bash
 MOOLIGAN_API_URL=https://mooligan-api.bessa.workers.dev \
   MOOLIGAN_AUTH_ORIGIN=https://mooligan-api.bessa.workers.dev \
+  MOOLIGAN_SYNC_URL=wss://mooligan-api.bessa.workers.dev/api/sync \
   vp run desktop#dist
 ```
 

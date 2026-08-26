@@ -159,6 +159,8 @@ if (!authStartup.isPrimary) {
           }
           publishRendererEvent("workspace:changed", undefined);
         },
+        Date.now,
+        app.getVersion(),
       );
       registerWorkspaceIpc(workspaceRegistry, accountWorkspace, app.getPath("documents"));
       const publishAuthStateAndRefresh = await registerAuthIpc(auth, authStartup, (snapshot) =>

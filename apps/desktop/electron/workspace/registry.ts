@@ -28,7 +28,7 @@ export class WorkspaceRegistry {
 
   constructor(userDataRoot: string) {
     mkdirSync(userDataRoot, { recursive: true });
-    this.#database = new DatabaseSync(join(userDataRoot, "workspace-registry-v3.sqlite"), {
+    this.#database = new DatabaseSync(join(userDataRoot, "workspace-registry-v4.sqlite"), {
       timeout: 5_000,
     });
 
@@ -45,7 +45,9 @@ export class WorkspaceRegistry {
           workspace_id TEXT PRIMARY KEY,
           active INTEGER NOT NULL CHECK (active IN (0, 1)),
           account_id TEXT,
-          binding_secret TEXT UNIQUE
+          binding_secret TEXT UNIQUE,
+          restore_pending INTEGER NOT NULL CHECK (restore_pending IN (0, 1)),
+          CHECK (restore_pending = 0 OR active = 0)
         ) STRICT;
 
         CREATE UNIQUE INDEX IF NOT EXISTS one_active_workspace
@@ -54,6 +56,7 @@ export class WorkspaceRegistry {
         CREATE UNIQUE INDEX IF NOT EXISTS one_workspace_per_account
           ON workspaces(account_id) WHERE account_id IS NOT NULL;
       `);
+      this.#database.prepare("DELETE FROM workspaces WHERE restore_pending = 1").run();
       this.#database
         .prepare("INSERT OR IGNORE INTO device (singleton, client_id) VALUES (1, ?)")
         .run(randomUUID());
@@ -68,7 +71,7 @@ export class WorkspaceRegistry {
         const { bindingSecret, workspaceId } = createWorkspaceIdentity();
         this.#database
           .prepare(
-            "INSERT INTO workspaces (workspace_id, active, account_id, binding_secret) VALUES (?, 1, NULL, ?)",
+            "INSERT INTO workspaces (workspace_id, active, account_id, binding_secret, restore_pending) VALUES (?, 1, NULL, ?, 0)",
           )
           .run(workspaceId, bindingSecret);
       }
@@ -95,7 +98,7 @@ export class WorkspaceRegistry {
     const { bindingSecret, workspaceId } = createWorkspaceIdentity();
     this.#database
       .prepare(
-        "INSERT INTO workspaces (workspace_id, active, account_id, binding_secret) VALUES (?, 0, NULL, ?)",
+        "INSERT INTO workspaces (workspace_id, active, account_id, binding_secret, restore_pending) VALUES (?, 0, NULL, ?, 0)",
       )
       .run(workspaceId, bindingSecret);
     return workspaceId;
@@ -106,7 +109,12 @@ export class WorkspaceRegistry {
       throw new Error("A workspace restore is already in progress.");
     }
 
-    const workspaceId = this.createWorkspace();
+    const { bindingSecret, workspaceId } = createWorkspaceIdentity();
+    this.#database
+      .prepare(
+        "INSERT INTO workspaces (workspace_id, active, account_id, binding_secret, restore_pending) VALUES (?, 0, NULL, ?, 1)",
+      )
+      .run(workspaceId, bindingSecret);
     this.#pendingRestoreWorkspaceId = workspaceId;
     return validateWorkspaceBootstrap({ ...this.bootstrap(), workspaceId });
   }
@@ -117,7 +125,20 @@ export class WorkspaceRegistry {
       throw new Error("The workspace restore is no longer active.");
     }
 
-    this.activateWorkspace(validatedWorkspaceId);
+    transact(this.#database, () => {
+      const result = this.#database
+        .prepare(
+          "UPDATE workspaces SET restore_pending = 0 WHERE workspace_id = ? AND restore_pending = 1",
+        )
+        .run(validatedWorkspaceId);
+      if (result.changes !== 1) {
+        throw new Error("The workspace restore is no longer active.");
+      }
+      this.#database.prepare("UPDATE workspaces SET active = 0 WHERE active = 1").run();
+      this.#database
+        .prepare("UPDATE workspaces SET active = 1 WHERE workspace_id = ?")
+        .run(validatedWorkspaceId);
+    });
     this.#pendingRestoreWorkspaceId = undefined;
   }
 
@@ -136,7 +157,7 @@ export class WorkspaceRegistry {
 
     transact(this.#database, () => {
       const known = this.#database
-        .prepare("SELECT 1 FROM workspaces WHERE workspace_id = ?")
+        .prepare("SELECT 1 FROM workspaces WHERE workspace_id = ? AND restore_pending = 0")
         .get(validatedWorkspaceId);
 
       if (!known) {
@@ -188,7 +209,7 @@ export class WorkspaceRegistry {
     transact(this.#database, () => {
       const accountWorkspace = this.#database
         .prepare(
-          "SELECT workspace_id AS workspaceId, account_id AS accountId, binding_secret AS bindingSecret FROM workspaces WHERE account_id = ?",
+          "SELECT workspace_id AS workspaceId, account_id AS accountId, binding_secret AS bindingSecret FROM workspaces WHERE account_id = ? AND restore_pending = 0",
         )
         .get(validatedAccountId);
       if (accountWorkspace !== undefined) {
@@ -201,7 +222,7 @@ export class WorkspaceRegistry {
 
       const workspace = this.#database
         .prepare(
-          "SELECT workspace_id AS workspaceId, account_id AS accountId, binding_secret AS bindingSecret FROM workspaces WHERE workspace_id = ?",
+          "SELECT workspace_id AS workspaceId, account_id AS accountId, binding_secret AS bindingSecret FROM workspaces WHERE workspace_id = ? AND restore_pending = 0",
         )
         .get(validatedWorkspaceId);
       if (workspace !== undefined) {
@@ -217,7 +238,7 @@ export class WorkspaceRegistry {
 
       this.#database
         .prepare(
-          "INSERT INTO workspaces (workspace_id, active, account_id, binding_secret) VALUES (?, 0, ?, NULL)",
+          "INSERT INTO workspaces (workspace_id, active, account_id, binding_secret, restore_pending) VALUES (?, 0, ?, NULL, 0)",
         )
         .run(validatedWorkspaceId, validatedAccountId);
     });
@@ -230,7 +251,7 @@ export class WorkspaceRegistry {
   workspaces() {
     return this.#database
       .prepare(
-        "SELECT workspace_id AS workspaceId, active, account_id AS accountId, binding_secret AS bindingSecret FROM workspaces ORDER BY rowid",
+        "SELECT workspace_id AS workspaceId, active, account_id AS accountId, binding_secret AS bindingSecret FROM workspaces WHERE restore_pending = 0 ORDER BY rowid",
       )
       .all()
       .map((row, index) => {
@@ -268,7 +289,7 @@ export class WorkspaceRegistry {
   #activeWorkspaceRow() {
     const row = this.#database
       .prepare(
-        "SELECT workspace_id AS workspaceId, account_id AS accountId, binding_secret AS bindingSecret FROM workspaces WHERE active = 1",
+        "SELECT workspace_id AS workspaceId, account_id AS accountId, binding_secret AS bindingSecret FROM workspaces WHERE active = 1 AND restore_pending = 0",
       )
       .get();
     return row === undefined ? undefined : WorkspaceRowSchema.parse(row);

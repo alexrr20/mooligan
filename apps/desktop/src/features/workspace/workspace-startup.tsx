@@ -18,6 +18,7 @@ import { CollectionProjectionStartup } from "./collection-projection";
 import { SpoilerProjectionStartup } from "./spoiler-projection";
 import { createLiveStoreRegistry, workspaceStoreOptions } from "./workspace-store";
 import { WorkspaceLiveStoreProvider, type WorkspaceLiveStore } from "./workspace-store-context";
+import { requirePersistentWorkspaceStorage } from "./workspace-storage";
 import {
   WorkspaceRuntimeProvider,
   type WorkspaceConnectionStatus,
@@ -104,9 +105,11 @@ function WorkspaceRuntimeRoot({ children }: { children: ReactNode }) {
   const options = workspaceStoreOptions(session.runtime);
   return (
     <StoreRegistryProvider storeRegistry={session.registry}>
-      <OpenWorkspace options={options} runtime={session.runtime}>
-        {children}
-      </OpenWorkspace>
+      <Suspense fallback={<WorkspaceStatus status="loading" />}>
+        <OpenWorkspace options={options} runtime={session.runtime}>
+          {children}
+        </OpenWorkspace>
+      </Suspense>
     </StoreRegistryProvider>
   );
 }
@@ -147,6 +150,7 @@ function OpenWorkspace({
   runtime: WorkspaceRuntime;
 }) {
   const store = useStore(options);
+  requirePersistentWorkspaceStorage(store.storageMode);
   const connectionStatus = useConnectionStatus(store, runtime);
 
   useEffect(() => {

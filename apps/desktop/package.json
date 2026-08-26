@@ -11,6 +11,7 @@
     "build": "tsc --noEmit && vp run clean && vp build",
     "package": "vp run build && electron-builder --dir",
     "dist": "vp run build && electron-builder",
+    "measure:livestore": "node test/measure-livestore-scale.ts",
     "start": "electron .",
     "test": "node --test test/*.test.ts"
   },
