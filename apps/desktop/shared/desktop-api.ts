@@ -20,6 +20,18 @@ import type {
   SpoilerRevealSummaries,
   SpoilerState,
 } from "@mooligan/domain/spoilers";
+import * as z from "zod";
+import type { JSONType } from "zod";
+
+export const WorkspaceBootstrapSchema = z.strictObject({
+  clientId: z.uuidv4(),
+  workspaceId: z.uuidv4(),
+});
+export type WorkspaceBootstrap = z.infer<typeof WorkspaceBootstrapSchema>;
+
+export function validateWorkspaceBootstrap(value: JSONType): WorkspaceBootstrap {
+  return WorkspaceBootstrapSchema.parse(value);
+}
 
 export type AuthStatus =
   | "signed-out"
@@ -103,6 +115,7 @@ export type DesktopApi = {
     setPolicy: (policy: SpoilerPolicy) => Promise<SpoilerState>;
   };
   workspace: {
+    bootstrap: () => Promise<WorkspaceBootstrap>;
     exportBackup: () => Promise<"cancelled" | "exported">;
     importBackup: () => Promise<"cancelled" | "imported">;
   };

@@ -9,6 +9,7 @@ import type { Deck } from "@mooligan/domain/decks";
 import type { CardList } from "@mooligan/domain/lists";
 
 import { parseWorkspaceBackup } from "../electron/workspace/backup.ts";
+import { WorkspaceRegistry } from "../electron/workspace/registry.ts";
 import { WorkspaceManager, WorkspaceStore } from "../electron/workspace/store.ts";
 
 const collectionLot: CollectionLot = {
@@ -89,7 +90,8 @@ void test("workspace backups round-trip user data while preserving local metadat
       { scope: "release", state: "protect", targetId: "preview-release" },
     ]);
 
-    const target = new WorkspaceManager(targetDirectory);
+    const registry = new WorkspaceRegistry(targetDirectory);
+    const target = new WorkspaceManager(registry);
     const targetWorkspaceId = target.workspaceId;
     putCollectionLotThroughBackup(target, { ...collectionLot, id: "old-lot" });
 
@@ -105,6 +107,7 @@ void test("workspace backups round-trip user data while preserving local metadat
     assert.deepEqual(target.readSpoilerState().activePrintingIds, ["preview-printing"]);
     assert.deepEqual(JSON.parse(target.createBackup()), JSON.parse(backup));
     target.close();
+    registry.close();
   } finally {
     await Promise.all([
       rm(sourceDirectory, { force: true, recursive: true }),

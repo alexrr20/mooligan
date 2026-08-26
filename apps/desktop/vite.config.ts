@@ -4,10 +4,11 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite-plus";
 import electron from "vite-plugin-electron/simple";
 
-const productionServiceOrigin = "https://mooligan-api.bessa.workers.dev";
-const developmentCsp =
-  "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://127.0.0.1:3000 ws://127.0.0.1:5173; img-src 'self' data: mooligan-image: mooligan-set-symbol:; object-src 'none'; base-uri 'none'";
-const productionCsp = `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ${productionServiceOrigin}; img-src 'self' data: mooligan-image: mooligan-set-symbol:; object-src 'none'; base-uri 'none'`;
+import {
+  developmentContentSecurityPolicy,
+  productionContentSecurityPolicy,
+  productionServiceOrigin,
+} from "./content-security-policy";
 
 export default defineConfig(({ command }) => ({
   base: "./",
@@ -45,7 +46,8 @@ export default defineConfig(({ command }) => ({
     {
       name: "desktop-content-security-policy",
       transformIndexHtml(html: string) {
-        const contentSecurityPolicy = command === "serve" ? developmentCsp : productionCsp;
+        const contentSecurityPolicy =
+          command === "serve" ? developmentContentSecurityPolicy : productionContentSecurityPolicy;
         return html.replace("__CONTENT_SECURITY_POLICY__", contentSecurityPolicy);
       },
     },

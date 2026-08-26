@@ -23,15 +23,15 @@ This describes the product direction rather than a committed feature roadmap.
 
 **Workspace**:
 The personal data boundary containing one Collection, its Decks and card lists,
-and durable user decisions such as spoiler reveals. A workspace exists without
-an Account, may be available on several Devices, and may be associated with at
-most one Account.
+and durable user decisions such as spoiler reveals. A Workspace exists without
+an Account, may later bind to one Account, and may be available on several
+Devices.
 _Avoid_: Account
 
 **Device**:
-One installation of Mooligan that holds local workspace data and device-specific
-settings. A Device may hold several Workspaces, but it is not itself a Workspace
-or Account.
+One installation of Mooligan with its own local files, caches, device-specific
+settings, and stable synchronization client identity. A Device may hold several
+Workspaces, but it is not itself a Workspace or Account.
 _Avoid_: Workspace, Account
 
 **Account**:
@@ -39,6 +39,16 @@ An optional online identity used to synchronize one personal Workspace across
 Devices and publish selected content. An Account is not required to create,
 open, or edit a Workspace.
 _Avoid_: Workspace
+
+**Unbound workspace**:
+A Workspace with no Account association. It remains a complete local Workspace
+and may later bind to one Account.
+_Avoid_: Anonymous account
+
+**Shared artifact**:
+A read-only Deck or card list published by its owner. Opening a Shared artifact
+does not add it to the recipient's personal Workspace.
+_Avoid_: Shared workspace
 
 ### Cards
 

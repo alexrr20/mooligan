@@ -1,6 +1,12 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 
-import type { AuthSnapshot, CatalogProgress, DesktopApi, Preferences } from "../shared/desktop-api";
+import {
+  validateWorkspaceBootstrap,
+  type AuthSnapshot,
+  type CatalogProgress,
+  type DesktopApi,
+  type Preferences,
+} from "../shared/desktop-api";
 
 function subscribe<Value>(channel: string, callback: (value: Value) => void) {
   const listener = (_event: IpcRendererEvent, value: Value) => callback(value);
@@ -50,6 +56,8 @@ export const desktopApi = {
   },
 
   workspace: {
+    bootstrap: async () =>
+      validateWorkspaceBootstrap(await ipcRenderer.invoke("workspace:bootstrap")),
     exportBackup: () => ipcRenderer.invoke("workspace:export"),
     importBackup: () => ipcRenderer.invoke("workspace:import"),
   },

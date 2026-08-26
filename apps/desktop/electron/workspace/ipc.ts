@@ -3,22 +3,29 @@ import { join } from "node:path";
 
 import { BrowserWindow, dialog, ipcMain, type OpenDialogOptions } from "electron";
 
+import { validateWorkspaceBootstrap } from "../../shared/desktop-api.ts";
 import { assertTrustedSender } from "../ipc-security";
 import type { SpoilerService } from "../spoilers/service";
 import { publishRendererEvent } from "../windows";
 import { parseWorkspaceBackup, type WorkspaceBackup } from "./backup";
 import type { MutationQueue } from "./mutations";
 import { validatePreferencesUpdate } from "./preferences";
+import type { WorkspaceRegistry } from "./registry";
 import type { WorkspaceManager } from "./store";
 
 const MAX_WORKSPACE_BACKUP_BYTES = 50 * 1024 * 1024;
 
 export function registerWorkspaceIpc(
+  registry: WorkspaceRegistry,
   workspace: WorkspaceManager,
   spoilers: SpoilerService,
   mutations: MutationQueue,
   documentsPath: string,
 ) {
+  ipcMain.handle("workspace:bootstrap", (event) => {
+    assertTrustedSender(event);
+    return validateWorkspaceBootstrap(registry.bootstrap());
+  });
   ipcMain.handle("preferences:read", (event) => {
     assertTrustedSender(event);
     return workspace.readPreferences();
