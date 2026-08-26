@@ -17,10 +17,8 @@ import {
   type AuthSnapshot,
   type CatalogProgress,
   type DesktopApi,
-  type Preferences,
 } from "../shared/desktop-api";
-import { validateWorkspaceBackup, validateWorkspaceLegacyBackupSnapshot } from "./workspace/backup";
-import { validatePreferencesUpdate } from "./workspace/preferences";
+import { validateWorkspaceBackup } from "./workspace/backup";
 
 function subscribe<Value>(channel: string, callback: (value: Value) => void) {
   const listener = (_event: IpcRendererEvent, value: Value) => callback(value);
@@ -103,31 +101,17 @@ export const desktopApi = {
       ),
   },
 
-  preferences: {
-    onChanged: (callback: (preferences: Preferences) => void) =>
-      subscribe("preferences:changed", callback),
-    read: () => ipcRenderer.invoke("preferences:read"),
-    update: (update) => ipcRenderer.invoke("preferences:update", validatePreferencesUpdate(update)),
-  },
-
   workspace: {
     activateRestore: (workspaceId) =>
       ipcRenderer.invoke("workspace:activate-restore", z.uuidv4().parse(workspaceId)),
-    beginRestore: async (snapshot) =>
-      validateWorkspaceBootstrap(
-        await ipcRenderer.invoke(
-          "workspace:begin-restore",
-          validateWorkspaceLegacyBackupSnapshot(snapshot),
-        ),
-      ),
+    beginRestore: async () =>
+      validateWorkspaceBootstrap(await ipcRenderer.invoke("workspace:begin-restore")),
     bootstrap: async () =>
       validateWorkspaceBootstrap(await ipcRenderer.invoke("workspace:bootstrap")),
     cancelRestore: (workspaceId) =>
       ipcRenderer.invoke("workspace:cancel-restore", z.uuidv4().parse(workspaceId)),
     exportBackup: (backup) =>
       ipcRenderer.invoke("workspace:export", validateWorkspaceBackup(backup)),
-    readLegacyBackupSnapshot: async () =>
-      validateWorkspaceLegacyBackupSnapshot(await ipcRenderer.invoke("workspace:backup-snapshot")),
     selectBackup: async () => {
       const value = await ipcRenderer.invoke("workspace:select-backup");
       return value === null ? null : validateWorkspaceBackup(value);
@@ -147,6 +131,5 @@ export const desktopApi = {
 contextBridge.exposeInMainWorld("catalog", desktopApi.catalog);
 contextBridge.exposeInMainWorld("collection", desktopApi.collection);
 contextBridge.exposeInMainWorld("workspaceProjection", desktopApi.workspaceProjection);
-contextBridge.exposeInMainWorld("preferences", desktopApi.preferences);
 contextBridge.exposeInMainWorld("workspace", desktopApi.workspace);
 contextBridge.exposeInMainWorld("auth", desktopApi.auth);

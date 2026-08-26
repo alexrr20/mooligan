@@ -6,8 +6,8 @@ import { Button } from "../../components/button";
 import { typography } from "../../styles/typography";
 import { SpoilerProjectionStartup } from "./spoiler-projection";
 import { CollectionProjectionStartup } from "./collection-projection";
-import { workspaceStoreOptions, workspaceStoreRegistry } from "./workspace-store";
-import { WorkspaceStoreProvider } from "./workspace-store-context";
+import { liveStoreRegistry, workspaceStoreOptions } from "./workspace-store";
+import { WorkspaceLiveStoreProvider } from "./workspace-store-context";
 
 const bootstrapPromise = window.workspace.bootstrap();
 
@@ -29,7 +29,7 @@ function WorkspaceProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <StoreRegistryProvider storeRegistry={workspaceStoreRegistry}>
+    <StoreRegistryProvider storeRegistry={liveStoreRegistry}>
       <OpenWorkspace options={options}>{children}</OpenWorkspace>
     </StoreRegistryProvider>
   );
@@ -44,7 +44,7 @@ function OpenWorkspace({
 }) {
   const store = useStore(options);
   return (
-    <WorkspaceStoreProvider store={store}>
+    <WorkspaceLiveStoreProvider store={store}>
       <CollectionProjectionStartup
         loading={<WorkspaceStatus status="loading" />}
         workspaceId={options.storeId}
@@ -56,7 +56,7 @@ function OpenWorkspace({
           {children}
         </SpoilerProjectionStartup>
       </CollectionProjectionStartup>
-    </WorkspaceStoreProvider>
+    </WorkspaceLiveStoreProvider>
   );
 }
 

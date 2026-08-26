@@ -15,13 +15,11 @@ const WorkspaceRowSchema = z.object({
 
 export class WorkspaceRegistry {
   readonly #database: DatabaseSync;
-  readonly #workspacesDirectory: string;
   readonly #clientId: string;
-  readonly #newWorkspaceIds = new Set<string>();
+  #pendingRestoreWorkspaceId: string | undefined;
 
   constructor(userDataRoot: string) {
     mkdirSync(userDataRoot, { recursive: true });
-    this.#workspacesDirectory = join(userDataRoot, "workspaces");
     this.#database = new DatabaseSync(join(userDataRoot, "workspace-registry-v2.sqlite"), {
       timeout: 5_000,
     });
@@ -59,7 +57,6 @@ export class WorkspaceRegistry {
         this.#database
           .prepare("INSERT INTO workspaces (workspace_id, active, account_id) VALUES (?, 1, NULL)")
           .run(workspaceId);
-        this.#newWorkspaceIds.add(workspaceId);
       }
     } catch (error) {
       this.#database.close();
@@ -85,8 +82,37 @@ export class WorkspaceRegistry {
     this.#database
       .prepare("INSERT INTO workspaces (workspace_id, active, account_id) VALUES (?, 0, NULL)")
       .run(workspaceId);
-    this.#newWorkspaceIds.add(workspaceId);
     return workspaceId;
+  }
+
+  beginRestore() {
+    if (this.#pendingRestoreWorkspaceId !== undefined) {
+      throw new Error("A workspace restore is already in progress.");
+    }
+
+    const workspaceId = this.createWorkspace();
+    this.#pendingRestoreWorkspaceId = workspaceId;
+    return validateWorkspaceBootstrap({ ...this.bootstrap(), workspaceId });
+  }
+
+  activateRestore(workspaceId: string) {
+    const validatedWorkspaceId = z.uuidv4().parse(workspaceId);
+    if (this.#pendingRestoreWorkspaceId !== validatedWorkspaceId) {
+      throw new Error("The workspace restore is no longer active.");
+    }
+
+    this.activateWorkspace(validatedWorkspaceId);
+    this.#pendingRestoreWorkspaceId = undefined;
+  }
+
+  cancelRestore(workspaceId: string) {
+    const validatedWorkspaceId = z.uuidv4().parse(workspaceId);
+    if (this.#pendingRestoreWorkspaceId !== validatedWorkspaceId) {
+      return;
+    }
+
+    this.removeWorkspace(validatedWorkspaceId);
+    this.#pendingRestoreWorkspaceId = undefined;
   }
 
   activateWorkspace(workspaceId: string) {
@@ -117,7 +143,6 @@ export class WorkspaceRegistry {
     if (result.changes !== 1) {
       throw new Error("The local workspace registry is invalid.");
     }
-    this.#newWorkspaceIds.delete(validatedWorkspaceId);
   }
 
   bindWorkspace(workspaceId: string, accountId: string | null) {
@@ -144,15 +169,11 @@ export class WorkspaceRegistry {
     return row.accountId;
   }
 
-  workspacePath(workspaceId: string) {
-    return join(this.#workspacesDirectory, `${z.uuidv4().parse(workspaceId)}.sqlite`);
-  }
-
-  isNewWorkspace(workspaceId: string) {
-    return this.#newWorkspaceIds.has(z.uuidv4().parse(workspaceId));
-  }
-
   close() {
+    if (this.#pendingRestoreWorkspaceId !== undefined) {
+      this.removeWorkspace(this.#pendingRestoreWorkspaceId);
+      this.#pendingRestoreWorkspaceId = undefined;
+    }
     this.#database.close();
   }
 

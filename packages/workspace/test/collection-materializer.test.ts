@@ -6,7 +6,7 @@ import { createStorePromise, type Store } from "@livestore/livestore";
 
 import { collectionLotsQuery, events, workspaceSchema } from "../src/schema.ts";
 
-type WorkspaceStore = Store<typeof workspaceSchema>;
+type WorkspaceLiveStore = Store<typeof workspaceSchema>;
 
 void test("offline additions to the same Holding are additive", async () => {
   await withStore("additive", (store) => {
@@ -124,7 +124,7 @@ async function replay(storeId: string) {
 }
 
 function addCopies(
-  store: WorkspaceStore,
+  store: WorkspaceLiveStore,
   input: {
     additionId: string;
     condition?: "lightly-played" | "near-mint";
@@ -154,7 +154,7 @@ function addCopies(
 }
 
 function changeLot(
-  store: WorkspaceStore,
+  store: WorkspaceLiveStore,
   input: {
     changeId: string;
     condition?: "lightly-played" | "near-mint";
@@ -174,13 +174,13 @@ function changeLot(
   );
 }
 
-function readLots(store: WorkspaceStore) {
+function readLots(store: WorkspaceLiveStore) {
   return store
     .query(collectionLotsQuery)
     .map(({ id, printingId, quantity }) => ({ id, printingId, quantity }));
 }
 
-async function withStore(storeId: string, run: (store: WorkspaceStore) => void) {
+async function withStore(storeId: string, run: (store: WorkspaceLiveStore) => void) {
   const store = await openStore(storeId);
   try {
     run(store);

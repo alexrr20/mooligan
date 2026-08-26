@@ -7,13 +7,17 @@ import { unstable_batchedUpdates as batchUpdates } from "react-dom";
 import type { WorkspaceBootstrap } from "../../../shared/desktop-api";
 import LiveStoreWorker from "./livestore.worker?worker";
 
-export const workspaceStoreRegistry = new StoreRegistry({
-  defaultOptions: {
-    batchUpdates,
-    confirmUnsavedChanges: false,
-    unusedCacheTime: 100,
-  },
-});
+export function createLiveStoreRegistry() {
+  return new StoreRegistry({
+    defaultOptions: {
+      batchUpdates,
+      confirmUnsavedChanges: false,
+      unusedCacheTime: 100,
+    },
+  });
+}
+
+export const liveStoreRegistry = createLiveStoreRegistry();
 
 export function workspaceStoreOptions({ clientId, workspaceId }: WorkspaceBootstrap) {
   return storeOptions({
@@ -34,7 +38,7 @@ export function workspaceStoreOptions({ clientId, workspaceId }: WorkspaceBootst
 window.addEventListener(
   "beforeunload",
   () => {
-    void workspaceStoreRegistry.dispose();
+    void liveStoreRegistry.dispose();
   },
   { once: true },
 );
