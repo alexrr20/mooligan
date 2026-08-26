@@ -1,12 +1,20 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
+import { SpoilerTargetIdSchema } from "@mooligan/domain/spoilers";
+import * as z from "zod";
 
 import {
+  validateSpoilerProjectionConnection,
+  validateSpoilerProjectionDelta,
+  validateSpoilerProjectionResult,
+  validateSpoilerProjectionSnapshot,
   validateWorkspaceBootstrap,
   type AuthSnapshot,
   type CatalogProgress,
   type DesktopApi,
   type Preferences,
 } from "../shared/desktop-api";
+import { validateWorkspaceBackup, validateWorkspaceLegacyBackupSnapshot } from "./workspace/backup";
+import { validatePreferencesUpdate } from "./workspace/preferences";
 
 function subscribe<Value>(channel: string, callback: (value: Value) => void) {
   const listener = (_event: IpcRendererEvent, value: Value) => callback(value);
@@ -31,35 +39,68 @@ export const desktopApi = {
     list: (request) => ipcRenderer.invoke("catalog:list", request),
     onProgress: (callback: (progress: CatalogProgress) => void) =>
       subscribe("catalog:progress", callback),
+    resolveRootSetId: (targetId) =>
+      ipcRenderer.invoke("catalog:root-set", SpoilerTargetIdSchema.parse(targetId)),
     spoilerRevealSummaries: () => ipcRenderer.invoke("catalog:spoiler-reveals"),
     status: () => ipcRenderer.invoke("catalog:status"),
     upcoming: () => ipcRenderer.invoke("catalog:upcoming"),
     upcomingPrintings: (request) => ipcRenderer.invoke("catalog:upcoming-printings", request),
   },
 
-  spoilers: {
-    onChanged: (callback) => subscribe("spoilers:changed", callback),
-    protectAll: () => ipcRenderer.invoke("spoilers:protect-all"),
-    protectPrinting: (printingId) => ipcRenderer.invoke("spoilers:protect-printing", printingId),
-    protectRelease: (setId) => ipcRenderer.invoke("spoilers:protect-release", setId),
-    read: () => ipcRenderer.invoke("spoilers:read"),
-    revealPrinting: (printingId) => ipcRenderer.invoke("spoilers:reveal-printing", printingId),
-    revealRelease: (setId) => ipcRenderer.invoke("spoilers:reveal-release", setId),
-    setPolicy: (policy) => ipcRenderer.invoke("spoilers:set-policy", policy),
+  workspaceProjection: {
+    applySpoilerDelta: async (delta) =>
+      validateSpoilerProjectionResult(
+        await ipcRenderer.invoke(
+          "workspace-projection:spoilers-apply",
+          validateSpoilerProjectionDelta(delta),
+        ),
+      ),
+    connectSpoilers: async (workspaceId) =>
+      validateSpoilerProjectionConnection(
+        await ipcRenderer.invoke(
+          "workspace-projection:spoilers-connect",
+          z.uuidv4().parse(workspaceId),
+        ),
+      ),
+    onSpoilersChanged: (callback) => subscribe("workspace-projection:spoilers-changed", callback),
+    replaceSpoilers: async (snapshot) =>
+      validateSpoilerProjectionResult(
+        await ipcRenderer.invoke(
+          "workspace-projection:spoilers-replace",
+          validateSpoilerProjectionSnapshot(snapshot),
+        ),
+      ),
   },
 
   preferences: {
     onChanged: (callback: (preferences: Preferences) => void) =>
       subscribe("preferences:changed", callback),
     read: () => ipcRenderer.invoke("preferences:read"),
-    update: (update) => ipcRenderer.invoke("preferences:update", update),
+    update: (update) => ipcRenderer.invoke("preferences:update", validatePreferencesUpdate(update)),
   },
 
   workspace: {
+    activateRestore: (workspaceId) =>
+      ipcRenderer.invoke("workspace:activate-restore", z.uuidv4().parse(workspaceId)),
+    beginRestore: async (snapshot) =>
+      validateWorkspaceBootstrap(
+        await ipcRenderer.invoke(
+          "workspace:begin-restore",
+          validateWorkspaceLegacyBackupSnapshot(snapshot),
+        ),
+      ),
     bootstrap: async () =>
       validateWorkspaceBootstrap(await ipcRenderer.invoke("workspace:bootstrap")),
-    exportBackup: () => ipcRenderer.invoke("workspace:export"),
-    importBackup: () => ipcRenderer.invoke("workspace:import"),
+    cancelRestore: (workspaceId) =>
+      ipcRenderer.invoke("workspace:cancel-restore", z.uuidv4().parse(workspaceId)),
+    exportBackup: (backup) =>
+      ipcRenderer.invoke("workspace:export", validateWorkspaceBackup(backup)),
+    readLegacyBackupSnapshot: async () =>
+      validateWorkspaceLegacyBackupSnapshot(await ipcRenderer.invoke("workspace:backup-snapshot")),
+    selectBackup: async () => {
+      const value = await ipcRenderer.invoke("workspace:select-backup");
+      return value === null ? null : validateWorkspaceBackup(value);
+    },
   },
 
   auth: {
@@ -74,7 +115,7 @@ export const desktopApi = {
 
 contextBridge.exposeInMainWorld("catalog", desktopApi.catalog);
 contextBridge.exposeInMainWorld("collection", desktopApi.collection);
-contextBridge.exposeInMainWorld("spoilers", desktopApi.spoilers);
+contextBridge.exposeInMainWorld("workspaceProjection", desktopApi.workspaceProjection);
 contextBridge.exposeInMainWorld("preferences", desktopApi.preferences);
 contextBridge.exposeInMainWorld("workspace", desktopApi.workspace);
 contextBridge.exposeInMainWorld("auth", desktopApi.auth);

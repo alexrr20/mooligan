@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import { MutationQueue, runForUnchangedRevision } from "../electron/workspace/mutations.ts";
 
-void test("spoiler mutations finish in invocation order", async () => {
+void test("workspace mutations finish in invocation order", async () => {
   const mutations = new MutationQueue();
   const lookup = deferred<string>();
   const events: string[] = [];

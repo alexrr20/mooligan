@@ -15,15 +15,53 @@ export type SpoilerRevealScope = z.infer<typeof SpoilerRevealScopeSchema>;
 export const SpoilerDecisionStateSchema = z.enum(["protect", "reveal"]);
 export type SpoilerDecisionState = z.infer<typeof SpoilerDecisionStateSchema>;
 
-export const SpoilerDecisionSchema = z.strictObject({
-  generation: z.number().int().nonnegative(),
-  revision: z.number().int().positive(),
+export const SpoilerProjectionDecisionSchema = z.strictObject({
   scope: SpoilerRevealScopeSchema,
   state: SpoilerDecisionStateSchema,
   targetId: idSchema,
-  updatedAt: z.iso.datetime({ offset: true }),
 });
-export type SpoilerDecision = z.infer<typeof SpoilerDecisionSchema>;
+export type SpoilerProjectionDecision = z.infer<typeof SpoilerProjectionDecisionSchema>;
+
+const MAX_SPOILER_PROJECTION_DECISIONS = 100_000;
+const SpoilerProjectionDecisionsSchema = z
+  .array(SpoilerProjectionDecisionSchema)
+  .max(MAX_SPOILER_PROJECTION_DECISIONS)
+  .refine(
+    (decisions) =>
+      new Set(decisions.map(({ scope, targetId }) => `${scope}\0${targetId}`)).size ===
+      decisions.length,
+    { message: "Spoiler projection targets must be unique." },
+  );
+
+const SpoilerProjectionIdentitySchema = z.strictObject({
+  revision: z.number().int().positive(),
+  sessionId: z.uuidv4(),
+  workspaceId: z.uuidv4(),
+});
+
+export const SpoilerProjectionSnapshotSchema = SpoilerProjectionIdentitySchema.extend({
+  decisions: SpoilerProjectionDecisionsSchema,
+  policy: SpoilerPolicySchema,
+});
+export type SpoilerProjectionSnapshot = z.infer<typeof SpoilerProjectionSnapshotSchema>;
+
+export const SpoilerProjectionDeltaSchema = SpoilerProjectionIdentitySchema.extend({
+  decisions: SpoilerProjectionDecisionsSchema,
+  policy: SpoilerPolicySchema.optional(),
+});
+export type SpoilerProjectionDelta = z.infer<typeof SpoilerProjectionDeltaSchema>;
+
+export const SpoilerProjectionConnectionSchema = z.strictObject({
+  sessionId: z.uuidv4(),
+  workspaceId: z.uuidv4(),
+});
+export type SpoilerProjectionConnection = z.infer<typeof SpoilerProjectionConnectionSchema>;
+
+export const SpoilerProjectionResultSchema = z.discriminatedUnion("status", [
+  z.strictObject({ revision: z.number().int().positive(), status: z.literal("applied") }),
+  z.strictObject({ status: z.literal("resync-required") }),
+]);
+export type SpoilerProjectionResult = z.infer<typeof SpoilerProjectionResultSchema>;
 
 export const CatalogSetSymbolDescriptorSchema = z.strictObject({ setId: idSchema });
 export type CatalogSetSymbolDescriptor = z.infer<typeof CatalogSetSymbolDescriptorSchema>;

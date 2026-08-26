@@ -10,7 +10,6 @@ import type {
 import type {
   CatalogPrintingResult as CatalogPrintingResultType,
   CatalogReleaseSummary as CatalogReleaseSummaryType,
-  SpoilerPolicy as SpoilerPolicyType,
   SpoilerRevealSummaries as SpoilerRevealSummariesType,
   SpoilerState as SpoilerStateType,
 } from "@mooligan/domain/spoilers";
@@ -40,7 +39,6 @@ declare global {
   type AuthUser = AuthUserType;
   type MotionPreference = MotionPreferenceType;
   type Preferences = PreferencesType;
-  type SpoilerPolicy = SpoilerPolicyType;
   type SpoilerRevealSummaries = SpoilerRevealSummariesType;
   type SpoilerState = SpoilerStateType;
 

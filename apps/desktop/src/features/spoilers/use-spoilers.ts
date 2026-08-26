@@ -1,14 +1,19 @@
-import type { SpoilerPolicy, SpoilerState } from "@mooligan/domain/spoilers";
-import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import type {
+  SpoilerDecisionState,
+  SpoilerPolicy,
+  SpoilerRevealScope,
+  SpoilerState,
+} from "@mooligan/domain/spoilers";
+import {
+  events,
+  spoilerDecisionsQuery,
+  spoilerSettingsQuery,
+  tables,
+} from "@mooligan/workspace/schema";
+import { useMutation } from "@tanstack/react-query";
 
-export const spoilerStateQueryKey = ["spoilers", "state"] as const;
-
-const protectedByDefault: SpoilerState = {
-  activePrintingIds: [],
-  activeRootSetIds: [],
-  policy: "protect",
-  revision: 0,
-};
+import { useWorkspaceStore } from "../workspace/workspace-store-context.tsx";
+export { spoilerCatalogCacheKey } from "./spoiler-cache-key.ts";
 
 type SpoilerAction =
   | { policy: SpoilerPolicy; type: "set-policy" }
@@ -18,21 +23,17 @@ type SpoilerAction =
   | { targetId: string; type: "reveal-release" }
   | { type: "protect-all" };
 
-type SpoilerStateEvents = Pick<Window["spoilers"], "onChanged">;
-
 export function useSpoilers() {
-  const bridge = window.spoilers;
-  const queryClient = useQueryClient();
+  const store = useWorkspaceStore();
   const query = useSpoilerState();
   const mutation = useMutation({
-    mutationFn: (action: SpoilerAction) => runSpoilerAction(bridge, action),
-    onSuccess: (state) => updateSpoilerState(queryClient, state),
+    mutationFn: (action: SpoilerAction) => runSpoilerAction(store, action),
   });
 
   return {
     busy: mutation.isPending,
-    error: query.error ?? mutation.error,
-    loading: query.loading,
+    error: mutation.error,
+    loading: false,
     protectAll: () => mutation.mutate({ type: "protect-all" }),
     protectPrinting: (printingId: string) =>
       mutation.mutate({ targetId: printingId, type: "protect-printing" }),
@@ -47,70 +48,154 @@ export function useSpoilers() {
 }
 
 export function useSpoilerState() {
-  const query = useQuery({
-    queryKey: spoilerStateQueryKey,
-    queryFn: () => window.spoilers.read(),
-    retry: false,
-    staleTime: Infinity,
-  });
+  const store = useWorkspaceStore();
+  const settings = store.useQuery(spoilerSettingsQuery);
+  const decisions = store.useQuery(spoilerDecisionsQuery);
+  const reveals = decisions.filter(({ state }) => state === "reveal");
 
   return {
-    error: query.error,
-    loading: query.isLoading,
-    state: query.data ?? protectedByDefault,
+    error: null,
+    loading: false,
+    state: {
+      activePrintingIds: reveals
+        .filter(({ scope }) => scope === "printing")
+        .map(({ targetId }) => targetId),
+      activeRootSetIds: reveals
+        .filter(({ scope }) => scope === "release")
+        .map(({ targetId }) => targetId),
+      policy: settings.policy,
+      revision: settings.resetGeneration,
+    } satisfies SpoilerState,
   };
 }
 
-export function spoilerCatalogCacheKey(state: SpoilerState) {
-  return JSON.stringify([
-    state.revision,
-    state.policy,
-    state.activePrintingIds,
-    state.activeRootSetIds,
-  ]);
-}
-
-export function subscribeToSpoilerState(
-  queryClient: QueryClient,
-  events: SpoilerStateEvents = window.spoilers,
+async function runSpoilerAction(
+  store: ReturnType<typeof useWorkspaceStore>,
+  action: SpoilerAction,
 ) {
-  return events.onChanged((state) => updateSpoilerState(queryClient, state));
-}
+  const settings = store.query(spoilerSettingsQuery);
+  const decisions = store.query(spoilerDecisionsQuery);
 
-function updateSpoilerState(queryClient: QueryClient, state: SpoilerState) {
-  const previous = queryClient.getQueryData<SpoilerState>(spoilerStateQueryKey);
-  queryClient.setQueryData(spoilerStateQueryKey, state);
-  if (!previous || spoilerVisibilityChanged(previous, state)) {
-    void queryClient.resetQueries({ queryKey: ["catalog"] });
+  switch (action.type) {
+    case "protect-all":
+      store.commit(
+        events.spoilerPolicyChanged({ policy: "protect" }),
+        events.spoilerProtectionReset({
+          generation: settings.resetGeneration + 1,
+          resetId: crypto.randomUUID(),
+        }),
+      );
+      return;
+    case "protect-printing": {
+      if (settings.policy === "show") {
+        throw new Error('Turn off "Always show previews" before protecting one printing.');
+      }
+      const rootSetId = await optionalRootSetId(action.targetId);
+      const current = findDecision(decisions, "printing", action.targetId);
+      if (current?.state !== "reveal" && !rootSetId) {
+        throw new Error("This printing is not present in the installed catalog.");
+      }
+      if (rootSetId && findDecision(decisions, "release", rootSetId)?.state === "reveal") {
+        throw new Error("Protect this release before protecting one printing from it.");
+      }
+      commitDecision(store, settings, current, "printing", action.targetId, "protect");
+      return;
+    }
+    case "protect-release": {
+      if (settings.policy === "show") {
+        throw new Error('Turn off "Always show previews" before protecting one release.');
+      }
+      const resolvedRootSetId = await optionalRootSetId(action.targetId);
+      const targetId =
+        resolvedRootSetId ??
+        (findDecision(decisions, "release", action.targetId)?.state === "reveal"
+          ? action.targetId
+          : null);
+      if (!targetId) {
+        throw new Error("This release is not present in the installed catalog.");
+      }
+      commitDecision(
+        store,
+        settings,
+        findDecision(decisions, "release", targetId),
+        "release",
+        targetId,
+        "protect",
+      );
+      return;
+    }
+    case "reveal-printing": {
+      if (!(await optionalRootSetId(action.targetId))) {
+        throw new Error("This printing is not present in the installed catalog.");
+      }
+      commitDecision(
+        store,
+        settings,
+        findDecision(decisions, "printing", action.targetId),
+        "printing",
+        action.targetId,
+        "reveal",
+      );
+      return;
+    }
+    case "reveal-release": {
+      const rootSetId = await optionalRootSetId(action.targetId);
+      if (!rootSetId) {
+        throw new Error("This release is not present in the installed catalog.");
+      }
+      commitDecision(
+        store,
+        settings,
+        findDecision(decisions, "release", rootSetId),
+        "release",
+        rootSetId,
+        "reveal",
+      );
+      return;
+    }
+    case "set-policy":
+      if (settings.policy !== action.policy) {
+        store.commit(events.spoilerPolicyChanged({ policy: action.policy }));
+      }
   }
 }
 
-function spoilerVisibilityChanged(previous: SpoilerState, next: SpoilerState) {
-  return (
-    previous.revision !== next.revision ||
-    previous.policy !== next.policy ||
-    !arraysEqual(previous.activePrintingIds, next.activePrintingIds) ||
-    !arraysEqual(previous.activeRootSetIds, next.activeRootSetIds)
+function commitDecision(
+  store: ReturnType<typeof useWorkspaceStore>,
+  settings: typeof tables.spoilerSettings.Type,
+  current: typeof tables.spoilerDecisions.Type | undefined,
+  scope: SpoilerRevealScope,
+  targetId: string,
+  state: SpoilerDecisionState,
+) {
+  if (current?.state === state) {
+    return;
+  }
+  store.commit(
+    events.spoilerDecisionChanged({
+      decisionId: crypto.randomUUID(),
+      generation: settings.resetGeneration,
+      observedDecisionId: current?.decisionId ?? null,
+      resetId: settings.resetId,
+      scope,
+      state,
+      targetId,
+    }),
   );
 }
 
-function arraysEqual(left: readonly string[], right: readonly string[]) {
-  return left.length === right.length && left.every((value, index) => value === right[index]);
+function findDecision(
+  decisions: readonly (typeof tables.spoilerDecisions.Type)[],
+  scope: SpoilerRevealScope,
+  targetId: string,
+) {
+  return decisions.find((decision) => decision.scope === scope && decision.targetId === targetId);
 }
 
-function runSpoilerAction(bridge: Window["spoilers"], action: SpoilerAction) {
-  switch (action.type) {
-    case "protect-all":
-      return bridge.protectAll();
-    case "protect-printing":
-      return bridge.protectPrinting(action.targetId);
-    case "protect-release":
-      return bridge.protectRelease(action.targetId);
-    case "reveal-printing":
-      return bridge.revealPrinting(action.targetId);
-    case "reveal-release":
-      return bridge.revealRelease(action.targetId);
-    case "set-policy":
-      return bridge.setPolicy(action.policy);
+async function optionalRootSetId(targetId: string) {
+  try {
+    return await window.catalog.resolveRootSetId(targetId);
+  } catch {
+    return null;
   }
 }

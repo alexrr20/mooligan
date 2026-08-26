@@ -73,10 +73,15 @@ broader decision that needs to be revoked first.
 
 ### Catalog reads enforce effective visibility
 
-The Electron main process combines the active workspace's spoiler state with
-the local date and passes a trusted visibility snapshot to catalog queries. The
-renderer cannot request `includeSpoilers`, provide its own date, or otherwise
-bypass the policy.
+LiveStore in the renderer owns the active workspace's durable spoiler policy,
+reset generation, and explicit decisions. The renderer sends a validated,
+session-bound projection to Electron main. Main rejects revision gaps,
+workspace mismatches, renderer replacement, and invalid projection data by
+returning to full protection until it accepts a complete replacement.
+
+Electron main combines only the accepted projection with its own local date
+and passes that visibility snapshot to catalog queries. Catalog requests cannot
+include spoiler state, request `includeSpoilers`, or provide a date.
 
 Enforcement occurs before data crosses the catalog boundary:
 
@@ -146,8 +151,9 @@ stale offline device cannot restore exceptions from an older generation.
 
 - Catalog installation must import validated set metadata and resolve an
   acyclic release-family graph alongside card records.
-- Spoiler decisions live in the durable workspace, separate from the
-  replaceable catalog database.
+- LiveStore events are the only durable source for spoiler policy, reset
+  generation, reveals, and protection tombstones. The catalog projection is
+  disposable and never becomes a second write path.
 - Catalog list, detail, sibling, set, and image-source operations share one
   visibility rule and require tests proving that no renderer input bypasses it.
 - The card-detail contract becomes a visible/protected result rather than

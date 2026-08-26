@@ -8,7 +8,8 @@ import type { CollectionLot } from "@mooligan/domain/collection";
 import type { Deck } from "@mooligan/domain/decks";
 import type { CardList } from "@mooligan/domain/lists";
 
-import { parseWorkspaceBackup } from "../electron/workspace/backup.ts";
+import type { WorkspaceBackup, WorkspaceLegacyBackupSnapshot } from "../shared/desktop-api.ts";
+import { parseWorkspaceBackup, serializeWorkspaceBackup } from "../electron/workspace/backup.ts";
 import { WorkspaceRegistry } from "../electron/workspace/registry.ts";
 import { WorkspaceManager, WorkspaceStore } from "../electron/workspace/store.ts";
 
@@ -23,105 +24,55 @@ const collectionLot: CollectionLot = {
   quantity: 2,
   unitCost: { amountMinor: 125, currency: "EUR" },
 };
-
 const deck: Deck = {
   createdAt: "2026-08-02T10:00:00.000Z",
-  entries: [
-    {
-      finish: "foil",
-      id: "deck-entry-stable-id",
-      printingId: "printing-1",
-      quantity: 1,
-      section: "mainboard",
-    },
-  ],
+  entries: [],
   formatId: "commander",
   id: "deck-stable-id",
   name: "Library test",
   tags: ["paper"],
   updatedAt: "2026-08-03T10:00:00.000Z",
 };
-
 const cardList: CardList = {
   createdAt: "2026-08-02T11:00:00.000Z",
-  entries: [
-    {
-      cardId: "card-1",
-      desiredPrinting: { finish: "nonfoil", printingId: "printing-2" },
-      id: "list-entry-stable-id",
-      quantity: 3,
-    },
-  ],
+  entries: [],
   id: "list-stable-id",
   name: "Trade targets",
   updatedAt: "2026-08-03T11:00:00.000Z",
 };
+const legacySnapshot: WorkspaceLegacyBackupSnapshot = {
+  cardLists: [{ id: cardList.id, value: cardList }],
+  collectionLots: [{ id: collectionLot.id, value: collectionLot }],
+  decks: [{ id: deck.id, value: deck }],
+  motion: "reduced",
+};
+const fullBackup: WorkspaceBackup = {
+  cardLists: legacySnapshot.cardLists,
+  collectionLots: legacySnapshot.collectionLots,
+  decks: legacySnapshot.decks,
+  format: "mooligan-workspace",
+  preferences: { motion: "reduced", spoilerPolicy: "show" },
+  spoilerDecisions: [
+    { scope: "printing", state: "reveal", targetId: "preview-printing" },
+    { scope: "release", state: "protect", targetId: "preview-release" },
+  ],
+  version: 2,
+};
 
-void test("workspace backups round-trip user data while preserving local metadata", async () => {
-  const sourceDirectory = await mkdtemp(join(tmpdir(), "mooligan-backup-source-"));
-  const targetDirectory = await mkdtemp(join(tmpdir(), "mooligan-backup-target-"));
+void test("version 2 backups retain LiveStore spoiler state without workspace metadata", () => {
+  const parsed = parseWorkspaceBackup(serializeWorkspaceBackup(fullBackup));
 
-  try {
-    const source = new WorkspaceStore(join(sourceDirectory, "workspace.sqlite"));
-    putCollectionLotThroughBackup(source, collectionLot);
-    source.updatePreferences({ motion: "reduced" });
-    source.putDeck(deck);
-    source.putCardList(cardList);
-    source.revealSpoilerPrinting("preview-printing");
-    source.protectSpoilerRelease("preview-release");
-    const backup = source.createBackup();
-    source.close();
-
-    const exported = parseWorkspaceBackup(backup);
-    assert.deepEqual(Object.keys(exported).sort(), [
-      "cardLists",
-      "collectionLots",
-      "decks",
-      "format",
-      "preferences",
-      "spoilerDecisions",
-      "version",
-    ]);
-    assert.equal(exported.format, "mooligan-workspace");
-    assert.equal(exported.version, 2);
-    assert.equal(Object.hasOwn(exported, "workspaceId"), false);
-    assert.deepEqual(exported.spoilerDecisions, [
-      { scope: "printing", state: "reveal", targetId: "preview-printing" },
-      { scope: "release", state: "protect", targetId: "preview-release" },
-    ]);
-
-    const registry = new WorkspaceRegistry(targetDirectory);
-    const target = new WorkspaceManager(registry);
-    const targetWorkspaceId = target.workspaceId;
-    putCollectionLotThroughBackup(target, { ...collectionLot, id: "old-lot" });
-
-    target.importBackup(exported);
-
-    assert.equal(target.workspaceId, targetWorkspaceId);
-    assert.deepEqual(target.readPreferences(), { motion: "reduced", spoilerPolicy: "protect" });
-    assert.deepEqual(target.readCollectionLots(), [collectionLot]);
-    assert.deepEqual(target.readDecks(), [deck]);
-    assert.deepEqual(target.readCardLists(), [cardList]);
-    assert.equal(target.readDecks()[0]?.entries[0]?.id, "deck-entry-stable-id");
-    assert.equal(target.readCardLists()[0]?.entries[0]?.id, "list-entry-stable-id");
-    assert.deepEqual(target.readSpoilerState().activePrintingIds, ["preview-printing"]);
-    assert.deepEqual(JSON.parse(target.createBackup()), JSON.parse(backup));
-    target.close();
-    registry.close();
-  } finally {
-    await Promise.all([
-      rm(sourceDirectory, { force: true, recursive: true }),
-      rm(targetDirectory, { force: true, recursive: true }),
-    ]);
-  }
+  assert.deepEqual(parsed, fullBackup);
+  assert.equal(Object.hasOwn(parsed, "workspaceId"), false);
+  assert.deepEqual(parsed.spoilerDecisions, fullBackup.spoilerDecisions);
 });
 
-void test("version 1 workspace backups import with spoiler protection enabled", () => {
+void test("version 1 backups still enter the staged restore with protection enabled", () => {
   const backup = parseWorkspaceBackup(
     JSON.stringify({
-      cardLists: [{ id: cardList.id, value: cardList }],
-      collectionLots: [{ id: collectionLot.id, value: collectionLot }],
-      decks: [{ id: deck.id, value: deck }],
+      cardLists: legacySnapshot.cardLists,
+      collectionLots: legacySnapshot.collectionLots,
+      decks: legacySnapshot.decks,
       format: "mooligan-workspace",
       preferences: { motion: "reduced" },
       version: 1,
@@ -131,83 +82,58 @@ void test("version 1 workspace backups import with spoiler protection enabled", 
   assert.equal(backup.version, 2);
   assert.deepEqual(backup.preferences, { motion: "reduced", spoilerPolicy: "protect" });
   assert.deepEqual(backup.spoilerDecisions, []);
-  assert.deepEqual(backup.collectionLots, [{ id: collectionLot.id, value: collectionLot }]);
-  assert.deepEqual(backup.decks, [{ id: deck.id, value: deck }]);
-  assert.deepEqual(backup.cardLists, [{ id: cardList.id, value: cardList }]);
 });
 
-void test("invalid backups are fully rejected before any workspace data changes", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "mooligan-backup-invalid-"));
+void test("staged restore creates and verifies a new workspace before activation", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "mooligan-backup-restore-"));
 
   try {
-    const store = new WorkspaceStore(join(directory, "workspace.sqlite"));
-    store.updatePreferences({ motion: "full" });
-    putCollectionLotThroughBackup(store, { ...collectionLot, id: "existing-lot" });
-    store.putDeck({ ...deck, id: "existing-deck" });
-    store.putCardList({ ...cardList, id: "existing-list" });
-    const before = store.createBackup();
-    const workspaceId = store.workspaceId;
+    const registry = new WorkspaceRegistry(directory);
+    const manager = new WorkspaceManager(registry);
+    const originalWorkspaceId = manager.workspaceId;
+    manager.importLegacyBackupSnapshot({
+      cardLists: [],
+      collectionLots: [],
+      decks: [],
+      motion: "full",
+    });
 
-    const replacement = parseWorkspaceBackup(
-      JSON.stringify({
-        cardLists: [{ id: cardList.id, value: cardList }],
-        collectionLots: [{ id: collectionLot.id, value: collectionLot }],
-        decks: [{ id: deck.id, value: deck }],
-        format: "mooligan-workspace",
-        preferences: { motion: "reduced", spoilerPolicy: "protect" },
-        spoilerDecisions: [],
-        version: 2,
-      }),
-    );
+    const pending = manager.beginRestore(legacySnapshot);
+    assert.notEqual(pending.workspaceId, originalWorkspaceId);
+    assert.equal(manager.workspaceId, originalWorkspaceId);
+    assert.deepEqual(manager.createLegacyBackupSnapshot().collectionLots, []);
 
-    replacement.decks[0].id = "does-not-match-payload";
-    assert.throws(() => parseWorkspaceBackup(JSON.stringify(replacement)), /deck IDs are invalid/);
-    assert.equal(store.createBackup(), before);
+    manager.cancelRestore(pending.workspaceId);
+    const restored = manager.beginRestore(legacySnapshot);
+    manager.activateRestore(restored.workspaceId);
+    assert.equal(manager.workspaceId, restored.workspaceId);
+    assert.deepEqual(manager.createLegacyBackupSnapshot(), legacySnapshot);
+    manager.close();
 
-    replacement.decks[0].id = deck.id;
-    replacement.decks[0].value.entries[0].quantity = 0;
-    assert.throws(() => parseWorkspaceBackup(JSON.stringify(replacement)), /deck is invalid/);
-    assert.equal(store.createBackup(), before);
-
-    replacement.decks[0].value.entries[0].quantity = 1;
-    Object.assign(replacement.decks[0].value.entries[0], { unexpected: true });
-    assert.throws(() => parseWorkspaceBackup(JSON.stringify(replacement)), /invalid fields/);
-
-    const unattributed: Omit<CollectionLot, "id"> = {
-      condition: "near-mint",
-      finish: "foil",
-      language: "en",
-      printingId: "printing-duplicate",
-      quantity: 1,
-    };
-    assert.throws(
-      () =>
-        parseWorkspaceBackup(
-          JSON.stringify({
-            ...replacement,
-            collectionLots: [
-              { id: "duplicate-a", value: { ...unattributed, id: "duplicate-a" } },
-              { id: "duplicate-b", value: { ...unattributed, id: "duplicate-b" } },
-            ],
-            decks: [],
-          }),
-        ),
-      /workspace backup is invalid/,
-    );
-
-    assert.equal(store.createBackup(), before);
-    assert.equal(store.workspaceId, workspaceId);
-    store.close();
+    registry.activateWorkspace(originalWorkspaceId);
+    const original = new WorkspaceManager(registry);
+    assert.equal(original.workspaceId, originalWorkspaceId);
+    assert.deepEqual(original.readPreferences(), { motion: "full" });
+    original.close();
+    registry.close();
   } finally {
     await rm(directory, { force: true, recursive: true });
   }
 });
 
-function putCollectionLotThroughBackup(
-  workspace: Pick<WorkspaceStore, "createBackup" | "importBackup">,
-  lot: CollectionLot,
-) {
-  const backup = parseWorkspaceBackup(workspace.createBackup());
-  backup.collectionLots.push({ id: lot.id, value: lot });
-  workspace.importBackup(backup);
-}
+void test("invalid backups are rejected before staged SQL data changes", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "mooligan-backup-invalid-"));
+  try {
+    const store = new WorkspaceStore(join(directory, "workspace.sqlite"));
+    store.importLegacyBackupSnapshot(legacySnapshot);
+    const before = store.createLegacyBackupSnapshot();
+    const invalid = structuredClone(fullBackup);
+    invalid.decks[0]!.id = "mismatched-id";
+
+    assert.throws(() => parseWorkspaceBackup(JSON.stringify(invalid)), /deck IDs are invalid/);
+    assert.deepEqual(store.createLegacyBackupSnapshot(), before);
+    store.close();
+  } finally {
+    await rm(directory, { force: true, recursive: true });
+  }
+});

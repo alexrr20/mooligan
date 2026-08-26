@@ -1,7 +1,6 @@
 import * as z from "zod";
 import type { JSONType } from "zod";
 
-import { SpoilerPolicySchema } from "@mooligan/domain/spoilers";
 import type { Preferences, PreferencesUpdate } from "../../shared/desktop-api.ts";
 
 export const MotionPreferenceSchema = z.enum(["system", "reduced", "full"]);
@@ -14,12 +13,10 @@ type PreferenceDefinitions = {
 
 export const preferenceDefinitions = {
   motion: { defaultValue: "system" },
-  spoilerPolicy: { defaultValue: "protect" },
 } satisfies PreferenceDefinitions;
 
 export const PreferencesSchema = z.strictObject({
   motion: MotionPreferenceSchema,
-  spoilerPolicy: SpoilerPolicySchema,
 });
 const PreferencesUpdateSchema = PreferencesSchema.partial();
 
@@ -37,9 +34,6 @@ export function validatePreferencesUpdate(value: JSONType): PreferencesUpdate {
   }
   if (preferences.error.issues.some(({ path }) => path[0] === "motion")) {
     throw new TypeError("Invalid motion preference.");
-  }
-  if (preferences.error.issues.some(({ path }) => path[0] === "spoilerPolicy")) {
-    throw new TypeError("Invalid spoiler policy.");
   }
   throw new TypeError("Invalid preference value.");
 }

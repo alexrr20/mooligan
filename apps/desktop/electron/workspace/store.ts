@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
@@ -15,28 +15,17 @@ import {
 import { FinishSchema } from "@mooligan/domain/catalog";
 import type { Deck } from "@mooligan/domain/decks";
 import type { CardList } from "@mooligan/domain/lists";
-import {
-  SpoilerDecisionStateSchema,
-  SpoilerRevealScopeSchema,
-  SpoilerTargetIdSchema,
-  type SpoilerDecisionState,
-  type SpoilerPolicy,
-  type SpoilerRevealScope,
-  type SpoilerState,
-} from "@mooligan/domain/spoilers";
 import * as z from "zod";
 import type { JSONType } from "zod";
 
-import type { Preferences, PreferencesUpdate } from "../../shared/desktop-api.ts";
-import { preferenceDefinitions, validatePreferences } from "./preferences.ts";
 import {
-  serializeWorkspaceBackup,
-  validateCardList,
-  validateCollectionLot,
-  validateDeck,
-  type WorkspaceBackup,
-  type WorkspaceBackupSpoilerDecision,
-} from "./backup.ts";
+  validateWorkspaceBootstrap,
+  type Preferences,
+  type PreferencesUpdate,
+  type WorkspaceLegacyBackupSnapshot,
+} from "../../shared/desktop-api.ts";
+import { preferenceDefinitions, validatePreferences } from "./preferences.ts";
+import { validateCardList, validateCollectionLot, validateDeck } from "./backup.ts";
 import type { WorkspaceRegistry } from "./registry.ts";
 
 type WorkspaceMetadata = {
@@ -60,19 +49,6 @@ const CollectionLotRowSchema = z.object({
   quantity: z.number().int().positive(),
   unitCostAmountMinor: z.number().int().nonnegative().nullable(),
   unitCostCurrency: z.string().nullable(),
-});
-const SpoilerStateRowSchema = z.object({
-  resetGeneration: z.number().int().nonnegative(),
-  revision: z.number().int().nonnegative(),
-  updatedAt: z.iso.datetime({ offset: true }),
-});
-const SpoilerDecisionRowSchema = z.object({
-  generation: z.number().int().nonnegative(),
-  localRevision: z.number().int().positive(),
-  scope: SpoilerRevealScopeSchema,
-  state: SpoilerDecisionStateSchema,
-  targetId: SpoilerTargetIdSchema,
-  updatedAt: z.iso.datetime({ offset: true }),
 });
 
 export class WorkspaceStore {
@@ -102,23 +78,6 @@ export class WorkspaceStore {
           key TEXT PRIMARY KEY,
           value TEXT NOT NULL CHECK (json_valid(value)),
           updated_at TEXT NOT NULL
-        ) STRICT;
-
-        CREATE TABLE IF NOT EXISTS spoiler_state (
-          singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-          reset_generation INTEGER NOT NULL DEFAULT 0 CHECK (reset_generation >= 0),
-          revision INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0),
-          updated_at TEXT NOT NULL
-        ) STRICT;
-
-        CREATE TABLE IF NOT EXISTS spoiler_decisions (
-          scope TEXT NOT NULL CHECK (scope IN ('printing', 'release')),
-          target_id TEXT NOT NULL,
-          state TEXT NOT NULL CHECK (state IN ('protect', 'reveal')),
-          reset_generation INTEGER NOT NULL CHECK (reset_generation >= 0),
-          local_revision INTEGER NOT NULL CHECK (local_revision > 0),
-          updated_at TEXT NOT NULL,
-          PRIMARY KEY (scope, target_id)
         ) STRICT;
 
         CREATE TABLE IF NOT EXISTS collection_lots (
@@ -166,6 +125,10 @@ export class WorkspaceStore {
           id TEXT PRIMARY KEY,
           payload TEXT NOT NULL CHECK (json_valid(payload))
         ) STRICT;
+
+        DROP TABLE IF EXISTS spoiler_decisions;
+        DROP TABLE IF EXISTS spoiler_state;
+        DELETE FROM preferences WHERE key = 'spoilerPolicy';
       `);
       this.#database
         .prepare(
@@ -184,13 +147,6 @@ export class WorkspaceStore {
         insertPreference.run(key, JSON.stringify(definition.defaultValue), now);
       }
 
-      this.#database
-        .prepare(
-          `INSERT OR IGNORE INTO spoiler_state
-           (singleton, reset_generation, revision, updated_at)
-           VALUES (1, 0, 0, ?)`,
-        )
-        .run(now);
       this.#metadata = this.#readMetadata();
     } catch (error) {
       this.#database.close();
@@ -210,21 +166,20 @@ export class WorkspaceStore {
     this.#database.close();
   }
 
-  createBackup(): string {
+  createLegacyBackupSnapshot(): WorkspaceLegacyBackupSnapshot {
     const cardLists = this.readCardLists().map((value) => ({ id: value.id, value }));
     const collectionLots = this.readCollectionLots().map((value) => ({ id: value.id, value }));
     const decks = this.readDecks().map((value) => ({ id: value.id, value }));
 
-    return serializeWorkspaceBackup({
+    return {
       cardLists,
       collectionLots,
       decks,
-      preferences: this.readPreferences(),
-      spoilerDecisions: this.#readBackupSpoilerDecisions(),
-    });
+      motion: this.readPreferences().motion,
+    };
   }
 
-  importBackup(backup: WorkspaceBackup) {
+  importLegacyBackupSnapshot(backup: WorkspaceLegacyBackupSnapshot) {
     const now = new Date().toISOString();
 
     transact(this.#database, () => {
@@ -248,22 +203,11 @@ export class WorkspaceStore {
          SET value = ?, updated_at = ?
          WHERE key = ?`,
       );
-      const motionResult = updatePreference.run(
-        JSON.stringify(backup.preferences.motion),
-        now,
-        "motion",
-      );
-      const spoilerPolicyResult = updatePreference.run(
-        JSON.stringify(backup.preferences.spoilerPolicy),
-        now,
-        "spoilerPolicy",
-      );
+      const motionResult = updatePreference.run(JSON.stringify(backup.motion), now, "motion");
 
-      if (motionResult.changes !== 1 || spoilerPolicyResult.changes !== 1) {
+      if (motionResult.changes !== 1) {
         throw new Error("The local preferences are invalid.");
       }
-
-      this.#replaceSpoilerDecisionsFromBackup(backup.spoilerDecisions, now);
     });
   }
 
@@ -465,7 +409,7 @@ export class WorkspaceStore {
   }
 
   updatePreferences(update: PreferencesUpdate): Preferences {
-    if (update.motion === undefined && update.spoilerPolicy === undefined) {
+    if (update.motion === undefined) {
       return this.readPreferences();
     }
 
@@ -481,242 +425,9 @@ export class WorkspaceStore {
           )
           .run(JSON.stringify(update.motion), now);
       }
-
-      if (
-        update.spoilerPolicy !== undefined &&
-        this.readPreferences().spoilerPolicy !== update.spoilerPolicy
-      ) {
-        this.#database
-          .prepare(
-            `UPDATE preferences
-             SET value = ?, updated_at = ?
-             WHERE key = 'spoilerPolicy'`,
-          )
-          .run(JSON.stringify(update.spoilerPolicy), now);
-        this.#advanceSpoilerRevision(now);
-      }
     });
 
     return this.readPreferences();
-  }
-
-  readSpoilerState(): SpoilerState {
-    const preferences = this.readPreferences();
-    const state = this.#readSpoilerStateRow();
-    const active = this.#readSpoilerDecisions(state.resetGeneration).filter(
-      (decision) => decision.state === "reveal",
-    );
-
-    return {
-      activePrintingIds: active
-        .filter((decision) => decision.scope === "printing")
-        .map((decision) => decision.targetId),
-      activeRootSetIds: active
-        .filter((decision) => decision.scope === "release")
-        .map((decision) => decision.targetId),
-      policy: preferences.spoilerPolicy,
-      revision: state.revision,
-    };
-  }
-
-  setSpoilerPolicy(policy: SpoilerPolicy): SpoilerState {
-    this.updatePreferences({ spoilerPolicy: policy });
-    return this.readSpoilerState();
-  }
-
-  revealSpoilerPrinting(printingId: string): SpoilerState {
-    return this.#setSpoilerDecision("printing", printingId, "reveal");
-  }
-
-  protectSpoilerPrinting(printingId: string): SpoilerState {
-    return this.#setSpoilerDecision("printing", printingId, "protect");
-  }
-
-  revealSpoilerRelease(rootSetId: string): SpoilerState {
-    return this.#setSpoilerDecision("release", rootSetId, "reveal");
-  }
-
-  protectSpoilerRelease(rootSetId: string): SpoilerState {
-    return this.#setSpoilerDecision("release", rootSetId, "protect");
-  }
-
-  protectAllSpoilers(): SpoilerState {
-    const now = new Date().toISOString();
-
-    transact(this.#database, () => {
-      this.#database
-        .prepare(
-          `UPDATE preferences
-           SET value = '"protect"', updated_at = ?
-           WHERE key = 'spoilerPolicy'`,
-        )
-        .run(now);
-      this.#database
-        .prepare(
-          `UPDATE spoiler_state
-           SET reset_generation = reset_generation + 1,
-               revision = revision + 1,
-               updated_at = ?
-           WHERE singleton = 1`,
-        )
-        .run(now);
-    });
-
-    return this.readSpoilerState();
-  }
-
-  #setSpoilerDecision(
-    scope: SpoilerRevealScope,
-    targetId: string,
-    state: SpoilerDecisionState,
-  ): SpoilerState {
-    const now = new Date().toISOString();
-
-    transact(this.#database, () => {
-      const spoilerState = this.#readSpoilerStateRow();
-      const current = this.#readSpoilerDecisionRow(scope, targetId);
-
-      if (current?.generation === spoilerState.resetGeneration && current.state === state) {
-        return;
-      }
-
-      const revision = this.#nextSpoilerRevision();
-      this.#database
-        .prepare(
-          `INSERT INTO spoiler_decisions
-           (scope, target_id, state, reset_generation, local_revision, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?)
-           ON CONFLICT(scope, target_id) DO UPDATE SET
-             state = excluded.state,
-             reset_generation = excluded.reset_generation,
-             local_revision = excluded.local_revision,
-             updated_at = excluded.updated_at`,
-        )
-        .run(scope, targetId, state, spoilerState.resetGeneration, revision, now);
-    });
-
-    return this.readSpoilerState();
-  }
-
-  #readSpoilerStateRow() {
-    return SpoilerStateRowSchema.parse(
-      this.#database
-        .prepare(
-          `SELECT reset_generation AS resetGeneration,
-                  revision,
-                  updated_at AS updatedAt
-           FROM spoiler_state
-           WHERE singleton = 1`,
-        )
-        .get(),
-    );
-  }
-
-  #readSpoilerDecisions(resetGeneration: number) {
-    return z.array(SpoilerDecisionRowSchema).parse(
-      this.#database
-        .prepare(
-          `SELECT scope,
-                  target_id AS targetId,
-                  state,
-                  reset_generation AS generation,
-                  local_revision AS localRevision,
-                  updated_at AS updatedAt
-           FROM spoiler_decisions
-           WHERE reset_generation = ?
-           ORDER BY scope, target_id`,
-        )
-        .all(resetGeneration),
-    );
-  }
-
-  #readSpoilerDecisionRow(scope: SpoilerRevealScope, targetId: string) {
-    const value = this.#database
-      .prepare(
-        `SELECT scope,
-                target_id AS targetId,
-                state,
-                reset_generation AS generation,
-                local_revision AS localRevision,
-                updated_at AS updatedAt
-         FROM spoiler_decisions
-         WHERE scope = ? AND target_id = ?`,
-      )
-      .get(scope, targetId);
-
-    return value === undefined ? null : SpoilerDecisionRowSchema.parse(value);
-  }
-
-  #nextSpoilerRevision() {
-    const row = z.object({ revision: z.number().int().positive() }).parse(
-      this.#database
-        .prepare(
-          `UPDATE spoiler_state
-             SET revision = revision + 1
-             WHERE singleton = 1
-             RETURNING revision`,
-        )
-        .get(),
-    );
-    return row.revision;
-  }
-
-  #advanceSpoilerRevision(updatedAt: string) {
-    this.#database
-      .prepare(
-        `UPDATE spoiler_state
-         SET revision = revision + 1,
-             updated_at = ?
-         WHERE singleton = 1`,
-      )
-      .run(updatedAt);
-  }
-
-  #readBackupSpoilerDecisions(): WorkspaceBackupSpoilerDecision[] {
-    const state = this.#readSpoilerStateRow();
-    return this.#readSpoilerDecisions(state.resetGeneration).map((decision) => ({
-      scope: decision.scope,
-      state: decision.state,
-      targetId: decision.targetId,
-    }));
-  }
-
-  #replaceSpoilerDecisionsFromBackup(
-    decisions: WorkspaceBackupSpoilerDecision[],
-    updatedAt: string,
-  ) {
-    const current = this.#readSpoilerStateRow();
-    const resetGeneration = current.resetGeneration + 1;
-    let revision = current.revision + 1;
-
-    this.#database.prepare("DELETE FROM spoiler_decisions").run();
-    const insert = this.#database.prepare(
-      `INSERT INTO spoiler_decisions
-       (scope, target_id, state, reset_generation, local_revision, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    );
-
-    for (const decision of decisions) {
-      revision += 1;
-      insert.run(
-        decision.scope,
-        decision.targetId,
-        decision.state,
-        resetGeneration,
-        revision,
-        updatedAt,
-      );
-    }
-
-    this.#database
-      .prepare(
-        `UPDATE spoiler_state
-         SET reset_generation = ?,
-             revision = ?,
-             updated_at = ?
-         WHERE singleton = 1`,
-      )
-      .run(resetGeneration, revision, updatedAt);
   }
 
   #readMetadata(): WorkspaceMetadata {
@@ -735,6 +446,7 @@ export class WorkspaceStore {
 export class WorkspaceManager {
   readonly #registry: WorkspaceRegistry;
   #active: WorkspaceStore;
+  #pendingRestore: WorkspaceStore | undefined;
 
   constructor(registry: WorkspaceRegistry) {
     this.#registry = registry;
@@ -750,15 +462,65 @@ export class WorkspaceManager {
   }
 
   close() {
+    this.#pendingRestore?.close();
     this.#active.close();
   }
 
-  createBackup() {
-    return this.#active.createBackup();
+  createLegacyBackupSnapshot() {
+    return this.#active.createLegacyBackupSnapshot();
   }
 
-  importBackup(backup: WorkspaceBackup) {
-    this.#active.importBackup(backup);
+  importLegacyBackupSnapshot(backup: WorkspaceLegacyBackupSnapshot) {
+    this.#active.importLegacyBackupSnapshot(backup);
+  }
+
+  beginRestore(backup: WorkspaceLegacyBackupSnapshot) {
+    if (this.#pendingRestore) {
+      throw new Error("A workspace restore is already in progress.");
+    }
+
+    const workspaceId = this.#registry.createWorkspace();
+    const path = this.#registry.workspacePath(workspaceId);
+
+    let pending: WorkspaceStore | undefined;
+    try {
+      pending = new WorkspaceStore(path, { workspaceId });
+      pending.importLegacyBackupSnapshot(backup);
+      if (!legacySnapshotsEqual(pending.createLegacyBackupSnapshot(), backup)) {
+        throw new Error("The restored workspace could not be verified.");
+      }
+      this.#pendingRestore = pending;
+      return validateWorkspaceBootstrap({ ...this.#registry.bootstrap(), workspaceId });
+    } catch (error) {
+      pending?.close();
+      this.#registry.removeWorkspace(workspaceId);
+      removeWorkspaceFiles(path);
+      throw error;
+    }
+  }
+
+  activateRestore(workspaceId: string) {
+    if (this.#pendingRestore?.workspaceId !== workspaceId) {
+      throw new Error("The workspace restore is no longer active.");
+    }
+
+    this.#pendingRestore.close();
+    this.#active.close();
+    this.#registry.activateWorkspace(workspaceId);
+    this.#active = this.#openWorkspace(workspaceId);
+    this.#pendingRestore = undefined;
+  }
+
+  cancelRestore(workspaceId: string) {
+    if (this.#pendingRestore?.workspaceId !== workspaceId) {
+      return;
+    }
+
+    const path = this.#pendingRestore.databasePath;
+    this.#pendingRestore.close();
+    this.#pendingRestore = undefined;
+    this.#registry.removeWorkspace(workspaceId);
+    removeWorkspaceFiles(path);
   }
 
   addCollectionHolding(request: AddCollectionHoldingRequest) {
@@ -805,34 +567,6 @@ export class WorkspaceManager {
     return this.#active.updatePreferences(update);
   }
 
-  readSpoilerState() {
-    return this.#active.readSpoilerState();
-  }
-
-  setSpoilerPolicy(policy: SpoilerPolicy) {
-    return this.#active.setSpoilerPolicy(policy);
-  }
-
-  revealSpoilerPrinting(printingId: string) {
-    return this.#active.revealSpoilerPrinting(printingId);
-  }
-
-  protectSpoilerPrinting(printingId: string) {
-    return this.#active.protectSpoilerPrinting(printingId);
-  }
-
-  revealSpoilerRelease(rootSetId: string) {
-    return this.#active.revealSpoilerRelease(rootSetId);
-  }
-
-  protectSpoilerRelease(rootSetId: string) {
-    return this.#active.protectSpoilerRelease(rootSetId);
-  }
-
-  protectAllSpoilers() {
-    return this.#active.protectAllSpoilers();
-  }
-
   #openWorkspace(workspaceId: string) {
     const path = this.#registry.workspacePath(workspaceId);
 
@@ -852,6 +586,25 @@ export class WorkspaceManager {
 
     return workspace;
   }
+}
+
+function removeWorkspaceFiles(path: string) {
+  for (const file of [path, `${path}-shm`, `${path}-wal`]) {
+    rmSync(file, { force: true });
+  }
+}
+
+function legacySnapshotsEqual(
+  left: WorkspaceLegacyBackupSnapshot,
+  right: WorkspaceLegacyBackupSnapshot,
+) {
+  const normalize = (snapshot: WorkspaceLegacyBackupSnapshot) => ({
+    ...snapshot,
+    cardLists: [...snapshot.cardLists].sort((a, b) => a.id.localeCompare(b.id)),
+    collectionLots: [...snapshot.collectionLots].sort((a, b) => a.id.localeCompare(b.id)),
+    decks: [...snapshot.decks].sort((a, b) => a.id.localeCompare(b.id)),
+  });
+  return JSON.stringify(normalize(left)) === JSON.stringify(normalize(right));
 }
 
 function transact<Result>(database: DatabaseSync, callback: () => Result): Result {
