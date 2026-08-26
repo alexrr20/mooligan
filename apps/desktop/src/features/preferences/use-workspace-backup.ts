@@ -2,18 +2,15 @@ import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { createWorkspaceBackup, restoreWorkspaceBackup } from "../workspace/workspace-backup";
-import { workspaceStoreOptions, workspaceStoreRegistry } from "../workspace/workspace-store";
-import { useWorkspaceStore } from "../workspace/workspace-store-context";
+import { createLiveStoreRegistry, workspaceStoreOptions } from "../workspace/workspace-store";
+import { useWorkspaceLiveStore } from "../workspace/workspace-store-context";
 
 export function useWorkspaceBackup() {
-  const store = useWorkspaceStore();
+  const store = useWorkspaceLiveStore();
   const bridge = window.workspace;
   const [result, setResult] = useState<"cancelled" | "exported" | "imported">();
   const exportBackup = useMutation({
-    mutationFn: async () => {
-      const legacy = await bridge.readLegacyBackupSnapshot();
-      return bridge.exportBackup(createWorkspaceBackup(store, legacy));
-    },
+    mutationFn: () => bridge.exportBackup(createWorkspaceBackup(store)),
     onSuccess: setResult,
   });
   const importBackup = useMutation({
@@ -23,24 +20,27 @@ export function useWorkspaceBackup() {
         return "cancelled" as const;
       }
 
-      const legacy = {
-        cardLists: backup.cardLists,
-        decks: backup.decks,
-        motion: backup.preferences.motion,
-      };
-      const bootstrap = await bridge.beginRestore(legacy);
+      const bootstrap = await bridge.beginRestore();
       const options = workspaceStoreOptions(bootstrap);
-      const release = workspaceStoreRegistry.retain(options);
+      const restoreRegistry = createLiveStoreRegistry();
+      const release = restoreRegistry.retain(options);
+      let restoreStoreClosed = false;
 
       try {
-        const restored = await workspaceStoreRegistry.getOrLoadPromise(options);
-        restoreWorkspaceBackup(restored, backup);
+        try {
+          const restored = await restoreRegistry.getOrLoadPromise(options);
+          restoreWorkspaceBackup(restored, backup);
+        } finally {
+          release();
+          await restoreRegistry.dispose();
+          restoreStoreClosed = true;
+        }
         await bridge.activateRestore(bootstrap.workspaceId);
       } catch (error) {
-        await bridge.cancelRestore(bootstrap.workspaceId);
+        if (restoreStoreClosed) {
+          await bridge.cancelRestore(bootstrap.workspaceId);
+        }
         throw error;
-      } finally {
-        release();
       }
 
       window.location.reload();

@@ -6,20 +6,20 @@ import { workspaceSchema } from "@mooligan/workspace/schema";
 
 export type WorkspaceLiveStore = Store<typeof workspaceSchema> & ReactApi;
 
-const WorkspaceStoreContext = createContext<WorkspaceLiveStore | null>(null);
+const WorkspaceLiveStoreContext = createContext<WorkspaceLiveStore | null>(null);
 
-export function WorkspaceStoreProvider({
+export function WorkspaceLiveStoreProvider({
   children,
   store,
 }: {
   children: ReactNode;
   store: WorkspaceLiveStore;
 }) {
-  return <WorkspaceStoreContext value={store}>{children}</WorkspaceStoreContext>;
+  return <WorkspaceLiveStoreContext value={store}>{children}</WorkspaceLiveStoreContext>;
 }
 
-export function useWorkspaceStore() {
-  const store = use(WorkspaceStoreContext);
+export function useWorkspaceLiveStore() {
+  const store = use(WorkspaceLiveStoreContext);
   if (!store) {
     throw new Error("The workspace store is not open.");
   }

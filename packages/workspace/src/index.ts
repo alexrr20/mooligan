@@ -8,3 +8,14 @@ export {
   workspaceSchema,
   workspaceSyncPayloadSchema,
 } from "./schema.ts";
+export {
+  workspaceBackupFormat,
+  workspaceBackupMaxBytes,
+  workspaceBackupMaxCollectionLots,
+  workspaceBackupMaxSpoilerDecisions,
+  workspaceBackupSchema,
+  workspaceBackupVersion,
+  type WorkspaceBackup,
+  type WorkspaceBackupCollectionLot,
+  type WorkspaceBackupSpoilerDecision,
+} from "./backup.ts";

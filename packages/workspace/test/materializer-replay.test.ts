@@ -12,7 +12,7 @@ import {
   workspaceSchema,
 } from "../src/schema.ts";
 
-type WorkspaceStore = Store<typeof workspaceSchema>;
+type WorkspaceLiveStore = Store<typeof workspaceSchema>;
 
 void test("a causally observed decision replaces the decision it observed", async () => {
   await withStore("causal", (store) => {
@@ -121,7 +121,7 @@ void test("globally ordered workspace events replay to the same materialized sta
   });
 });
 
-async function withStore(storeId: string, run: (store: WorkspaceStore) => void) {
+async function withStore(storeId: string, run: (store: WorkspaceLiveStore) => void) {
   const store = await openStore(storeId);
   try {
     run(store);
@@ -173,7 +173,7 @@ function openStore(storeId: string) {
 }
 
 function commitDecision(
-  store: WorkspaceStore,
+  store: WorkspaceLiveStore,
   decision: {
     decisionId: string;
     generation?: number;
@@ -196,6 +196,6 @@ function commitDecision(
   );
 }
 
-function readDecisionStates(store: WorkspaceStore) {
+function readDecisionStates(store: WorkspaceLiveStore) {
   return store.query(spoilerDecisionsQuery).map(({ state }) => state);
 }

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { BrowserWindow, dialog, ipcMain, type OpenDialogOptions } from "electron";
@@ -7,43 +7,18 @@ import * as z from "zod";
 
 import { validateWorkspaceBootstrap } from "../../shared/desktop-api.ts";
 import { assertTrustedSender } from "../ipc-security";
-import { publishRendererEvent } from "../windows";
 import {
   parseWorkspaceBackup,
+  readUtf8FileWithinLimit,
   serializeWorkspaceBackup,
   validateWorkspaceBackup,
-  validateWorkspaceLegacyBackupSnapshot,
 } from "./backup";
-import type { MutationQueue } from "./mutations";
-import { validatePreferencesUpdate } from "./preferences";
 import type { WorkspaceRegistry } from "./registry";
-import type { WorkspaceManager } from "./store";
 
-const MAX_WORKSPACE_BACKUP_BYTES = 50 * 1024 * 1024;
-
-export function registerWorkspaceIpc(
-  registry: WorkspaceRegistry,
-  workspace: WorkspaceManager,
-  mutations: MutationQueue,
-  documentsPath: string,
-) {
+export function registerWorkspaceIpc(registry: WorkspaceRegistry, documentsPath: string) {
   ipcMain.handle("workspace:bootstrap", (event) => {
     assertTrustedSender(event);
     return validateWorkspaceBootstrap(registry.bootstrap());
-  });
-  ipcMain.handle("preferences:read", (event) => {
-    assertTrustedSender(event);
-    return workspace.readPreferences();
-  });
-  ipcMain.handle("preferences:update", (event, update) => {
-    assertTrustedSender(event);
-    const preferences = workspace.updatePreferences(validatePreferencesUpdate(update));
-    publishRendererEvent("preferences:changed", preferences);
-    return preferences;
-  });
-  ipcMain.handle("workspace:backup-snapshot", (event) => {
-    assertTrustedSender(event);
-    return workspace.createLegacyBackupSnapshot();
   });
   ipcMain.handle("workspace:export", async (event, value) => {
     assertTrustedSender(event);
@@ -90,11 +65,7 @@ export function registerWorkspaceIpc(
 
     let backup;
     try {
-      const info = await stat(result.filePaths[0]);
-      if (!info.isFile() || info.size > MAX_WORKSPACE_BACKUP_BYTES) {
-        throw new Error("invalid backup");
-      }
-      backup = parseWorkspaceBackup(await readFile(result.filePaths[0], "utf8"));
+      backup = parseWorkspaceBackup(await readUtf8FileWithinLimit(result.filePaths[0]));
     } catch {
       throw new Error("The selected file is not a valid Mooligan workspace backup.");
     }
@@ -115,23 +86,18 @@ export function registerWorkspaceIpc(
 
     return confirmation.response === 1 ? backup : null;
   });
-  ipcMain.handle("workspace:begin-restore", (event, value) => {
+  ipcMain.handle("workspace:begin-restore", (event) => {
     assertTrustedSender(event);
-    const backup = validateWorkspaceLegacyBackupSnapshot(value);
-    return mutations.run(() => workspace.beginRestore(backup));
+    return registry.beginRestore();
   });
   ipcMain.handle("workspace:activate-restore", (event, value) => {
     assertTrustedSender(event);
-    const workspaceId = z.uuidv4().parse(value);
-    return mutations.run(() => workspace.activateRestore(workspaceId));
+    registry.activateRestore(z.uuidv4().parse(value));
   });
   ipcMain.handle("workspace:cancel-restore", (event, value) => {
     assertTrustedSender(event);
-    const workspaceId = z.uuidv4().parse(value);
-    return mutations.run(() => workspace.cancelRestore(workspaceId));
+    registry.cancelRestore(z.uuidv4().parse(value));
   });
-
-  return () => publishRendererEvent("preferences:changed", workspace.readPreferences());
 }
 
 async function atomicWrite(path: string, contents: string) {

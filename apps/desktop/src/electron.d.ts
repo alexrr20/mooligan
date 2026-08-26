@@ -20,8 +20,6 @@ import type {
   CatalogProgress as CatalogProgressType,
   CatalogStatus as CatalogStatusType,
   DesktopApi,
-  MotionPreference as MotionPreferenceType,
-  Preferences as PreferencesType,
 } from "../shared/desktop-api";
 
 declare global {
@@ -37,8 +35,6 @@ declare global {
   type AuthSnapshot = AuthSnapshotType;
   type AuthStatus = AuthStatusType;
   type AuthUser = AuthUserType;
-  type MotionPreference = MotionPreferenceType;
-  type Preferences = PreferencesType;
   type SpoilerRevealSummaries = SpoilerRevealSummariesType;
   type SpoilerState = SpoilerStateType;
 

@@ -4,7 +4,7 @@ import { motion, MotionConfig } from "motion/react";
 
 import { BottomNavigation } from "../components/bottom-navigation";
 import { CatalogSetup } from "../components/catalog-setup";
-import { usePreferences } from "../features/preferences/use-preferences";
+import { useMotionPreference } from "../features/preferences/use-motion-preference";
 
 export const Route = createRootRoute({
   component: AppShell,
@@ -20,8 +20,8 @@ function AppShell() {
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
-  const { preferences } = usePreferences();
-  const reducedMotion = reducedMotionByPreference[preferences.motion];
+  const { motion: motionPreference } = useMotionPreference();
+  const reducedMotion = reducedMotionByPreference[motionPreference];
 
   return (
     <MotionConfig reducedMotion={reducedMotion}>

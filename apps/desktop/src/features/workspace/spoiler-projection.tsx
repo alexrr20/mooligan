@@ -8,7 +8,7 @@ import { spoilerDecisionsQuery, spoilerSettingsQuery } from "@mooligan/workspace
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { useWorkspaceStore } from "./workspace-store-context";
+import { useWorkspaceLiveStore } from "./workspace-store-context";
 
 type ProjectedSpoilers = Pick<SpoilerProjectionSnapshot, "decisions" | "policy">;
 
@@ -21,7 +21,7 @@ export function SpoilerProjectionStartup({
   loading: ReactNode;
   workspaceId: string;
 }) {
-  const store = useWorkspaceStore();
+  const store = useWorkspaceLiveStore();
   const queryClient = useQueryClient();
   const settings = store.useQuery(spoilerSettingsQuery);
   const rows = store.useQuery(spoilerDecisionsQuery);

@@ -7,7 +7,6 @@ import type {
 } from "@mooligan/domain/catalog-search";
 import type {
   CollectionListResult,
-  CollectionLot,
   CollectionListRequest,
   CollectionPrintingValidationRequest,
   CollectionProjectionDelta,
@@ -22,17 +21,12 @@ import {
   CollectionProjectionResultSchema,
   CollectionProjectionSnapshotSchema,
 } from "@mooligan/domain/collection";
-import type { Deck } from "@mooligan/domain/decks";
-import type { CardList } from "@mooligan/domain/lists";
 import type {
   CatalogPrintingResult,
   CatalogReleaseSummary,
   SpoilerProjectionDelta,
   SpoilerProjectionResult,
   SpoilerProjectionSnapshot,
-  SpoilerDecisionState,
-  SpoilerPolicy,
-  SpoilerRevealScope,
   SpoilerRevealSummaries,
 } from "@mooligan/domain/spoilers";
 import {
@@ -41,8 +35,11 @@ import {
   SpoilerProjectionResultSchema,
   SpoilerProjectionSnapshotSchema,
 } from "@mooligan/domain/spoilers";
+import type { WorkspaceBackup } from "@mooligan/workspace/backup";
 import * as z from "zod";
 import type { JSONType } from "zod";
+
+export type { WorkspaceBackup } from "@mooligan/workspace/backup";
 
 export const WorkspaceBootstrapSchema = z.strictObject({
   clientId: z.uuidv4(),
@@ -123,36 +120,6 @@ export type CatalogStatus =
   | { installed: false }
   | (CatalogSnapshot & { installed: true; updateAvailable: boolean });
 
-export type MotionPreference = "system" | "reduced" | "full";
-
-type BackupEntity<Entity> = { id: string; value: Entity };
-
-export type WorkspaceBackupSpoilerDecision = {
-  scope: SpoilerRevealScope;
-  state: SpoilerDecisionState;
-  targetId: string;
-};
-
-export type WorkspaceBackup = {
-  cardLists: BackupEntity<CardList>[];
-  collectionLots: BackupEntity<CollectionLot>[];
-  decks: BackupEntity<Deck>[];
-  format: "mooligan-workspace";
-  preferences: { motion: MotionPreference; spoilerPolicy: SpoilerPolicy };
-  spoilerDecisions: WorkspaceBackupSpoilerDecision[];
-  version: 2;
-};
-
-export type WorkspaceLegacyBackupSnapshot = Pick<WorkspaceBackup, "cardLists" | "decks"> & {
-  motion: MotionPreference;
-};
-
-export type Preferences = {
-  motion: MotionPreference;
-};
-
-export type PreferencesUpdate = Partial<Preferences>;
-
 export type DesktopApi = {
   auth: {
     onChanged: (callback: (snapshot: AuthSnapshot) => void) => () => void;
@@ -179,11 +146,6 @@ export type DesktopApi = {
   collection: {
     list: (request?: CollectionListRequest) => Promise<CollectionListResult>;
   };
-  preferences: {
-    onChanged: (callback: (preferences: Preferences) => void) => () => void;
-    read: () => Promise<Preferences>;
-    update: (update: PreferencesUpdate) => Promise<Preferences>;
-  };
   workspaceProjection: {
     applyCollectionDelta: (delta: CollectionProjectionDelta) => Promise<CollectionProjectionResult>;
     applySpoilerDelta: (delta: SpoilerProjectionDelta) => Promise<SpoilerProjectionResult>;
@@ -198,11 +160,10 @@ export type DesktopApi = {
   };
   workspace: {
     activateRestore: (workspaceId: string) => Promise<void>;
-    beginRestore: (snapshot: WorkspaceLegacyBackupSnapshot) => Promise<WorkspaceBootstrap>;
+    beginRestore: () => Promise<WorkspaceBootstrap>;
     bootstrap: () => Promise<WorkspaceBootstrap>;
     cancelRestore: (workspaceId: string) => Promise<void>;
     exportBackup: (backup: WorkspaceBackup) => Promise<"cancelled" | "exported">;
-    readLegacyBackupSnapshot: () => Promise<WorkspaceLegacyBackupSnapshot>;
     selectBackup: () => Promise<WorkspaceBackup | null>;
   };
 };

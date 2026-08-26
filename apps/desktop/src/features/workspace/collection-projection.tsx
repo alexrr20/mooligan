@@ -3,7 +3,7 @@ import { collectionLotsQuery, tables } from "@mooligan/workspace/schema";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { useWorkspaceStore } from "./workspace-store-context";
+import { useWorkspaceLiveStore } from "./workspace-store-context";
 import { diffCollectionLots } from "./collection-projection-diff";
 
 export function CollectionProjectionStartup({
@@ -15,7 +15,7 @@ export function CollectionProjectionStartup({
   loading: ReactNode;
   workspaceId: string;
 }) {
-  const store = useWorkspaceStore();
+  const store = useWorkspaceLiveStore();
   const queryClient = useQueryClient();
   const rows = store.useQuery(collectionLotsQuery);
   const lots = useMemo(() => rows.map(toCollectionLot), [rows]);

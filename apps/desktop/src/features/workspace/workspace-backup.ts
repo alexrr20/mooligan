@@ -1,5 +1,11 @@
 import type { Store } from "@livestore/livestore";
 import {
+  workspaceBackupFormat,
+  workspaceBackupVersion,
+  type WorkspaceBackup,
+  type WorkspaceBackupCollectionLot,
+} from "@mooligan/workspace/backup";
+import {
   collectionLotsQuery,
   events,
   initialSpoilerResetId,
@@ -8,33 +14,53 @@ import {
   workspaceSchema,
 } from "@mooligan/workspace/schema";
 
-import type {
-  WorkspaceBackup,
-  WorkspaceLegacyBackupSnapshot,
-} from "../../../shared/desktop-api.ts";
+type WorkspaceLiveStore = Store<typeof workspaceSchema>;
+type RestoreEvent =
+  | ReturnType<typeof events.collectionCopiesAdded>
+  | ReturnType<typeof events.spoilerDecisionChanged>
+  | ReturnType<typeof events.spoilerPolicyChanged>
+  | ReturnType<typeof events.spoilerProtectionReset>;
 
-type WorkspaceStore = Store<typeof workspaceSchema>;
+const RESTORE_EVENT_BATCH_SIZE = 500;
 
-export function createWorkspaceBackup(
-  store: WorkspaceStore,
-  legacy: WorkspaceLegacyBackupSnapshot,
-): WorkspaceBackup {
+export function createWorkspaceBackup(store: WorkspaceLiveStore): WorkspaceBackup {
   const settings = store.query(spoilerSettingsQuery);
   return {
-    cardLists: legacy.cardLists,
     collectionLots: readBackupCollectionLots(store),
-    decks: legacy.decks,
-    format: "mooligan-workspace",
-    preferences: { motion: legacy.motion, spoilerPolicy: settings.policy },
-    spoilerDecisions: readBackupDecisions(store),
-    version: 2,
+    format: workspaceBackupFormat,
+    spoilers: {
+      decisions: readBackupDecisions(store),
+      policy: settings.policy,
+      resetGeneration: settings.resetGeneration,
+    },
+    version: workspaceBackupVersion,
   };
 }
 
-export function restoreWorkspaceBackup(store: WorkspaceStore, backup: WorkspaceBackup) {
-  for (const { value: lot } of backup.collectionLots) {
-    store.commit(
-      { skipRefresh: true },
+export function restoreWorkspaceBackup(store: WorkspaceLiveStore, backup: WorkspaceBackup) {
+  const restoreResetId =
+    backup.spoilers.resetGeneration === 0 ? initialSpoilerResetId : crypto.randomUUID();
+  let batch: RestoreEvent[] = [];
+  const enqueue = (event: RestoreEvent) => {
+    batch.push(event);
+    if (batch.length === RESTORE_EVENT_BATCH_SIZE) {
+      commitRestoreBatch(store, batch);
+      batch = [];
+    }
+  };
+
+  enqueue(events.spoilerPolicyChanged({ policy: backup.spoilers.policy }));
+  if (backup.spoilers.resetGeneration > 0) {
+    enqueue(
+      events.spoilerProtectionReset({
+        generation: backup.spoilers.resetGeneration,
+        resetId: restoreResetId,
+      }),
+    );
+  }
+
+  for (const lot of backup.collectionLots) {
+    enqueue(
       events.collectionCopiesAdded({
         additionId: crypto.randomUUID(),
         lot: {
@@ -52,29 +78,28 @@ export function restoreWorkspaceBackup(store: WorkspaceStore, backup: WorkspaceB
       }),
     );
   }
-  store.commit(
-    { skipRefresh: true },
-    events.spoilerPolicyChanged({ policy: backup.preferences.spoilerPolicy }),
-  );
-  for (const decision of backup.spoilerDecisions) {
-    store.commit(
-      { skipRefresh: true },
+
+  for (const decision of backup.spoilers.decisions) {
+    enqueue(
       events.spoilerDecisionChanged({
         ...decision,
         decisionId: crypto.randomUUID(),
-        generation: 0,
+        generation: backup.spoilers.resetGeneration,
         observedDecisionId: null,
-        resetId: initialSpoilerResetId,
+        resetId: restoreResetId,
       }),
     );
   }
+
+  commitRestoreBatch(store, batch);
   store.manualRefresh();
 
   const settings = store.query(spoilerSettingsQuery);
   if (
-    settings.policy !== backup.preferences.spoilerPolicy ||
+    settings.policy !== backup.spoilers.policy ||
+    settings.resetGeneration !== backup.spoilers.resetGeneration ||
     JSON.stringify(readBackupDecisions(store)) !==
-      JSON.stringify(sortedDecisions(backup.spoilerDecisions)) ||
+      JSON.stringify(sortedDecisions(backup.spoilers.decisions)) ||
     JSON.stringify(readBackupCollectionLots(store)) !==
       JSON.stringify(sortedCollectionLots(backup.collectionLots))
   ) {
@@ -82,36 +107,43 @@ export function restoreWorkspaceBackup(store: WorkspaceStore, backup: WorkspaceB
   }
 }
 
-function readBackupCollectionLots(store: WorkspaceStore): WorkspaceBackup["collectionLots"] {
+function commitRestoreBatch(store: WorkspaceLiveStore, batch: readonly RestoreEvent[]) {
+  if (batch.length > 0) {
+    store.commit({ skipRefresh: true }, ...batch);
+  }
+}
+
+function readBackupCollectionLots(store: WorkspaceLiveStore): WorkspaceBackup["collectionLots"] {
   return store.query(collectionLotsQuery).map((row) => {
-    const value: WorkspaceBackup["collectionLots"][number]["value"] = {
+    const lot: WorkspaceBackupCollectionLot = {
+      acquiredAt: row.acquiredAt ?? undefined,
       condition: row.condition,
       finish: row.finish,
       id: row.id,
       language: row.language,
+      locationId: row.locationId ?? undefined,
+      notes: row.notes ?? undefined,
       printingId: row.printingId,
       quantity: row.quantity,
+      unitCost:
+        row.unitCostAmountMinor !== null && row.unitCostCurrency !== null
+          ? {
+              amountMinor: row.unitCostAmountMinor,
+              currency: row.unitCostCurrency,
+            }
+          : undefined,
     };
-    if (row.acquiredAt !== null) value.acquiredAt = row.acquiredAt;
-    if (row.locationId !== null) value.locationId = row.locationId;
-    if (row.notes !== null) value.notes = row.notes;
-    if (row.unitCostAmountMinor !== null && row.unitCostCurrency !== null) {
-      value.unitCost = {
-        amountMinor: row.unitCostAmountMinor,
-        currency: row.unitCostCurrency,
-      };
-    }
-    return { id: value.id, value };
+    return lot;
   });
 }
 
-function readBackupDecisions(store: WorkspaceStore) {
+function readBackupDecisions(store: WorkspaceLiveStore) {
   return store
     .query(spoilerDecisionsQuery)
     .map(({ scope, state, targetId }) => ({ scope, state, targetId }));
 }
 
-function sortedDecisions(decisions: WorkspaceBackup["spoilerDecisions"]) {
+function sortedDecisions(decisions: WorkspaceBackup["spoilers"]["decisions"]) {
   return [...decisions].sort(
     (left, right) =>
       left.scope.localeCompare(right.scope) || left.targetId.localeCompare(right.targetId),

@@ -12,7 +12,7 @@ import {
 } from "@mooligan/workspace/schema";
 import { useMutation } from "@tanstack/react-query";
 
-import { useWorkspaceStore } from "../workspace/workspace-store-context.tsx";
+import { useWorkspaceLiveStore } from "../workspace/workspace-store-context.tsx";
 export { spoilerCatalogCacheKey } from "./spoiler-cache-key.ts";
 
 type SpoilerAction =
@@ -24,7 +24,7 @@ type SpoilerAction =
   | { type: "protect-all" };
 
 export function useSpoilers() {
-  const store = useWorkspaceStore();
+  const store = useWorkspaceLiveStore();
   const query = useSpoilerState();
   const mutation = useMutation({
     mutationFn: (action: SpoilerAction) => runSpoilerAction(store, action),
@@ -48,7 +48,7 @@ export function useSpoilers() {
 }
 
 export function useSpoilerState() {
-  const store = useWorkspaceStore();
+  const store = useWorkspaceLiveStore();
   const settings = store.useQuery(spoilerSettingsQuery);
   const decisions = store.useQuery(spoilerDecisionsQuery);
   const reveals = decisions.filter(({ state }) => state === "reveal");
@@ -70,7 +70,7 @@ export function useSpoilerState() {
 }
 
 async function runSpoilerAction(
-  store: ReturnType<typeof useWorkspaceStore>,
+  store: ReturnType<typeof useWorkspaceLiveStore>,
   action: SpoilerAction,
 ) {
   const settings = store.query(spoilerSettingsQuery);
@@ -161,7 +161,7 @@ async function runSpoilerAction(
 }
 
 function commitDecision(
-  store: ReturnType<typeof useWorkspaceStore>,
+  store: ReturnType<typeof useWorkspaceLiveStore>,
   settings: typeof tables.spoilerSettings.Type,
   current: typeof tables.spoilerDecisions.Type | undefined,
   scope: SpoilerRevealScope,

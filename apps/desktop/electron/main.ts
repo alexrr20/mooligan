@@ -31,9 +31,7 @@ import { registerSpoilerProjectionIpc } from "./spoilers/projection-ipc";
 import { SpoilerProjection } from "./spoilers/projection";
 import { focusFirstWindow, publishRendererEvent } from "./windows";
 import { registerWorkspaceIpc } from "./workspace/ipc";
-import { MutationQueue } from "./workspace/mutations";
 import { WorkspaceRegistry } from "./workspace/registry";
-import { WorkspaceManager } from "./workspace/store";
 
 app.enableSandbox();
 registerDesktopSchemes(protocol);
@@ -103,17 +101,16 @@ if (!authStartup.isPrimary) {
     .whenReady()
     .then(async () => {
       const workspaceRegistry = new WorkspaceRegistry(app.getPath("userData"));
-      const workspace = new WorkspaceManager(workspaceRegistry);
-      const spoilers = new SpoilerProjection(() => workspace.workspaceId, {
+      const activeWorkspaceId = () => workspaceRegistry.bootstrap().workspaceId;
+      const spoilers = new SpoilerProjection(activeWorkspaceId, {
         onChanged: () => publishRendererEvent("workspace-projection:spoilers-changed", undefined),
       });
-      const collection = new CollectionProjection(() => workspace.workspaceId, {
+      const collection = new CollectionProjection(activeWorkspaceId, {
         applyDelta: applyCatalogCollectionProjection,
         onResyncRequired: () =>
           publishRendererEvent("workspace-projection:collection-resync-required", undefined),
         replace: replaceCatalogCollectionProjection,
       });
-      const workspaceMutations = new MutationQueue();
 
       registerCatalogIpc({
         getCollectionProjectionLots: () => collection.lots(),
@@ -123,12 +120,7 @@ if (!authStartup.isPrimary) {
       });
       registerCollectionProjectionIpc(collection);
       registerSpoilerProjectionIpc(spoilers);
-      const publishPreferences = registerWorkspaceIpc(
-        workspaceRegistry,
-        workspace,
-        workspaceMutations,
-        app.getPath("documents"),
-      );
+      registerWorkspaceIpc(workspaceRegistry, app.getPath("documents"));
 
       const imageCache = createCatalogImageCache({
         cacheDirectory: resolveCatalogImageCacheDirectory(app.getPath("home")),
@@ -161,7 +153,6 @@ if (!authStartup.isPrimary) {
 
       app.once("will-quit", () => {
         spoilers.close();
-        workspace.close();
         workspaceRegistry.close();
       });
 
@@ -172,7 +163,6 @@ if (!authStartup.isPrimary) {
 
       await createWindow(collection, spoilers);
       publishAuthStateAndRefresh();
-      publishPreferences();
 
       app.on("activate", () => {
         if (BrowserWindow.getAllWindows().length === 0) {

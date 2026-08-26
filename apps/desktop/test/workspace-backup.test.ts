@@ -1,137 +1,130 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { access, mkdtemp, readFile, readdir, rm, truncate, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import type { CollectionLot } from "@mooligan/domain/collection";
-import type { Deck } from "@mooligan/domain/decks";
-import type { CardList } from "@mooligan/domain/lists";
+import { workspaceBackupMaxBytes, type WorkspaceBackup } from "@mooligan/workspace/backup";
 
-import type { WorkspaceBackup, WorkspaceLegacyBackupSnapshot } from "../shared/desktop-api.ts";
-import { parseWorkspaceBackup, serializeWorkspaceBackup } from "../electron/workspace/backup.ts";
+import {
+  parseWorkspaceBackup,
+  readUtf8FileWithinLimit,
+  serializeWorkspaceBackup,
+} from "../electron/workspace/backup.ts";
 import { WorkspaceRegistry } from "../electron/workspace/registry.ts";
-import { WorkspaceManager, WorkspaceStore } from "../electron/workspace/store.ts";
 
-const collectionLot: CollectionLot = {
-  acquiredAt: "2026-08-01T10:00:00.000Z",
-  condition: "near-mint",
-  finish: "foil",
-  id: "lot-stable-id",
-  language: "en",
-  notes: "Draft night",
-  printingId: "printing-1",
-  quantity: 2,
-  unitCost: { amountMinor: 125, currency: "EUR" },
-};
-const deck: Deck = {
-  createdAt: "2026-08-02T10:00:00.000Z",
-  entries: [],
-  formatId: "commander",
-  id: "deck-stable-id",
-  name: "Library test",
-  tags: ["paper"],
-  updatedAt: "2026-08-03T10:00:00.000Z",
-};
-const cardList: CardList = {
-  createdAt: "2026-08-02T11:00:00.000Z",
-  entries: [],
-  id: "list-stable-id",
-  name: "Trade targets",
-  updatedAt: "2026-08-03T11:00:00.000Z",
-};
-const legacySnapshot: WorkspaceLegacyBackupSnapshot = {
-  cardLists: [{ id: cardList.id, value: cardList }],
-  decks: [{ id: deck.id, value: deck }],
-  motion: "reduced",
-};
-const fullBackup: WorkspaceBackup = {
-  cardLists: legacySnapshot.cardLists,
-  collectionLots: [{ id: collectionLot.id, value: collectionLot }],
-  decks: legacySnapshot.decks,
-  format: "mooligan-workspace",
-  preferences: { motion: "reduced", spoilerPolicy: "show" },
-  spoilerDecisions: [
-    { scope: "printing", state: "reveal", targetId: "preview-printing" },
-    { scope: "release", state: "protect", targetId: "preview-release" },
+const backup: WorkspaceBackup = {
+  collectionLots: [
+    {
+      acquiredAt: "2026-08-01T10:00:00.000Z",
+      condition: "near-mint",
+      finish: "foil",
+      id: "lot-stable-id",
+      language: "en",
+      notes: "Draft night",
+      printingId: "printing-1",
+      quantity: 2,
+      unitCost: { amountMinor: 125, currency: "EUR" },
+    },
   ],
-  version: 2,
+  format: "mooligan-workspace",
+  spoilers: {
+    decisions: [
+      { scope: "printing", state: "reveal", targetId: "preview-printing" },
+      { scope: "release", state: "protect", targetId: "preview-release" },
+    ],
+    policy: "show",
+    resetGeneration: 3,
+  },
+  version: 3,
 };
 
-void test("version 2 backups retain LiveStore spoiler state without workspace metadata", () => {
-  const parsed = parseWorkspaceBackup(serializeWorkspaceBackup(fullBackup));
+void test("version 3 backups round trip without device or account metadata", () => {
+  const parsed = parseWorkspaceBackup(serializeWorkspaceBackup(backup));
 
-  assert.deepEqual(parsed, fullBackup);
+  assert.deepEqual(parsed, backup);
+  assert.equal(Object.hasOwn(parsed, "clientId"), false);
   assert.equal(Object.hasOwn(parsed, "workspaceId"), false);
-  assert.deepEqual(parsed.spoilerDecisions, fullBackup.spoilerDecisions);
+  assert.equal(Object.hasOwn(parsed, "motion"), false);
+  assert.equal(Object.hasOwn(parsed, "account"), false);
 });
 
-void test("version 1 backups still enter the staged restore with protection enabled", () => {
-  const backup = parseWorkspaceBackup(
-    JSON.stringify({
-      cardLists: legacySnapshot.cardLists,
-      collectionLots: fullBackup.collectionLots,
-      decks: legacySnapshot.decks,
-      format: "mooligan-workspace",
-      preferences: { motion: "reduced" },
-      version: 1,
-    }),
+void test("old backup versions and unknown fields are rejected", () => {
+  assert.throws(
+    () => parseWorkspaceBackup(JSON.stringify({ ...backup, version: 2 })),
+    /invalid or exceeds a limit/u,
   );
-
-  assert.equal(backup.version, 2);
-  assert.deepEqual(backup.preferences, { motion: "reduced", spoilerPolicy: "protect" });
-  assert.deepEqual(backup.spoilerDecisions, []);
+  assert.throws(
+    () => parseWorkspaceBackup(JSON.stringify({ ...backup, deviceId: "device-one" })),
+    /invalid or exceeds a limit/u,
+  );
+  assert.throws(
+    () =>
+      parseWorkspaceBackup(
+        JSON.stringify({
+          ...backup,
+          spoilers: { ...backup.spoilers, credentials: "secret" },
+        }),
+      ),
+    /invalid or exceeds a limit/u,
+  );
 });
 
-void test("staged restore creates and verifies a new workspace before activation", async () => {
+void test("restore registry entries stay inactive until verification succeeds", async () => {
   const directory = await mkdtemp(join(tmpdir(), "mooligan-backup-restore-"));
 
   try {
     const registry = new WorkspaceRegistry(directory);
-    const manager = new WorkspaceManager(registry);
-    const originalWorkspaceId = manager.workspaceId;
-    manager.importLegacyBackupSnapshot({
-      cardLists: [],
-      decks: [],
-      motion: "full",
-    });
+    const original = registry.bootstrap();
+    const failed = registry.beginRestore();
 
-    const pending = manager.beginRestore(legacySnapshot);
-    assert.notEqual(pending.workspaceId, originalWorkspaceId);
-    assert.equal(manager.workspaceId, originalWorkspaceId);
-    assert.deepEqual(manager.createLegacyBackupSnapshot().cardLists, []);
+    assert.notEqual(failed.workspaceId, original.workspaceId);
+    assert.equal(registry.bootstrap().workspaceId, original.workspaceId);
+    assert.throws(() => registry.beginRestore(), /already in progress/u);
 
-    manager.cancelRestore(pending.workspaceId);
-    const restored = manager.beginRestore(legacySnapshot);
-    manager.activateRestore(restored.workspaceId);
-    assert.equal(manager.workspaceId, restored.workspaceId);
-    assert.deepEqual(manager.createLegacyBackupSnapshot(), legacySnapshot);
-    manager.close();
+    registry.cancelRestore(failed.workspaceId);
+    assert.deepEqual(registry.bootstrap(), original);
 
-    registry.activateWorkspace(originalWorkspaceId);
-    const original = new WorkspaceManager(registry);
-    assert.equal(original.workspaceId, originalWorkspaceId);
-    assert.deepEqual(original.readPreferences(), { motion: "full" });
-    original.close();
+    const restored = registry.beginRestore();
+    assert.equal(registry.bootstrap().workspaceId, original.workspaceId);
+    assert.equal(registry.accountId(restored.workspaceId), null);
+    registry.activateRestore(restored.workspaceId);
+    assert.equal(registry.bootstrap().workspaceId, restored.workspaceId);
     registry.close();
   } finally {
     await rm(directory, { force: true, recursive: true });
   }
 });
 
-void test("invalid backups are rejected before staged SQL data changes", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "mooligan-backup-invalid-"));
-  try {
-    const store = new WorkspaceStore(join(directory, "workspace.sqlite"));
-    store.importLegacyBackupSnapshot(legacySnapshot);
-    const before = store.createLegacyBackupSnapshot();
-    const invalid = structuredClone(fullBackup);
-    invalid.decks[0]!.id = "mismatched-id";
+void test("native backup reads stop at the 50 MiB limit", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "mooligan-backup-limit-"));
+  const path = join(directory, "backup.json");
 
-    assert.throws(() => parseWorkspaceBackup(JSON.stringify(invalid)), /deck IDs are invalid/);
-    assert.deepEqual(store.createLegacyBackupSnapshot(), before);
-    store.close();
+  try {
+    await writeFile(path, "{}", "utf8");
+    assert.equal(await readUtf8FileWithinLimit(path), "{}");
+
+    await truncate(path, workspaceBackupMaxBytes + 1);
+    await assert.rejects(readUtf8FileWithinLimit(path), /too large/u);
   } finally {
     await rm(directory, { force: true, recursive: true });
   }
+});
+
+void test("legacy workspace persistence is absent from desktop source", async () => {
+  const workspaceDirectory = new URL("../electron/workspace/", import.meta.url);
+
+  for (const obsoleteFile of ["mutations.ts", "preferences.ts", "store.ts"]) {
+    await assert.rejects(access(new URL(obsoleteFile, workspaceDirectory)));
+  }
+
+  const sourceFiles = (await readdir(workspaceDirectory)).filter((name) => name.endsWith(".ts"));
+  const source = (
+    await Promise.all(
+      sourceFiles.map((name) => readFile(new URL(name, workspaceDirectory), "utf8")),
+    )
+  ).join("\n");
+
+  assert.doesNotMatch(source, /WorkspaceStore|WorkspaceLegacyBackup|card_lists|preferences:/u);
+  assert.doesNotMatch(source, /BackupSchema.*version.*(?:1|2)/u);
 });

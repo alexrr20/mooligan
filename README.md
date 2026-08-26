@@ -1,28 +1,30 @@
 # Mooligan
 
 A local-first Electron app for managing Magic: The Gathering cards, with an
-optional Better Auth account for synchronization. Creating an account is not a
-prerequisite for using the desktop app.
+optional Better Auth account foundation for future synchronization. Creating
+an account is not a prerequisite for using the desktop app.
 
 - `apps/desktop`: Electron, React 19, TanStack Router, StyleX, and Motion
 - `apps/api`: Hono 4 for Cloudflare Workers, served locally by Wrangler on
   `http://127.0.0.1:3000`
 - `packages/domain`: shared catalog, collection, deck, list, and market types
+- `packages/workspace`: shared LiveStore events, state, and backup schema
 
 Node.js 22.18 or newer is required.
 
 ## Local-first behavior
 
-Mooligan creates a durable SQLite workspace under Electron's user-data
-directory on first launch. The workspace and its preferences remain usable
-without signing in, without the API running, and after signing out. Its stable
-local ID is not an anonymous online account.
+Mooligan stores collection lots and spoiler decisions in a renderer LiveStore
+that persists to OPFS. A small Electron-owned SQLite registry stores the stable
+device ID, known workspace IDs, account bindings, and the active workspace. The
+workspace remains usable without signing in, without the API running, and after
+signing out. Its stable local ID is not an anonymous online account.
 
 The user-owned workspace is separate from the replaceable Scryfall catalog
-database. Signing in binds a local workspace to an online identity and enables
-preference sync; SQLite remains the working copy, so an expired session or
-network outage pauses sync rather than blocking local reads and writes. Account
-switches use separate local workspaces to avoid mixing user data.
+database. Motion and view preferences stay in renderer local storage on the
+current device. Workspace backup version 3 contains only materialized
+collection lots and spoiler state, and every restore creates a new unbound
+workspace before activation.
 
 ## Development
 
@@ -93,12 +95,12 @@ credentials, or fragment. It must use HTTPS except for the loopback hosts
    protocol `com.mooligan.app`; the callback shape is
    `com.mooligan.app://auth/callback#token=<authorization-token>`.
 4. Quit and relaunch the app to verify session restoration. Then sign out and
-   confirm the local workspace and its preferences remain present.
+   confirm the local workspace remains present.
 
-Also disconnect the Worker while editing a preference: the local save should
-succeed immediately and sync should resume after reconnecting. Session cookies,
-PKCE material, and authorization codes must never appear in renderer storage or
-the renderer-facing API.
+Also disconnect the Worker while editing collection or spoiler state. Local
+reads and writes should continue. Session cookies, PKCE material, and
+authorization codes must never appear in renderer storage or the
+renderer-facing API.
 
 The Worker and hosted page use the official `@better-auth/electron` plugin. The
 desktop side intentionally uses a narrow main-process client over that plugin's

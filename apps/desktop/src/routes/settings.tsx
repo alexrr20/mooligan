@@ -4,7 +4,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Button } from "../components/button";
 import { PageFrame } from "../components/page-frame";
 import { useAuth } from "../features/auth/use-auth";
-import { usePreferences } from "../features/preferences/use-preferences";
+import {
+  useMotionPreference,
+  type MotionPreference,
+} from "../features/preferences/use-motion-preference";
 import { useWorkspaceBackup } from "../features/preferences/use-workspace-backup";
 import { SpoilerSettings } from "../features/spoilers/spoiler-settings";
 import { colors } from "../styles/tokens.stylex.js";
@@ -16,7 +19,7 @@ export const Route = createFileRoute("/settings")({
 function SettingsPage() {
   const auth = useAuth();
   const backup = useWorkspaceBackup();
-  const { error, loading, preferences, saving, update } = usePreferences();
+  const { motion, setMotion } = useMotionPreference();
 
   return (
     <PageFrame>
@@ -32,18 +35,14 @@ function SettingsPage() {
           </div>
           <p {...stylex.props(typography.body, styles.settingCopy)}>
             Follow your operating system, keep transitions restrained, or show every interface
-            movement. This preference is saved in your local workspace.
+            movement. This preference is saved on this device.
           </p>
         </div>
 
-        <fieldset
-          {...stylex.props(styles.options)}
-          aria-describedby="motion-status"
-          disabled={saving}
-        >
+        <fieldset {...stylex.props(styles.options)} aria-describedby="motion-status">
           <legend {...stylex.props(styles.visuallyHidden)}>Motion behavior</legend>
           {motionOptions.map((option, index) => {
-            const selected = preferences.motion === option.value;
+            const selected = motion === option.value;
 
             return (
               <label
@@ -54,7 +53,7 @@ function SettingsPage() {
                   {...stylex.props(styles.radio)}
                   checked={selected}
                   name="motion"
-                  onChange={() => update({ motion: option.value })}
+                  onChange={() => setMotion(option.value)}
                   type="radio"
                   value={option.value}
                 />
@@ -82,7 +81,7 @@ function SettingsPage() {
             id="motion-status"
             aria-live="polite"
           >
-            {statusMessage({ error, loading, saving })}
+            Saved on this device
           </p>
         </div>
       </section>
@@ -195,8 +194,8 @@ function BackupSetting({ backup }: { backup: ReturnType<typeof useWorkspaceBacku
           </h2>
         </div>
         <p {...stylex.props(typography.body, styles.settingCopy)}>
-          Export a validated copy of this workspace, including preferences, spoiler choices,
-          collection lots, decks, and lists. Backups never contain account sessions or credentials.
+          Export a validated copy of this workspace, including collection lots and spoiler choices.
+          Backups never contain device preferences, account sessions, or credentials.
         </p>
       </div>
 
@@ -323,26 +322,6 @@ const motionOptions: readonly {
     value: "full",
   },
 ];
-
-function statusMessage({
-  error,
-  loading,
-  saving,
-}: {
-  error: Error | null;
-  loading: boolean;
-  saving: boolean;
-}) {
-  if (error) {
-    return "Could not save this preference";
-  }
-
-  if (saving) {
-    return "Saving locally…";
-  }
-
-  return loading ? "Reading local preference…" : "Saved locally";
-}
 
 const styles = stylex.create({
   account: {
