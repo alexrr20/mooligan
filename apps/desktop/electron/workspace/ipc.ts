@@ -13,9 +13,14 @@ import {
   serializeWorkspaceBackup,
   validateWorkspaceBackup,
 } from "./backup";
+import type { AccountWorkspace } from "./account";
 import type { WorkspaceRegistry } from "./registry";
 
-export function registerWorkspaceIpc(registry: WorkspaceRegistry, documentsPath: string) {
+export function registerWorkspaceIpc(
+  registry: WorkspaceRegistry,
+  accountWorkspace: AccountWorkspace,
+  documentsPath: string,
+) {
   ipcMain.handle("workspace:bootstrap", (event) => {
     assertTrustedSender(event);
     return validateWorkspaceBootstrap(registry.bootstrap());
@@ -90,13 +95,26 @@ export function registerWorkspaceIpc(registry: WorkspaceRegistry, documentsPath:
     assertTrustedSender(event);
     return registry.beginRestore();
   });
-  ipcMain.handle("workspace:activate-restore", (event, value) => {
+  ipcMain.handle("workspace:activate-restore", async (event, value) => {
     assertTrustedSender(event);
     registry.activateRestore(z.uuid().parse(value));
+    await accountWorkspace.workspaceActivated();
   });
   ipcMain.handle("workspace:cancel-restore", (event, value) => {
     assertTrustedSender(event);
     registry.cancelRestore(z.uuid().parse(value));
+  });
+  ipcMain.handle("workspace:runtime", (event) => {
+    assertTrustedSender(event);
+    return accountWorkspace.runtime();
+  });
+  ipcMain.handle("workspace:refresh-sync", (event) => {
+    assertTrustedSender(event);
+    return accountWorkspace.refreshSync();
+  });
+  ipcMain.handle("workspace:select", async (event, value) => {
+    assertTrustedSender(event);
+    await accountWorkspace.selectWorkspace(z.uuid().parse(value));
   });
 }
 

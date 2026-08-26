@@ -8,10 +8,12 @@ import {
   developmentContentSecurityPolicy,
   productionContentSecurityPolicy,
   productionServiceOrigin,
+  productionSyncOrigin,
 } from "./content-security-policy";
 
 export default defineConfig(({ command }) => ({
   base: "./",
+  define: desktopRendererDefinitions(command),
   server: {
     host: "127.0.0.1",
     port: 5173,
@@ -53,6 +55,16 @@ export default defineConfig(({ command }) => ({
     },
   ],
 }));
+
+function desktopRendererDefinitions(command: "build" | "serve") {
+  const defaultSyncUrl =
+    command === "build" ? `${productionSyncOrigin}/api/sync` : "ws://127.0.0.1:3000/api/sync";
+  return {
+    "import.meta.env.MOOLIGAN_SYNC_URL": JSON.stringify(
+      process.env.MOOLIGAN_SYNC_URL ?? defaultSyncUrl,
+    ),
+  };
+}
 
 function desktopServiceDefinitions(command: "build" | "serve") {
   const defaultOrigin = command === "build" ? productionServiceOrigin : undefined;

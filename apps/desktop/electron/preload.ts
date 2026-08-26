@@ -14,6 +14,7 @@ import {
   validateSpoilerProjectionResult,
   validateSpoilerProjectionSnapshot,
   validateWorkspaceBootstrap,
+  validateWorkspaceRuntime,
   type AuthSnapshot,
   type CatalogProgress,
   type DesktopApi,
@@ -112,6 +113,11 @@ export const desktopApi = {
       ipcRenderer.invoke("workspace:cancel-restore", z.uuid().parse(workspaceId)),
     exportBackup: (backup) =>
       ipcRenderer.invoke("workspace:export", validateWorkspaceBackup(backup)),
+    onChanged: (callback) => subscribe("workspace:changed", callback),
+    refreshSync: async () =>
+      validateWorkspaceRuntime(await ipcRenderer.invoke("workspace:refresh-sync")),
+    runtime: async () => validateWorkspaceRuntime(await ipcRenderer.invoke("workspace:runtime")),
+    select: (workspaceId) => ipcRenderer.invoke("workspace:select", z.uuid().parse(workspaceId)),
     selectBackup: async () => {
       const value = await ipcRenderer.invoke("workspace:select-backup");
       return value === null ? null : validateWorkspaceBackup(value);

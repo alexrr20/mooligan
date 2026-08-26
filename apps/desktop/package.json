@@ -17,6 +17,7 @@
     "@livestore/adapter-web": "catalog:",
     "@livestore/livestore": "catalog:",
     "@livestore/react": "catalog:",
+    "@livestore/sync-cf": "catalog:",
     "@livestore/wa-sqlite": "catalog:",
     "@mooligan/workspace": "workspace:*",
     "effect": "catalog:",
@@ -24,6 +25,7 @@
   },
   "devDependencies": {
     "@base-ui/react": "catalog:",
+    "@livestore/common": "catalog:",
     "@mooligan/domain": "workspace:*",
     "@stylexjs/stylex": "catalog:",
     "@stylexjs/unplugin": "catalog:",

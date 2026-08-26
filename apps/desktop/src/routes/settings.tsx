@@ -10,6 +10,7 @@ import {
 } from "../features/preferences/use-motion-preference";
 import { useWorkspaceBackup } from "../features/preferences/use-workspace-backup";
 import { SpoilerSettings } from "../features/spoilers/spoiler-settings";
+import { WorkspaceSetting } from "../features/workspace/workspace-setting";
 import { colors } from "../styles/tokens.stylex.js";
 import { typography } from "../styles/typography";
 
@@ -24,6 +25,8 @@ function SettingsPage() {
   return (
     <PageFrame>
       <AccountSetting auth={auth} />
+
+      <WorkspaceSetting />
 
       <section {...stylex.props(styles.setting)} aria-labelledby="motion-heading">
         <div {...stylex.props(styles.settingIntro)}>

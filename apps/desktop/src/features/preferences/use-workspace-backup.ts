@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { createWorkspaceBackup, restoreWorkspaceBackup } from "../workspace/workspace-backup";
-import { createLiveStoreRegistry, workspaceStoreOptions } from "../workspace/workspace-store";
+import { createLiveStoreRegistry, localWorkspaceStoreOptions } from "../workspace/workspace-store";
 import { useWorkspaceLiveStore } from "../workspace/workspace-store-context";
 
 export function useWorkspaceBackup() {
@@ -21,7 +21,7 @@ export function useWorkspaceBackup() {
       }
 
       const bootstrap = await bridge.beginRestore();
-      const options = workspaceStoreOptions(bootstrap);
+      const options = localWorkspaceStoreOptions(bootstrap);
       const restoreRegistry = createLiveStoreRegistry();
       const release = restoreRegistry.retain(options);
       let restoreStoreClosed = false;

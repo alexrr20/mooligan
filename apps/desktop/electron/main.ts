@@ -30,6 +30,7 @@ import { registerDesktopSchemes } from "./protocols";
 import { registerSpoilerProjectionIpc } from "./spoilers/projection-ipc";
 import { SpoilerProjection } from "./spoilers/projection";
 import { focusFirstWindow, publishRendererEvent } from "./windows";
+import { AccountWorkspace } from "./workspace/account";
 import { registerWorkspaceIpc } from "./workspace/ipc";
 import { WorkspaceRegistry } from "./workspace/registry";
 
@@ -120,7 +121,6 @@ if (!authStartup.isPrimary) {
       });
       registerCollectionProjectionIpc(collection);
       registerSpoilerProjectionIpc(spoilers);
-      registerWorkspaceIpc(workspaceRegistry, app.getPath("documents"));
 
       const imageCache = createCatalogImageCache({
         cacheDirectory: resolveCatalogImageCacheDirectory(app.getPath("home")),
@@ -149,7 +149,21 @@ if (!authStartup.isPrimary) {
         origin: authOrigin,
         safeStorage,
       });
-      const publishAuthStateAndRefresh = await registerAuthIpc(auth, authStartup);
+      const accountWorkspace = new AccountWorkspace(
+        auth,
+        workspaceRegistry,
+        async (workspaceChanged) => {
+          if (workspaceChanged) {
+            await collection.workspaceChanged();
+            spoilers.workspaceChanged();
+          }
+          publishRendererEvent("workspace:changed", undefined);
+        },
+      );
+      registerWorkspaceIpc(workspaceRegistry, accountWorkspace, app.getPath("documents"));
+      const publishAuthStateAndRefresh = await registerAuthIpc(auth, authStartup, (snapshot) =>
+        accountWorkspace.authChanged(snapshot),
+      );
 
       app.once("will-quit", () => {
         spoilers.close();
