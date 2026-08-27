@@ -149,14 +149,18 @@ function formatManaValue(value: number) {
 const styles = stylex.create({
   section: {
     marginTop: "36px",
-    borderTop: "1px solid #55584f",
+    borderTopWidth: "1px",
+    borderTopStyle: "solid",
+    borderTopColor: "#55584f",
   },
   faces: {
     display: "grid",
   },
   face: {
     paddingBlock: "30px 32px",
-    borderBottom: "1px solid #34362f",
+    borderBottomWidth: "1px",
+    borderBottomStyle: "solid",
+    borderBottomColor: "#34362f",
   },
   faceMultiple: {
     paddingBlock: "28px 34px",
@@ -222,7 +226,9 @@ const styles = stylex.create({
     display: "grid",
     alignContent: "start",
     gap: "1px",
-    border: "1px solid #34362f",
+    borderWidth: "1px",
+    borderStyle: "solid",
+    borderColor: "#34362f",
     backgroundColor: "#34362f",
   },
   stat: {
@@ -252,7 +258,9 @@ const styles = stylex.create({
     display: "grid",
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
     gap: "1px",
-    borderBottom: "1px solid #34362f",
+    borderBottomWidth: "1px",
+    borderBottomStyle: "solid",
+    borderBottomColor: "#34362f",
     backgroundColor: "#34362f",
   },
   cardFact: {
