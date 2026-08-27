@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { createFileRoute } from "@tanstack/react-router";
 
-import { CardLoadingIndicator } from "../components/card-loading-indicator";
+import { SolidCardLoadingIndicator } from "../components/solid-card-loading-indicator";
 
 export const Route = createFileRoute("/")({
   component: Home,
@@ -10,7 +10,7 @@ export const Route = createFileRoute("/")({
 function Home() {
   return (
     <div {...stylex.props(styles.page)}>
-      <CardLoadingIndicator label="Loading Home" />
+      <SolidCardLoadingIndicator label="Loading Home" />
     </div>
   );
 }
