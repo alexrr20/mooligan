@@ -318,7 +318,9 @@ const styles = stylex.create({
     backgroundColor: "#0a0a0a",
   },
   chrome: {
-    borderBottom: "1px solid #20211e",
+    borderBottomWidth: "1px",
+    borderBottomStyle: "solid",
+    borderBottomColor: "#20211e",
   },
   content: {
     width: "min(420px, calc(100vw - 64px))",

@@ -87,14 +87,18 @@ function titleCase(value: string) {
 const styles = stylex.create({
   section: {
     marginTop: "46px",
-    borderTop: "1px solid #55584f",
+    borderTopWidth: "1px",
+    borderTopStyle: "solid",
+    borderTopColor: "#55584f",
   },
   details: {
     margin: "1px 0 0",
     display: "grid",
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
     gap: "1px",
-    borderBottom: "1px solid #34362f",
+    borderBottomWidth: "1px",
+    borderBottomStyle: "solid",
+    borderBottomColor: "#34362f",
     backgroundColor: "#34362f",
   },
   detail: {

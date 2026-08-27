@@ -74,7 +74,9 @@ const statusNames = {
 const styles = stylex.create({
   section: {
     marginTop: "46px",
-    borderTop: "1px solid #55584f",
+    borderTopWidth: "1px",
+    borderTopStyle: "solid",
+    borderTopColor: "#55584f",
   },
   grid: {
     margin: 0,

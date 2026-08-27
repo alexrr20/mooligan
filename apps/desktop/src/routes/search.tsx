@@ -194,7 +194,9 @@ function SearchPage() {
 
 const styles = stylex.create({
   catalog: {
-    borderTop: "1px solid #55584f",
+    borderTopWidth: "1px",
+    borderTopStyle: "solid",
+    borderTopColor: "#55584f",
   },
   indexMeta: {
     minHeight: "66px",
@@ -204,7 +206,9 @@ const styles = stylex.create({
     justifyContent: "flex-end",
     flexWrap: "wrap",
     gap: "24px",
-    borderBottom: "1px solid #34362f",
+    borderBottomWidth: "1px",
+    borderBottomStyle: "solid",
+    borderBottomColor: "#34362f",
   },
   indexActions: {
     display: "flex",
@@ -224,7 +228,9 @@ const styles = stylex.create({
     justifyContent: "space-between",
     flexWrap: "wrap",
     gap: "28px",
-    borderBottom: "1px solid #34362f",
+    borderBottomWidth: "1px",
+    borderBottomStyle: "solid",
+    borderBottomColor: "#34362f",
   },
   upcomingIntro: {
     maxWidth: "620px",

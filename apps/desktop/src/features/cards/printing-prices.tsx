@@ -40,13 +40,15 @@ const styles = stylex.create({
     padding: "9px 0 0",
     display: "grid",
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    borderTop: "1px solid #34362f",
+    borderTopWidth: "1px",
+    borderTopStyle: "solid",
+    borderTopColor: "#34362f",
   },
   detailPrices: {
     marginTop: "14px",
     paddingTop: 0,
     gap: "1px",
-    borderTop: 0,
+    borderTopWidth: 0,
     backgroundColor: "#34362f",
   },
   price: {
@@ -65,7 +67,9 @@ const styles = stylex.create({
   },
   foilPrice: {
     paddingLeft: "10px",
-    borderLeft: "1px solid #34362f",
+    borderLeftWidth: "1px",
+    borderLeftStyle: "solid",
+    borderLeftColor: "#34362f",
   },
   detailFoilPrice: {
     paddingLeft: "16px",
@@ -73,7 +77,9 @@ const styles = stylex.create({
   cardIcon: {
     width: "9px",
     height: "13px",
-    border: "1px solid #f4f1e8",
+    borderWidth: "1px",
+    borderStyle: "solid",
+    borderColor: "#f4f1e8",
     borderRadius: "1.5px",
     backgroundColor: "#f4f1e8",
     boxShadow: "1px 1px 0 rgba(0, 0, 0, 0.45)",

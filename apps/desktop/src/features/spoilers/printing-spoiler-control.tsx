@@ -58,7 +58,9 @@ const styles = stylex.create({
     justifyContent: "space-between",
     flexWrap: "wrap",
     gap: "16px",
-    borderBottom: "1px solid #34362f",
+    borderBottomWidth: "1px",
+    borderBottomStyle: "solid",
+    borderBottomColor: "#34362f",
     backgroundColor: "#171914",
   },
   copy: {

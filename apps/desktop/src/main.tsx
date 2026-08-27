@@ -8,6 +8,8 @@ import "./global.css";
 import { routeTree } from "./routeTree.gen";
 import { WorkspaceStartup } from "./features/workspace/workspace-startup";
 
+const animationTools = import.meta.env.DEV ? await import("./dev/animation-tools") : undefined;
+
 document.fonts.add(
   new FontFace("Mana", `url("${manaFontUrl}") format("woff2")`, {
     style: "normal",
@@ -22,6 +24,8 @@ const router = createRouter({
   scrollRestoration: true,
 });
 const queryClient = new QueryClient();
+const animationSpeedController = animationTools?.installAnimationSpeedController();
+const AnimationSpeedSelect = animationTools?.AnimationSpeedSelect;
 
 declare module "@tanstack/react-router" {
   interface Register {
@@ -41,6 +45,9 @@ createRoot(rootElement).render(
       <WorkspaceStartup>
         <App />
       </WorkspaceStartup>
+      {animationSpeedController && AnimationSpeedSelect ? (
+        <AnimationSpeedSelect controller={animationSpeedController} />
+      ) : null}
     </QueryClientProvider>
   </StrictMode>,
 );
