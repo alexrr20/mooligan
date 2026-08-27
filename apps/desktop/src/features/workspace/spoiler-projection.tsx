@@ -86,7 +86,7 @@ export function SpoilerProjectionStartup({
   useEffect(
     () =>
       window.workspaceProjection.onSpoilersChanged(() => {
-        queryClient.removeQueries({ queryKey: ["catalog"] });
+        void queryClient.resetQueries({ queryKey: ["catalog"] });
       }),
     [queryClient],
   );

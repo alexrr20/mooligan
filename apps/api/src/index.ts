@@ -135,17 +135,17 @@ api.post("/api/workspace/sync-credential", async (context) => {
 });
 
 api.get("/catalog/release", async (context) => {
-  let release = await readCatalogRelease(context.env.DB);
+  const cachedRelease = await readCatalogRelease(context.env.DB);
 
-  if (!release) {
-    try {
-      await refreshCatalogReleaseMetadata(context.env);
-      release = await readCatalogRelease(context.env.DB);
-    } catch {
-      return context.json({ error: "catalog_release_unavailable" as const }, 503);
-    }
+  try {
+    await refreshCatalogReleaseMetadata(context.env);
+  } catch {
+    return cachedRelease
+      ? context.json(cachedRelease)
+      : context.json({ error: "catalog_release_unavailable" as const }, 503);
   }
 
+  const release = await readCatalogRelease(context.env.DB);
   return release
     ? context.json(release)
     : context.json({ error: "catalog_release_unavailable" as const }, 503);

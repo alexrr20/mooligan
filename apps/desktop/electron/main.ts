@@ -81,7 +81,8 @@ async function createWindow(
     event.preventDefault();
   });
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-  window.webContents.on("did-start-loading", () => {
+  window.webContents.on("did-start-navigation", (event) => {
+    if (!event.isMainFrame || event.isSameDocument) return;
     collectionProjection.rendererReplaced(window.webContents.id);
     spoilerProjection.rendererReplaced(window.webContents.id);
   });

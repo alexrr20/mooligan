@@ -15,21 +15,98 @@ test("GET /health reports a healthy service", async () => {
 });
 
 test("GET /catalog/release exposes the current Scryfall archive", async () => {
-  const { database } = releaseDatabase({
+  const current = {
     compressed_size: 77_064_542,
     download_url: "https://data.scryfall.io/default-cards/test.jsonl.gz",
     updated_at: "2026-07-31T09:11:02.266+00:00",
-  });
-  const response = await api.request("http://localhost/catalog/release", undefined, {
-    DB: database,
-  });
+  };
+  const store = releaseDatabase(current);
+  const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    Response.json({
+      compressed_size: current.compressed_size,
+      jsonl_download_uri: current.download_url,
+      type: "default_cards",
+      updated_at: current.updated_at,
+    }),
+  );
 
-  assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), {
-    compressedSize: 77_064_542,
-    downloadUrl: "https://data.scryfall.io/default-cards/test.jsonl.gz",
-    updatedAt: "2026-07-31T09:11:02.266+00:00",
+  try {
+    const response = await api.request("http://localhost/catalog/release", undefined, {
+      DB: store.database,
+    });
+
+    assert.equal(response.status, 200);
+    assert.equal(fetchMock.mock.calls.length, 1);
+    assert.equal(store.writeCount(), 0);
+    assert.deepEqual(await response.json(), {
+      compressedSize: current.compressed_size,
+      downloadUrl: current.download_url,
+      updatedAt: current.updated_at,
+    });
+  } finally {
+    fetchMock.mockRestore();
+  }
+});
+
+test("GET /catalog/release refreshes a cached archive before returning it", async () => {
+  const store = releaseDatabase({
+    compressed_size: 75_000_000,
+    download_url: "https://data.scryfall.io/default-cards/old.jsonl.gz",
+    updated_at: "2026-08-04T09:09:56.490+00:00",
   });
+  const source = {
+    compressed_size: 77_973_023,
+    jsonl_download_uri: "https://data.scryfall.io/default-cards/current.jsonl.gz",
+    type: "default_cards",
+    updated_at: "2026-08-26T21:05:47.053+00:00",
+  };
+  const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(source));
+
+  try {
+    const response = await api.request("http://localhost/catalog/release", undefined, {
+      DB: store.database,
+    });
+
+    assert.equal(response.status, 200);
+    assert.equal(store.writeCount(), 1);
+    assert.deepEqual(await response.json(), {
+      compressedSize: source.compressed_size,
+      downloadUrl: source.jsonl_download_uri,
+      updatedAt: source.updated_at,
+    });
+  } finally {
+    fetchMock.mockRestore();
+  }
+});
+
+test("GET /catalog/release falls back to the cached archive when Scryfall is unavailable", async () => {
+  const cached = {
+    compressed_size: 77_064_542,
+    download_url: "https://data.scryfall.io/default-cards/cached.jsonl.gz",
+    updated_at: "2026-07-31T09:11:02.266+00:00",
+  };
+  const store = releaseDatabase(cached);
+  const fetchMock = vi
+    .spyOn(globalThis, "fetch")
+    .mockResolvedValue(new Response(null, { status: 503 }));
+  const consoleMock = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+  try {
+    const response = await api.request("http://localhost/catalog/release", undefined, {
+      DB: store.database,
+    });
+
+    assert.equal(response.status, 200);
+    assert.equal(store.writeCount(), 0);
+    assert.deepEqual(await response.json(), {
+      compressedSize: cached.compressed_size,
+      downloadUrl: cached.download_url,
+      updatedAt: cached.updated_at,
+    });
+  } finally {
+    consoleMock.mockRestore();
+    fetchMock.mockRestore();
+  }
 });
 
 test("GET /catalog/release bootstraps an empty catalog", async () => {
