@@ -13,6 +13,7 @@ import {
 
 import type { WorkspaceRuntime } from "../../../shared/desktop-api";
 import { Button } from "../../components/button";
+import { SolidCardLoadingIndicator } from "../../components/solid-card-loading-indicator";
 import { typography } from "../../styles/typography";
 import { CollectionProjectionStartup } from "./collection-projection";
 import { SpoilerProjectionStartup } from "./spoiler-projection";
@@ -45,7 +46,7 @@ type WorkspaceSession = ClosingSession | OpenSession;
 export function WorkspaceStartup({ children }: { children: ReactNode }) {
   return (
     <WorkspaceFailureBoundary>
-      <Suspense fallback={<WorkspaceStatus status="loading" />}>
+      <Suspense fallback={<WorkspaceLoadingScreen />}>
         <WorkspaceRuntimeRoot>{children}</WorkspaceRuntimeRoot>
       </Suspense>
     </WorkspaceFailureBoundary>
@@ -105,7 +106,7 @@ function WorkspaceRuntimeRoot({ children }: { children: ReactNode }) {
   const options = workspaceStoreOptions(session.runtime);
   return (
     <StoreRegistryProvider storeRegistry={session.registry}>
-      <Suspense fallback={<WorkspaceStatus status="loading" />}>
+      <Suspense fallback={<WorkspaceLoadingScreen />}>
         <OpenWorkspace options={options} runtime={session.runtime}>
           {children}
         </OpenWorkspace>
@@ -137,7 +138,7 @@ function CloseWorkspaceSession({
     };
   }, [onClosed, session]);
 
-  return <WorkspaceStatus status="reopening" />;
+  return <WorkspaceLoadingScreen />;
 }
 
 function OpenWorkspace({
@@ -165,11 +166,11 @@ function OpenWorkspace({
     <WorkspaceLiveStoreProvider store={store}>
       <WorkspaceRuntimeProvider connectionStatus={connectionStatus} runtime={runtime}>
         <CollectionProjectionStartup
-          loading={<WorkspaceStatus status="loading" />}
+          loading={<WorkspaceLoadingScreen />}
           workspaceId={options.storeId}
         >
           <SpoilerProjectionStartup
-            loading={<WorkspaceStatus status="loading" />}
+            loading={<WorkspaceLoadingScreen />}
             workspaceId={options.storeId}
           >
             {children}
@@ -270,41 +271,37 @@ class WorkspaceFailureBoundary extends Component<{ children: ReactNode }, { fail
 
   render() {
     if (this.state.failed) {
-      return <WorkspaceStatus status="failed" />;
+      return <WorkspaceFailureScreen />;
     }
     return this.props.children;
   }
 }
 
-function WorkspaceStatus({ status }: { status: "failed" | "loading" | "reopening" }) {
-  const failed = status === "failed";
-  const reopening = status === "reopening";
-
+function WorkspaceLoadingScreen() {
   return (
-    <div {...stylex.props(styles.screen)} role={failed ? "alert" : "status"}>
+    <div {...stylex.props(styles.screen)}>
+      <div {...stylex.props(styles.chrome)} data-window-drag-region />
+      <div {...stylex.props(styles.loadingContent)} data-window-no-drag>
+        <SolidCardLoadingIndicator startOffsetMs={600} />
+      </div>
+    </div>
+  );
+}
+
+function WorkspaceFailureScreen() {
+  return (
+    <div {...stylex.props(styles.screen)} role="alert">
       <div {...stylex.props(styles.chrome)} data-window-drag-region />
       <div {...stylex.props(styles.content)} data-window-no-drag>
         <div {...stylex.props(styles.marker)} aria-hidden="true" />
         <p {...stylex.props(typography.label, styles.eyebrow)}>Local Workspace</p>
-        <h1 {...stylex.props(typography.pageTitle, styles.title)}>
-          {failed
-            ? "This Workspace couldn't open"
-            : reopening
-              ? "Reopening your Workspace"
-              : "Opening your Workspace"}
-        </h1>
+        <h1 {...stylex.props(typography.pageTitle, styles.title)}>This Workspace couldn't open</h1>
         <p {...stylex.props(typography.body, styles.detail)}>
-          {failed
-            ? "Mooligan left its local data untouched. Reload the app to try again."
-            : reopening
-              ? "Applying the latest Account and sync settings."
-              : "Reconnecting to the data stored on this device."}
+          Mooligan left its local data untouched. Reload the app to try again.
         </p>
-        {failed ? (
-          <Button onClick={() => window.location.reload()} size="small">
-            Reload Mooligan
-          </Button>
-        ) : null}
+        <Button onClick={() => window.location.reload()} size="small">
+          Reload Mooligan
+        </Button>
       </div>
     </div>
   );
@@ -321,6 +318,12 @@ const styles = stylex.create({
     borderBottomWidth: "1px",
     borderBottomStyle: "solid",
     borderBottomColor: "#20211e",
+  },
+  loadingContent: {
+    minHeight: 0,
+    display: "grid",
+    placeItems: "center",
+    paddingBottom: "52px",
   },
   content: {
     width: "min(420px, calc(100vw - 64px))",
