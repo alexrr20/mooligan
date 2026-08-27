@@ -207,12 +207,6 @@ const styles = stylex.create({
   section: {
     maxWidth: "980px",
     marginTop: "64px",
-    borderTopWidth: "1px",
-    borderTopStyle: "solid",
-    borderTopColor: "#34362f",
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
   },
   intro: {
     paddingBlock: "26px 30px",
@@ -247,9 +241,6 @@ const styles = stylex.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: "24px",
-    borderTopWidth: "1px",
-    borderTopStyle: "solid",
-    borderTopColor: "#34362f",
     backgroundColor: "#171914",
   },
   policyCopy: {
@@ -306,9 +297,7 @@ const styles = stylex.create({
     transform: "translateX(18px)",
   },
   reveals: {
-    borderTopWidth: "1px",
-    borderTopStyle: "solid",
-    borderTopColor: "#34362f",
+    marginTop: "12px",
   },
   revealHeading: {
     minHeight: "86px",
@@ -328,21 +317,14 @@ const styles = stylex.create({
     color: "#f4f1e8",
   },
   revealGroups: {
-    borderTopWidth: "1px",
-    borderTopStyle: "solid",
-    borderTopColor: "#34362f",
+    display: "grid",
+    gap: "8px",
   },
   group: {
     display: "grid",
     gridTemplateColumns: {
       default: "112px minmax(0, 1fr)",
       "@media (max-width: 620px)": "1fr",
-    },
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
-    ":last-child": {
-      borderBottomWidth: 0,
     },
   },
   groupTitle: {
@@ -354,6 +336,8 @@ const styles = stylex.create({
   list: {
     margin: 0,
     padding: 0,
+    display: "grid",
+    gap: "2px",
     listStyle: "none",
   },
   row: {
@@ -363,13 +347,7 @@ const styles = stylex.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: "20px",
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
     backgroundColor: "#171914",
-    ":last-child": {
-      borderBottomWidth: 0,
-    },
   },
   rowCopy: {
     minWidth: 0,
@@ -389,30 +367,22 @@ const styles = stylex.create({
   empty: {
     margin: 0,
     padding: "22px",
-    borderTopWidth: "1px",
-    borderTopStyle: "solid",
-    borderTopColor: "#34362f",
     color: "#85887e",
     backgroundColor: "#171914",
   },
   inlineError: {
     margin: 0,
     padding: "11px 22px",
-    borderTopWidth: "1px",
-    borderTopStyle: "solid",
-    borderTopColor: "#5d332e",
     color: "#ef9a8f",
     backgroundColor: "rgba(170, 45, 34, 0.1)",
   },
   statusRow: {
     minHeight: "42px",
+    marginTop: "12px",
     paddingInline: "2px",
     display: "flex",
     alignItems: "center",
     gap: "9px",
-    borderTopWidth: "1px",
-    borderTopStyle: "solid",
-    borderTopColor: "#34362f",
   },
   statusDot: {
     width: "5px",
