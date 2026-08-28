@@ -13,7 +13,6 @@ const navigation = [
   { to: "/sets", label: "Sets", icon: "sets" },
   { to: "/lists", label: "Lists", icon: "lists" },
   { to: "/search", label: "Search", icon: "search" },
-  { to: "/settings", label: "Settings", icon: "settings" },
 ] as const;
 
 export function BottomNavigation() {
@@ -146,14 +145,6 @@ function NavigationIcon({ name }: { name: NavigationIconName }) {
         <>
           <circle cx="11" cy="11" r="7" />
           <path d="m20 20-4-4" />
-        </>
-      ) : null}
-      {name === "settings" ? (
-        <>
-          <path d="M4 6h4M14 6h6M4 12h9M17 12h3M4 18h2M12 18h8" />
-          <circle cx="11" cy="6" r="2" />
-          <circle cx="15" cy="12" r="2" />
-          <circle cx="9" cy="18" r="2" />
         </>
       ) : null}
     </svg>

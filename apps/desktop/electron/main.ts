@@ -64,7 +64,7 @@ async function createWindow(
     show: false,
     title: "Mooligan",
     titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 14, y: 19 },
+    trafficLightPosition: { x: 14, y: 16 },
     backgroundColor: "#0a0a0a",
     webPreferences: {
       preload: fileURLToPath(new URL(/* @vite-ignore */ "./preload.mjs", import.meta.url)),
@@ -90,6 +90,7 @@ async function createWindow(
 
   const developmentUrl = developmentRendererUrl();
   if (developmentUrl) {
+    await window.webContents.setVisualZoomLevelLimits(1, 3);
     await window.loadURL(developmentUrl.href);
   } else {
     await window.loadFile(join(app.getAppPath(), "dist/index.html"));

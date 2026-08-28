@@ -21,12 +21,9 @@ export function WorkspaceSetting() {
   return (
     <section {...stylex.props(styles.section)} aria-labelledby="workspace-heading">
       <div {...stylex.props(styles.intro)}>
-        <div>
-          <p {...stylex.props(typography.label, styles.kicker)}>Data / Workspace</p>
-          <h2 {...stylex.props(typography.pageTitle, styles.title)} id="workspace-heading">
-            Choose your Workspace.
-          </h2>
-        </div>
+        <h2 {...stylex.props(typography.pageTitle, styles.title)} id="workspace-heading">
+          Workspaces
+        </h2>
         <p {...stylex.props(typography.body, styles.copy)}>
           Each Workspace keeps its own Collection and spoiler choices. Switching never merges or
           deletes another Workspace.
@@ -34,7 +31,7 @@ export function WorkspaceSetting() {
       </div>
 
       <div {...stylex.props(styles.controlRow)}>
-        <div {...stylex.props(styles.index)} aria-hidden="true">
+        <div {...stylex.props(typography.label, styles.index)} aria-hidden="true">
           {String(runtime.workspaces.findIndex(({ active }) => active) + 1).padStart(2, "0")}
         </div>
         <div {...stylex.props(styles.controlBody)}>
@@ -52,8 +49,11 @@ export function WorkspaceSetting() {
               Active Workspace
             </Select.Label>
             <Select.Trigger {...stylex.props(typography.control, styles.trigger)}>
-              <Select.Value />
-              <Select.Icon {...stylex.props(styles.chevron)} aria-hidden="true">
+              <Select.Value {...stylex.props(typography.control)} />
+              <Select.Icon
+                {...stylex.props(typography.bodyLarge, styles.chevron)}
+                aria-hidden="true"
+              >
                 ▾
               </Select.Icon>
             </Select.Trigger>
@@ -76,14 +76,14 @@ export function WorkspaceSetting() {
                           {String(index + 1).padStart(2, "0")}
                         </span>
                         <Select.ItemText {...stylex.props(styles.itemText)}>
-                          <span>{workspace.label}</span>
+                          <span {...stylex.props(typography.body)}>{workspace.label}</span>
                           <small {...stylex.props(typography.bodySmall, styles.association)}>
                             {workspace.accountAssociation === "account"
                               ? "Account associated"
                               : "Unbound / local only"}
                           </small>
                         </Select.ItemText>
-                        <Select.ItemIndicator {...stylex.props(styles.indicator)}>
+                        <Select.ItemIndicator {...stylex.props(typography.label, styles.indicator)}>
                           ●
                         </Select.ItemIndicator>
                       </Select.Item>
@@ -111,22 +111,6 @@ export function WorkspaceSetting() {
             : syncIssueMessage(runtime.syncIssue)}
         </p>
       )}
-
-      <div {...stylex.props(styles.statusRow)}>
-        <span
-          {...stylex.props(
-            styles.statusDot,
-            connectionStatus === "connecting" && styles.connectingDot,
-            connectionStatus === "sync-paused" && styles.pausedDot,
-          )}
-          aria-hidden="true"
-        />
-        <p {...stylex.props(typography.label, styles.status)} aria-live="polite">
-          {selectWorkspace.isPending
-            ? "Switching Workspace"
-            : connectionDescription(connectionStatus)}
-        </p>
-      </div>
     </section>
   );
 }
@@ -136,13 +120,6 @@ function connectionLabel(status: ReturnType<typeof useWorkspaceRuntime>["connect
   if (status === "connecting") return "Connecting";
   if (status === "sync-paused") return "Sync paused";
   return "Local only";
-}
-
-function connectionDescription(status: ReturnType<typeof useWorkspaceRuntime>["connectionStatus"]) {
-  if (status === "synchronized") return "Local access ready / changes synchronized";
-  if (status === "connecting") return "Local access ready / connecting to sync";
-  if (status === "sync-paused") return "Local access ready / sync paused";
-  return "Local access ready / saved on this device";
 }
 
 function syncIssueMessage(issue: WorkspaceSyncIssue | null) {
@@ -176,10 +153,6 @@ const styles = stylex.create({
     },
     alignItems: "end",
   },
-  kicker: {
-    margin: "0 0 12px",
-    color: "#85887e",
-  },
   title: {
     margin: 0,
     color: "#f4f1e8",
@@ -199,16 +172,12 @@ const styles = stylex.create({
     },
     alignItems: "center",
     gap: "18px",
-    backgroundColor: "#171914",
   },
   index: {
     alignSelf: "stretch",
     display: "grid",
     placeItems: "center",
     color: "#65685f",
-    fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-    fontSize: "12px",
-    letterSpacing: "0.08em",
   },
   controlBody: {
     minWidth: 0,
@@ -254,7 +223,6 @@ const styles = stylex.create({
   },
   chevron: {
     color: colors.accent,
-    fontSize: "13px",
   },
   activeDetail: {
     color: "#777a70",
@@ -305,7 +273,6 @@ const styles = stylex.create({
   },
   itemIndex: {
     color: "#6f7269",
-    fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
   },
   itemText: {
     minWidth: 0,
@@ -318,36 +285,11 @@ const styles = stylex.create({
   },
   indicator: {
     color: colors.accent,
-    fontSize: "8px",
   },
   error: {
     margin: 0,
     padding: "11px 22px",
     color: "#ef9a8f",
     backgroundColor: "rgba(170, 45, 34, 0.1)",
-  },
-  statusRow: {
-    minHeight: "42px",
-    marginTop: "12px",
-    paddingInline: "2px",
-    display: "flex",
-    alignItems: "center",
-    gap: "9px",
-  },
-  statusDot: {
-    width: "5px",
-    height: "5px",
-    borderRadius: "50%",
-    backgroundColor: colors.accent,
-  },
-  connectingDot: {
-    backgroundColor: "#7cb4cc",
-  },
-  pausedDot: {
-    backgroundColor: "#c6a869",
-  },
-  status: {
-    margin: 0,
-    color: "#85887e",
   },
 });

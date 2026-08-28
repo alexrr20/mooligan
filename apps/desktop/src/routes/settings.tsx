@@ -24,74 +24,63 @@ function SettingsPage() {
 
   return (
     <PageFrame>
-      <AccountSetting auth={auth} />
+      <div {...stylex.props(styles.content)}>
+        <AccountSetting auth={auth} />
 
-      <WorkspaceSetting />
+        <WorkspaceSetting />
 
-      <section {...stylex.props(styles.setting)} aria-labelledby="motion-heading">
-        <div {...stylex.props(styles.settingIntro)}>
-          <div>
-            <p {...stylex.props(typography.label, styles.kicker)}>Appearance / Motion</p>
+        <section {...stylex.props(styles.setting)} aria-labelledby="motion-heading">
+          <div {...stylex.props(styles.settingIntro)}>
             <h2 {...stylex.props(typography.pageTitle, styles.settingTitle)} id="motion-heading">
-              Choose the pace.
+              Motion
             </h2>
+            <p {...stylex.props(typography.body, styles.settingCopy)}>
+              Follow your operating system, keep transitions restrained, or show every interface
+              movement. This preference is saved on this device.
+            </p>
           </div>
-          <p {...stylex.props(typography.body, styles.settingCopy)}>
-            Follow your operating system, keep transitions restrained, or show every interface
-            movement. This preference is saved on this device.
-          </p>
-        </div>
 
-        <fieldset {...stylex.props(styles.options)} aria-describedby="motion-status">
-          <legend {...stylex.props(styles.visuallyHidden)}>Motion behavior</legend>
-          {motionOptions.map((option, index) => {
-            const selected = motion === option.value;
+          <fieldset {...stylex.props(styles.options)}>
+            <legend {...stylex.props(typography.bodySmall, styles.visuallyHidden)}>
+              Motion behavior
+            </legend>
+            {motionOptions.map((option) => {
+              const selected = motion === option.value;
 
-            return (
-              <label
-                {...stylex.props(styles.option, selected && styles.optionSelected)}
-                key={option.value}
-              >
-                <input
-                  {...stylex.props(styles.radio)}
-                  checked={selected}
-                  name="motion"
-                  onChange={() => setMotion(option.value)}
-                  type="radio"
-                  value={option.value}
-                />
-                <span {...stylex.props(typography.label, styles.optionNumber)}>0{index + 1}</span>
-                <span {...stylex.props(styles.optionBody)}>
-                  <strong {...stylex.props(typography.heading, styles.optionTitle)}>
-                    {option.label}
-                  </strong>
-                  <span {...stylex.props(typography.bodySmall, styles.optionCopy)}>
-                    {option.description}
+              return (
+                <label
+                  {...stylex.props(styles.option, selected && styles.optionSelected)}
+                  key={option.value}
+                >
+                  <input
+                    {...stylex.props(styles.radio)}
+                    checked={selected}
+                    name="motion"
+                    onChange={() => setMotion(option.value)}
+                    type="radio"
+                    value={option.value}
+                  />
+                  <span {...stylex.props(styles.optionBody)}>
+                    <strong {...stylex.props(typography.heading, styles.optionTitle)}>
+                      {option.label}
+                    </strong>
+                    <span {...stylex.props(typography.bodySmall, styles.optionCopy)}>
+                      {option.description}
+                    </span>
                   </span>
-                </span>
-                <span {...stylex.props(styles.optionMark)} aria-hidden="true">
-                  {selected ? "●" : "○"}
-                </span>
-              </label>
-            );
-          })}
-        </fieldset>
+                  <span {...stylex.props(typography.body, styles.optionMark)} aria-hidden="true">
+                    {selected ? "●" : "○"}
+                  </span>
+                </label>
+              );
+            })}
+          </fieldset>
+        </section>
 
-        <div {...stylex.props(styles.statusRow)}>
-          <span {...stylex.props(styles.localDot)} aria-hidden="true" />
-          <p
-            {...stylex.props(typography.label, styles.status)}
-            id="motion-status"
-            aria-live="polite"
-          >
-            Saved on this device
-          </p>
-        </div>
-      </section>
+        <SpoilerSettings />
 
-      <SpoilerSettings />
-
-      <BackupSetting backup={backup} />
+        <BackupSetting backup={backup} />
+      </div>
     </PageFrame>
   );
 }
@@ -101,24 +90,12 @@ function AccountSetting({ auth }: { auth: ReturnType<typeof useAuth> }) {
   const signedIn = snapshot.user !== null || snapshot.status === "session-unavailable";
 
   return (
-    <section {...stylex.props(styles.account)} aria-labelledby="account-heading">
-      <div {...stylex.props(styles.settingIntro)}>
-        <div>
-          <p {...stylex.props(typography.label, styles.kicker)}>Account / Optional</p>
-          <h1 {...stylex.props(typography.pageTitle, styles.settingTitle)} id="account-heading">
-            Local by default.
-          </h1>
-        </div>
-        <p {...stylex.props(typography.body, styles.settingCopy)}>
-          Sign in to connect an online identity. Your library stays in its local workspace and
-          remains available if the account service is offline.
-        </p>
-      </div>
-
+    <section {...stylex.props(styles.account)} aria-label="Account">
       <div {...stylex.props(styles.accountPanel)}>
         <div {...stylex.props(styles.accountState)}>
           <span
             {...stylex.props(
+              typography.control,
               styles.accountGlyph,
               signedIn && styles.accountGlyphSignedIn,
               snapshot.status === "session-unavailable" && styles.accountGlyphPaused,
@@ -158,7 +135,9 @@ function AccountSetting({ auth }: { auth: ReturnType<typeof useAuth> }) {
               onClick={() => auth.signIn()}
             >
               Continue with Google
-              <span aria-hidden="true">↗</span>
+              <span {...stylex.props(typography.control)} aria-hidden="true">
+                ↗
+              </span>
             </Button>
           )}
         </div>
@@ -169,19 +148,6 @@ function AccountSetting({ auth }: { auth: ReturnType<typeof useAuth> }) {
           {auth.error}
         </p>
       )}
-
-      <div {...stylex.props(styles.statusRow)}>
-        <span
-          {...stylex.props(
-            styles.localDot,
-            snapshot.status === "session-unavailable" && styles.pausedDot,
-          )}
-          aria-hidden="true"
-        />
-        <p {...stylex.props(typography.label, styles.status)} aria-live="polite">
-          {auth.busy ? "Working…" : accountStatus(snapshot.status)}
-        </p>
-      </div>
     </section>
   );
 }
@@ -278,19 +244,6 @@ function accountBadge(status: AuthStatus) {
   return "Local only";
 }
 
-function accountStatus(status: AuthStatus) {
-  if (status === "signed-in") {
-    return "Local access ready / account connected";
-  }
-  if (status === "session-unavailable") {
-    return "Local access ready / account service unavailable";
-  }
-  if (status === "protected-storage-unavailable") {
-    return "Local access ready / account storage unavailable";
-  }
-  return "Local access ready / no account required";
-}
-
 function backupStatus(backup: ReturnType<typeof useWorkspaceBackup>) {
   if (backup.busy) {
     return "Preparing workspace…";
@@ -327,6 +280,11 @@ const motionOptions: readonly {
 ];
 
 const styles = stylex.create({
+  content: {
+    width: "100%",
+    maxWidth: "980px",
+    marginInline: "auto",
+  },
   account: {
     maxWidth: "980px",
     marginBottom: "64px",
@@ -378,7 +336,6 @@ const styles = stylex.create({
       "@media (max-width: 700px)": "column",
     },
     gap: "20px",
-    backgroundColor: "#171914",
   },
   accountState: {
     minWidth: 0,
@@ -394,9 +351,7 @@ const styles = stylex.create({
     placeItems: "center",
     color: "#85887e",
     backgroundColor: "#20221d",
-    borderRadius: "50%",
-    fontSize: "11px",
-    letterSpacing: "0.04em",
+    borderRadius: "12px",
   },
   accountGlyphSignedIn: {
     color: "#0a0a0a",
@@ -485,7 +440,7 @@ const styles = stylex.create({
     padding: "18px",
     position: "relative",
     display: "grid",
-    gridTemplateColumns: "28px 1fr auto",
+    gridTemplateColumns: "1fr auto",
     gap: "12px",
     color: "#a6a89d",
     backgroundColor: "rgba(255, 255, 255, 0.018)",
@@ -515,9 +470,6 @@ const styles = stylex.create({
     opacity: 0,
     pointerEvents: "none",
   },
-  optionNumber: {
-    color: "#85887e",
-  },
   optionBody: {
     minWidth: 0,
     display: "flex",
@@ -533,7 +485,6 @@ const styles = stylex.create({
   },
   optionMark: {
     color: colors.accent,
-    fontSize: "12px",
   },
   statusRow: {
     minHeight: "42px",
