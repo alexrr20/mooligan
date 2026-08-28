@@ -17,7 +17,7 @@ const toolingIgnorePatterns = [
 
 export default defineConfig({
   test: {
-    projects: ["apps/api/vitest.config.ts"],
+    projects: ["apps/api/vitest.config.ts", "apps/mobile/vitest.config.ts"],
   },
   staged: {
     "*": "vp check --fix",

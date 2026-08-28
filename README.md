@@ -5,6 +5,7 @@ Auth account can synchronize one personal Workspace, but an account is not a
 prerequisite for using the desktop app.
 
 - `apps/desktop`: Electron, React 19, TanStack Router, StyleX, and Motion
+- `apps/mobile`: Expo SDK 57, React Native, and Expo Router for iOS and Android
 - `apps/api`: Hono 4 for Cloudflare Workers, served locally by Wrangler on
   `http://127.0.0.1:3000`
 - `packages/domain`: shared catalog, collection, deck, list, and market types
@@ -41,6 +42,26 @@ vp install
 vp run api#db:migrate:local
 vp run dev
 ```
+
+The mobile client runs separately so normal desktop and API development does
+not start Metro. Build and install its native development client on a simulator
+or connected Device:
+
+```bash
+vp run mobile#ios
+vp run mobile#android
+```
+
+After the native client is installed, JavaScript and asset changes only need
+Metro:
+
+```bash
+vp run mobile#dev
+```
+
+Expo generates `apps/mobile/ios` and `apps/mobile/android` locally from
+`apps/mobile/app.json`. Neither directory is committed. The mobile foundation
+does not create or synchronize a Workspace yet.
 
 The baseline migration creates the catalog release, Better Auth, and
 workspace-sync tables in Wrangler's local D1 database. It targets a fresh

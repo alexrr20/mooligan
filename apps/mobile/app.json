@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "Mooligan",
+    "slug": "mooligan-mobile",
+    "version": "0.0.0",
+    "scheme": "mooligan",
+    "orientation": "default",
+    "icon": "./assets/images/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "com.mooligan.mobile",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.mooligan.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#0A0A0A",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0A0A0A",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 180,
+          "dark": {
+            "backgroundColor": "#0A0A0A",
+            "image": "./assets/images/splash-icon.png"
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
