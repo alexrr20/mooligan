@@ -4,7 +4,7 @@ import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 import type { Ref } from "react";
 
-import { Button } from "../../components/button";
+import { Button } from "../../components/ui/button";
 import { colors } from "../../styles/tokens.stylex.js";
 import { CardRules } from "./card-rules";
 import { ManaCost } from "./mana-cost";
@@ -136,7 +136,7 @@ export function CardDetailProblem({ headingRef, kind, onRetry, origin }: CardDet
         </p>
         <div {...stylex.props(styles.problemActions)}>
           {!unavailable && onRetry ? (
-            <Button size="small" type="button" onClick={onRetry}>
+            <Button size="sm" type="button" onClick={onRetry}>
               Try again
             </Button>
           ) : null}

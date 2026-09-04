@@ -1,9 +1,9 @@
 import type { SpoilerRevealSummary, SpoilerState } from "@mooligan/domain/spoilers";
-import { Switch } from "@base-ui/react/switch";
 import * as stylex from "@stylexjs/stylex";
 import { useId } from "react";
 
-import { Button } from "../../components/button";
+import { Button } from "../../components/ui/button";
+import { Switch } from "../../components/ui/switch";
 import { colors } from "../../styles/tokens.stylex.js";
 import { typography } from "../../styles/typography";
 import {
@@ -44,17 +44,12 @@ export function SpoilerSettings() {
             Turning this off restores the narrower printing and release choices below.
           </span>
         </div>
-        <Switch.Root
-          {...stylex.props(styles.switchRoot, alwaysShow && styles.switchRootChecked)}
+        <Switch
           aria-label="Always show previews"
           checked={alwaysShow}
           disabled={spoilers.busy || spoilers.loading}
           onCheckedChange={(checked) => spoilers.setPolicy(checked ? "show" : "protect")}
-        >
-          <Switch.Thumb
-            {...stylex.props(styles.switchThumb, alwaysShow && styles.switchThumbChecked)}
-          />
-        </Switch.Root>
+        />
       </div>
 
       <div {...stylex.props(styles.reveals)}>
@@ -65,7 +60,7 @@ export function SpoilerSettings() {
           </div>
           <Button
             disabled={spoilers.busy || spoilers.loading}
-            size="small"
+            size="sm"
             type="button"
             variant="secondary"
             onClick={() => spoilers.protectAll()}
@@ -192,7 +187,7 @@ function RevealRow({
         aria-describedby={descriptionId}
         aria-label={revealSummaryActionAccessibleName(summary)}
         disabled={busy || control.disabled}
-        size="small"
+        size="sm"
         type="button"
         variant="ghost"
         onClick={onProtect}
@@ -254,47 +249,6 @@ const styles = stylex.create({
   policyDescription: {
     maxWidth: "560px",
     color: "#85887e",
-  },
-  switchRoot: {
-    width: "42px",
-    height: "24px",
-    padding: "3px",
-    flex: "0 0 auto",
-    display: "flex",
-    alignItems: "center",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#55584f",
-    borderRadius: "999px",
-    backgroundColor: "#22241f",
-    cursor: "pointer",
-    transition: "background-color 160ms ease, border-color 160ms ease",
-    ":focus-visible": {
-      outlineWidth: "2px",
-      outlineStyle: "solid",
-      outlineColor: colors.accent,
-      outlineOffset: "4px",
-    },
-    ":disabled": {
-      cursor: "wait",
-      opacity: 0.55,
-    },
-  },
-  switchRootChecked: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accent,
-  },
-  switchThumb: {
-    width: "16px",
-    height: "16px",
-    borderRadius: "50%",
-    backgroundColor: "#a6a89d",
-    transform: "translateX(0)",
-    transition: "background-color 160ms ease, transform 160ms cubic-bezier(0.23, 1, 0.32, 1)",
-  },
-  switchThumbChecked: {
-    backgroundColor: "#1b1d19",
-    transform: "translateX(18px)",
   },
   reveals: {
     marginTop: "12px",

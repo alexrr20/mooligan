@@ -1,9 +1,14 @@
-import { Select } from "@base-ui/react/select";
 import * as stylex from "@stylexjs/stylex";
 import { useMutation } from "@tanstack/react-query";
 
 import type { WorkspaceSyncIssue } from "../../../shared/desktop-api";
-import { colors } from "../../styles/tokens.stylex.js";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
 import { typography } from "../../styles/typography";
 import { useWorkspaceRuntime } from "./workspace-runtime-context";
 
@@ -35,7 +40,7 @@ export function WorkspaceSetting() {
           {String(runtime.workspaces.findIndex(({ active }) => active) + 1).padStart(2, "0")}
         </div>
         <div {...stylex.props(styles.controlBody)}>
-          <Select.Root
+          <Select
             disabled={selectWorkspace.isPending}
             items={items}
             onValueChange={(workspaceId) => {
@@ -45,54 +50,34 @@ export function WorkspaceSetting() {
             }}
             value={runtime.workspaceId}
           >
-            <Select.Label {...stylex.props(typography.label, styles.label)}>
+            <span {...stylex.props(typography.label, styles.label)} id="active-workspace-label">
               Active Workspace
-            </Select.Label>
-            <Select.Trigger {...stylex.props(typography.control, styles.trigger)}>
-              <Select.Value {...stylex.props(typography.control)} />
-              <Select.Icon
-                {...stylex.props(typography.bodyLarge, styles.chevron)}
-                aria-hidden="true"
-              >
-                ▾
-              </Select.Icon>
-            </Select.Trigger>
-            <Select.Portal>
-              <Select.Positioner
-                {...stylex.props(styles.positioner)}
-                alignItemWithTrigger={false}
-                sideOffset={6}
-              >
-                <Select.Popup {...stylex.props(styles.popup)}>
-                  <Select.List {...stylex.props(styles.list)}>
-                    {runtime.workspaces.map((workspace, index) => (
-                      <Select.Item
-                        {...stylex.props(typography.body, styles.item)}
-                        key={workspace.workspaceId}
-                        label={workspace.label}
-                        value={workspace.workspaceId}
-                      >
-                        <span {...stylex.props(typography.label, styles.itemIndex)}>
-                          {String(index + 1).padStart(2, "0")}
-                        </span>
-                        <Select.ItemText {...stylex.props(styles.itemText)}>
-                          <span {...stylex.props(typography.body)}>{workspace.label}</span>
-                          <small {...stylex.props(typography.bodySmall, styles.association)}>
-                            {workspace.accountAssociation === "account"
-                              ? "Account associated"
-                              : "Unbound / local only"}
-                          </small>
-                        </Select.ItemText>
-                        <Select.ItemIndicator {...stylex.props(typography.label, styles.indicator)}>
-                          ●
-                        </Select.ItemIndicator>
-                      </Select.Item>
-                    ))}
-                  </Select.List>
-                </Select.Popup>
-              </Select.Positioner>
-            </Select.Portal>
-          </Select.Root>
+            </span>
+            <SelectTrigger aria-labelledby="active-workspace-label">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent alignItemWithTrigger={false}>
+              {runtime.workspaces.map((workspace, index) => (
+                <SelectItem
+                  key={workspace.workspaceId}
+                  label={workspace.label}
+                  value={workspace.workspaceId}
+                >
+                  <span {...stylex.props(typography.label, styles.itemIndex)}>
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <span {...stylex.props(styles.itemText)}>
+                    <span {...stylex.props(typography.body)}>{workspace.label}</span>
+                    <small {...stylex.props(typography.bodySmall, styles.association)}>
+                      {workspace.accountAssociation === "account"
+                        ? "Account associated"
+                        : "Unbound / local only"}
+                    </small>
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <span {...stylex.props(typography.bodySmall, styles.activeDetail)}>
             {active?.accountAssociation === "account"
               ? "Associated with an Account"
@@ -191,39 +176,6 @@ const styles = stylex.create({
     marginBottom: "7px",
     color: "#85887e",
   },
-  trigger: {
-    width: "min(100%, 420px)",
-    minHeight: "42px",
-    paddingInline: "13px 10px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "16px",
-    color: "#f4f1e8",
-    backgroundColor: "#0f100d",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#3b3e36",
-    borderRadius: "10px",
-    cursor: "pointer",
-    textAlign: "left",
-    transition: "border-color 140ms ease, background-color 140ms ease",
-    ":hover": {
-      borderColor: "#85887e",
-      backgroundColor: "#121410",
-    },
-    ":focus-visible": {
-      outline: `2px solid ${colors.accent}`,
-      outlineOffset: "2px",
-    },
-    ":disabled": {
-      cursor: "wait",
-      opacity: 0.55,
-    },
-  },
-  chevron: {
-    color: colors.accent,
-  },
   activeDetail: {
     color: "#777a70",
   },
@@ -234,41 +186,6 @@ const styles = stylex.create({
     backgroundColor: "rgba(255, 255, 255, 0.05)",
     "@media (max-width: 700px)": {
       display: "none",
-    },
-  },
-  positioner: {
-    zIndex: 100,
-    outline: "none",
-  },
-  popup: {
-    minWidth: "var(--anchor-width)",
-    color: "#f4f1e8",
-    backgroundColor: "#151713",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#45483f",
-    borderRadius: "10px",
-    boxShadow: "0 18px 48px rgba(0, 0, 0, 0.46)",
-    transformOrigin: "var(--transform-origin)",
-  },
-  list: {
-    maxHeight: "min(320px, var(--available-height))",
-    padding: "5px",
-    overflowY: "auto",
-  },
-  item: {
-    minHeight: "58px",
-    padding: "9px 10px",
-    display: "grid",
-    gridTemplateColumns: "30px minmax(0, 1fr) 16px",
-    alignItems: "center",
-    gap: "9px",
-    borderRadius: "7px",
-    cursor: "default",
-    outline: "none",
-    transition: "background-color 100ms ease",
-    "[data-highlighted]": {
-      backgroundColor: "#24271f",
     },
   },
   itemIndex: {
@@ -282,9 +199,6 @@ const styles = stylex.create({
   },
   association: {
     color: "#777a70",
-  },
-  indicator: {
-    color: colors.accent,
   },
   error: {
     margin: 0,

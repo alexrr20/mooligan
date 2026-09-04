@@ -6,15 +6,20 @@ import {
   cardConditions,
   cardLanguages,
 } from "@mooligan/domain/collection";
-import { Select } from "@base-ui/react/select";
-import { Toggle } from "@base-ui/react/toggle";
-import { ToggleGroup } from "@base-ui/react/toggle-group";
 import * as stylex from "@stylexjs/stylex";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
 
-import { Button } from "../components/button";
 import { PageFrame } from "../components/page-frame";
+import { Button } from "../components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "../components/ui/toggle-group";
 import { createCollectionOrigin } from "../features/collection/collection-origin";
 import { CollectionResults } from "../features/collection/collection-results";
 import {
@@ -164,7 +169,6 @@ function CollectionPage() {
           <div {...stylex.props(styles.viewControl)}>
             <span {...stylex.props(styles.controlLabel)}>View</span>
             <ToggleGroup
-              {...stylex.props(styles.viewToggle)}
               aria-label="Collection view"
               value={[view]}
               onValueChange={(nextViews) => {
@@ -173,19 +177,14 @@ function CollectionPage() {
               }}
             >
               {(["list", "grid"] as const).map((option) => (
-                <Toggle
-                  {...stylex.props(styles.viewButton)}
-                  key={option}
-                  type="button"
-                  value={option}
-                >
+                <ToggleGroupItem key={option} type="button" value={option}>
                   {option}
-                </Toggle>
+                </ToggleGroupItem>
               ))}
             </ToggleGroup>
           </div>
           {activeFilters ? (
-            <Button size="small" type="button" variant="ghost" onClick={clearFilters}>
+            <Button size="sm" type="button" variant="ghost" onClick={clearFilters}>
               Clear
             </Button>
           ) : null}
@@ -200,7 +199,7 @@ function CollectionPage() {
 
         {collection.error ? (
           <Message mark="!" title="Collection unavailable" copy={collection.error}>
-            <Button size="small" onClick={() => void collection.retry()}>
+            <Button size="sm" onClick={() => void collection.retry()}>
               Retry
             </Button>
           </Message>
@@ -220,7 +219,7 @@ function CollectionPage() {
             title="No matching Holdings"
             copy="Your Collection has cards, but none match this search and filter combination."
           >
-            <Button size="small" variant="secondary" onClick={clearFilters}>
+            <Button size="sm" variant="secondary" onClick={clearFilters}>
               Clear search and filters
             </Button>
           </Message>
@@ -239,7 +238,6 @@ function CollectionPage() {
             />
             {collection.hasMore ? (
               <Button
-                fullWidth
                 disabled={collection.loading}
                 variant="secondary"
                 onClick={() => collection.loadMore()}
@@ -268,45 +266,22 @@ function Filter({
   return (
     <div {...stylex.props(styles.filter)}>
       <span {...stylex.props(styles.controlLabel)}>{label}</span>
-      <Select.Root<string>
+      <Select<string>
         items={options}
         value={value || null}
         onValueChange={(nextValue) => onChange(nextValue ?? "")}
       >
-        <Select.Trigger {...stylex.props(styles.selectTrigger)} aria-label={label}>
-          <Select.Value />
-          <Select.Icon {...stylex.props(styles.selectIcon)} aria-hidden="true">
-            ▾
-          </Select.Icon>
-        </Select.Trigger>
-        <Select.Portal>
-          <Select.Positioner
-            {...stylex.props(styles.selectPositioner)}
-            align="start"
-            alignItemWithTrigger={false}
-            sideOffset={6}
-          >
-            <Select.Popup {...stylex.props(styles.selectPopup)}>
-              <Select.List {...stylex.props(styles.selectList)}>
-                {options.map((option) => (
-                  <Select.Item
-                    {...stylex.props(styles.selectItem)}
-                    key={option.value ?? "all"}
-                    value={option.value}
-                  >
-                    <span {...stylex.props(styles.selectIndicatorSlot)}>
-                      <Select.ItemIndicator {...stylex.props(styles.selectIndicator)}>
-                        ✓
-                      </Select.ItemIndicator>
-                    </span>
-                    <Select.ItemText>{option.label}</Select.ItemText>
-                  </Select.Item>
-                ))}
-              </Select.List>
-            </Select.Popup>
-          </Select.Positioner>
-        </Select.Portal>
-      </Select.Root>
+        <SelectTrigger aria-label={label}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent align="start" alignItemWithTrigger={false}>
+          {options.map((option) => (
+            <SelectItem key={option.value ?? "all"} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }
@@ -397,86 +372,7 @@ const styles = stylex.create({
     letterSpacing: ".12em",
     textTransform: "uppercase",
   },
-  selectTrigger: {
-    minWidth: "120px",
-    height: "34px",
-    paddingInline: "8px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "10px",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#43463e",
-    borderRadius: "2px",
-    color: "#d7d5cc",
-    backgroundColor: "#151613",
-    fontSize: "9px",
-    textAlign: "left",
-    cursor: "pointer",
-    outline: "none",
-    ":hover": { borderColor: "#696c63" },
-    ":focus-visible": { borderColor: colors.accent },
-    "[data-popup-open]": { borderColor: colors.accent },
-  },
-  selectIcon: { color: "#85887e", fontSize: "9px" },
-  selectPositioner: { zIndex: 120 },
-  selectPopup: {
-    width: "var(--anchor-width)",
-    maxWidth: "calc(100vw - 32px)",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#55584f",
-    borderRadius: "3px",
-    color: "#f4f1e8",
-    backgroundColor: "#151613",
-    boxShadow: "0 16px 42px rgba(0, 0, 0, 0.52)",
-    outline: "none",
-  },
-  selectList: {
-    maxHeight: "min(276px, var(--available-height))",
-    padding: "6px",
-    overflowY: "auto",
-  },
-  selectItem: {
-    minHeight: "32px",
-    paddingInline: "6px",
-    display: "grid",
-    gridTemplateColumns: "16px minmax(0, 1fr)",
-    alignItems: "center",
-    gap: "4px",
-    borderRadius: "2px",
-    color: "#b8baaf",
-    fontSize: "9px",
-    cursor: "pointer",
-    outline: "none",
-    "[data-highlighted]": { color: "#f4f1e8", backgroundColor: "#242620" },
-    "[data-selected]": { color: "#f4f1e8" },
-  },
-  selectIndicatorSlot: { width: "16px", display: "grid", placeItems: "center" },
-  selectIndicator: { color: colors.accent, fontSize: "9px" },
   viewControl: { display: "grid", gap: "7px" },
-  viewToggle: {
-    height: "34px",
-    display: "flex",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#43463e",
-    borderRadius: "2px",
-    overflow: "hidden",
-  },
-  viewButton: {
-    minWidth: "48px",
-    paddingInline: "8px",
-    borderWidth: 0,
-    color: "#85887e",
-    backgroundColor: "#151613",
-    fontSize: "7px",
-    letterSpacing: ".08em",
-    textTransform: "uppercase",
-    cursor: "pointer",
-    "[data-pressed]": { color: "#1b1d19", backgroundColor: colors.accent },
-  },
   filteredCount: {
     margin: 0,
     paddingBlock: "12px",

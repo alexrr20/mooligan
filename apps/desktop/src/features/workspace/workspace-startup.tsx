@@ -12,7 +12,7 @@ import {
 } from "react";
 
 import type { WorkspaceRuntime } from "../../../shared/desktop-api";
-import { Button } from "../../components/button";
+import { Button } from "../../components/ui/button";
 import { SolidCardLoadingIndicator } from "../../components/solid-card-loading-indicator";
 import { typography } from "../../styles/typography";
 import { CollectionProjectionStartup } from "./collection-projection";
@@ -299,7 +299,7 @@ function WorkspaceFailureScreen() {
         <p {...stylex.props(typography.body, styles.detail)}>
           Mooligan left its local data untouched. Reload the app to try again.
         </p>
-        <Button onClick={() => window.location.reload()} size="small">
+        <Button onClick={() => window.location.reload()} size="sm">
           Reload Mooligan
         </Button>
       </div>

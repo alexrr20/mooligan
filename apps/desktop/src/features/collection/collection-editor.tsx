@@ -1,8 +1,3 @@
-import { Dialog } from "@base-ui/react/dialog";
-import { Field } from "@base-ui/react/field";
-import { Form } from "@base-ui/react/form";
-import { NumberField } from "@base-ui/react/number-field";
-import { Select } from "@base-ui/react/select";
 import type { CatalogCardDetail } from "@mooligan/domain/catalog-detail";
 import {
   CardLanguageSchema,
@@ -16,8 +11,30 @@ import type { Finish } from "@mooligan/domain/catalog";
 import * as stylex from "@stylexjs/stylex";
 import { useState } from "react";
 
-import { Button } from "../../components/button";
-import { colors } from "../../styles/tokens.stylex.js";
+import { Button } from "../../components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "../../components/ui/dialog";
+import { Field, FieldLabel } from "../../components/ui/field";
+import { Form } from "../../components/ui/form";
+import {
+  NumberField,
+  NumberFieldDecrement,
+  NumberFieldGroup,
+  NumberFieldIncrement,
+  NumberFieldInput,
+} from "../../components/ui/number-field";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
 import { useCollectionMutations } from "./use-collection-mutations";
 
 export type CollectionFormValue = {
@@ -43,16 +60,11 @@ export function CollectionFormDialog(props: CollectionFormDialogProps) {
   if (!props.open) return null;
 
   return (
-    <Dialog.Root open onOpenChange={props.onOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Backdrop {...stylex.props(styles.backdrop)} />
-        <Dialog.Viewport {...stylex.props(styles.viewport)}>
-          <Dialog.Popup {...stylex.props(styles.popup)}>
-            <CollectionForm {...props} />
-          </Dialog.Popup>
-        </Dialog.Viewport>
-      </Dialog.Portal>
-    </Dialog.Root>
+    <Dialog open onOpenChange={props.onOpenChange}>
+      <DialogContent>
+        <CollectionForm {...props} />
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -92,20 +104,17 @@ function CollectionForm({
   }
 
   return (
-    <Form {...stylex.props(styles.form)} onFormSubmit={() => void submit()}>
+    <Form onFormSubmit={() => void submit()}>
       <div {...stylex.props(styles.topline)}>
         <span>Collection / Physical copy</span>
-        <Dialog.Close {...stylex.props(styles.close)} aria-label="Close">
-          ×
-        </Dialog.Close>
       </div>
-      <Dialog.Title {...stylex.props(styles.title)}>{title}</Dialog.Title>
-      <Dialog.Description {...stylex.props(styles.printing)}>{printingLabel}</Dialog.Description>
+      <DialogTitle>{title}</DialogTitle>
+      <DialogDescription>{printingLabel}</DialogDescription>
 
       <div {...stylex.props(styles.fields)}>
-        <Field.Root {...stylex.props(styles.field)} disabled={pending} name="quantity">
-          <Field.Label {...stylex.props(styles.label)}>Quantity</Field.Label>
-          <NumberField.Root
+        <Field disabled={pending} name="quantity">
+          <FieldLabel>Quantity</FieldLabel>
+          <NumberField
             disabled={pending}
             max={Number.MAX_SAFE_INTEGER}
             min={1}
@@ -114,27 +123,13 @@ function CollectionForm({
             value={quantity}
             onValueChange={setQuantity}
           >
-            <NumberField.Group {...stylex.props(styles.numberGroup)}>
-              <NumberField.Decrement
-                {...stylex.props(styles.numberButton)}
-                aria-label="Decrease quantity"
-              >
-                −
-              </NumberField.Decrement>
-              <NumberField.Input
-                {...stylex.props(styles.numberInput)}
-                autoFocus
-                inputMode="numeric"
-              />
-              <NumberField.Increment
-                {...stylex.props(styles.numberButton)}
-                aria-label="Increase quantity"
-              >
-                +
-              </NumberField.Increment>
-            </NumberField.Group>
-          </NumberField.Root>
-        </Field.Root>
+            <NumberFieldGroup>
+              <NumberFieldDecrement aria-label="Decrease quantity">−</NumberFieldDecrement>
+              <NumberFieldInput autoFocus inputMode="numeric" />
+              <NumberFieldIncrement aria-label="Increase quantity">+</NumberFieldIncrement>
+            </NumberFieldGroup>
+          </NumberField>
+        </Field>
         <CollectionSelect
           disabled={pending || finishLocked}
           label="Finish"
@@ -182,7 +177,7 @@ function CollectionForm({
         >
           {pending ? "Saving…" : "Save to collection"}
         </Button>
-        <Button disabled={pending} render={<Dialog.Close />} type="button" variant="ghost">
+        <Button disabled={pending} render={<DialogClose />} type="button" variant="ghost">
           Cancel
         </Button>
       </div>
@@ -210,9 +205,9 @@ function CollectionSelect<Value extends string>({
   onValueChange,
 }: CollectionSelectProps<Value>) {
   return (
-    <Field.Root {...stylex.props(styles.field)} disabled={disabled} name={name}>
-      <Field.Label {...stylex.props(styles.label)}>{label}</Field.Label>
-      <Select.Root<Value>
+    <Field disabled={disabled} name={name}>
+      <FieldLabel>{label}</FieldLabel>
+      <Select<Value>
         disabled={disabled}
         items={options}
         name={name}
@@ -220,43 +215,18 @@ function CollectionSelect<Value extends string>({
         value={value || null}
         onValueChange={(nextValue) => onValueChange(nextValue ?? "")}
       >
-        <Select.Trigger {...stylex.props(styles.selectTrigger)}>
-          <Select.Value placeholder={placeholder} />
-          <Select.Icon {...stylex.props(styles.selectIcon)} aria-hidden="true">
-            <svg {...stylex.props(styles.selectIconGraphic)} fill="none" viewBox="0 0 12 8">
-              <path d="m1 1.5 5 5 5-5" />
-            </svg>
-          </Select.Icon>
-        </Select.Trigger>
-        <Select.Portal>
-          <Select.Positioner
-            {...stylex.props(styles.selectPositioner)}
-            align="start"
-            alignItemWithTrigger={false}
-            sideOffset={6}
-          >
-            <Select.Popup {...stylex.props(styles.selectPopup)}>
-              <Select.List {...stylex.props(styles.selectList)}>
-                {options.map((option) => (
-                  <Select.Item
-                    {...stylex.props(styles.selectItem)}
-                    key={option.value}
-                    value={option.value}
-                  >
-                    <span {...stylex.props(styles.selectIndicatorSlot)}>
-                      <Select.ItemIndicator {...stylex.props(styles.selectIndicator)}>
-                        ✓
-                      </Select.ItemIndicator>
-                    </span>
-                    <Select.ItemText>{option.label}</Select.ItemText>
-                  </Select.Item>
-                ))}
-              </Select.List>
-            </Select.Popup>
-          </Select.Positioner>
-        </Select.Portal>
-      </Select.Root>
-    </Field.Root>
+        <SelectTrigger>
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent align="start" alignItemWithTrigger={false}>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </Field>
   );
 }
 
@@ -307,7 +277,7 @@ export function AddToCollectionButton({
   return (
     <>
       <div {...stylex.props(styles.addControl)}>
-        <Button size="small" type="button" onClick={() => void prepare()}>
+        <Button size="sm" type="button" onClick={() => void prepare()}>
           {loading ? "Reading…" : "Add to collection"}
         </Button>
         {message ? (
@@ -357,38 +327,6 @@ export function cleanCollectionError(cause: unknown) {
 }
 
 const styles = stylex.create({
-  backdrop: {
-    position: "fixed",
-    inset: 0,
-    zIndex: 100,
-    backgroundColor: "rgba(5, 6, 5, 0.78)",
-    backdropFilter: "blur(6px)",
-  },
-  viewport: {
-    position: "fixed",
-    inset: 0,
-    zIndex: 100,
-    padding: "24px",
-    display: "grid",
-    placeItems: "center",
-    overflowY: "auto",
-  },
-  popup: {
-    width: "min(620px, calc(100vw - 48px))",
-    padding: 0,
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#55584f",
-    borderRadius: "4px",
-    color: "#f4f1e8",
-    backgroundColor: "#0d0d0d",
-    boxShadow: "18px 20px 0 rgba(0, 0, 0, 0.46)",
-    outline: "none",
-  },
-  form: {
-    padding: "0 28px 28px",
-    backgroundImage: "linear-gradient(145deg, rgba(17, 197, 101, 0.04), transparent 42%)",
-  },
   topline: {
     minHeight: "46px",
     display: "flex",
@@ -402,29 +340,6 @@ const styles = stylex.create({
     letterSpacing: "0.13em",
     textTransform: "uppercase",
   },
-  close: {
-    width: "32px",
-    height: "32px",
-    borderWidth: 0,
-    color: "#a6a89d",
-    backgroundColor: "transparent",
-    fontSize: "18px",
-    cursor: "pointer",
-  },
-  title: {
-    margin: "30px 0 0",
-    color: "#f4f1e8",
-    fontSize: "40px",
-    fontWeight: 400,
-    letterSpacing: "-0.045em",
-    lineHeight: 0.95,
-  },
-  printing: {
-    margin: "14px 0 0",
-    color: "#a6a89d",
-    fontSize: "11px",
-    lineHeight: 1.5,
-  },
   fields: {
     marginTop: "28px",
     display: "grid",
@@ -433,177 +348,6 @@ const styles = stylex.create({
       "@media (max-width: 560px)": "1fr",
     },
     gap: "14px",
-  },
-  field: {
-    display: "grid",
-    gap: "8px",
-  },
-  label: {
-    color: "#85887e",
-    fontSize: "7px",
-    letterSpacing: "0.12em",
-    textTransform: "uppercase",
-  },
-  numberGroup: {
-    width: "100%",
-    height: "44px",
-    display: "flex",
-    alignItems: "stretch",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#43463e",
-    borderRadius: "2px",
-    backgroundColor: "#151613",
-    overflow: "hidden",
-    ":focus-within": {
-      borderColor: colors.accent,
-      boxShadow: "0 0 0 3px rgba(17, 197, 101, 0.1)",
-    },
-    "[data-disabled]": { opacity: 0.65 },
-  },
-  numberInput: {
-    width: "100%",
-    minWidth: 0,
-    height: "100%",
-    padding: 0,
-    borderWidth: 0,
-    color: "#f4f1e8",
-    backgroundColor: "transparent",
-    fontSize: "11px",
-    textAlign: "center",
-    outline: "none",
-  },
-  numberButton: {
-    width: "38px",
-    minWidth: "38px",
-    padding: 0,
-    borderWidth: 0,
-    color: "#a6a89d",
-    backgroundColor: "transparent",
-    fontSize: "16px",
-    cursor: "pointer",
-    ":hover:not(:disabled)": {
-      color: "#f4f1e8",
-      backgroundColor: "rgba(244, 241, 232, 0.05)",
-    },
-    ":focus-visible": {
-      position: "relative",
-      outline: `2px solid ${colors.accent}`,
-      outlineOffset: "-2px",
-    },
-    ":disabled": { cursor: "not-allowed", opacity: 0.45 },
-  },
-  selectTrigger: {
-    width: "100%",
-    height: "44px",
-    paddingInline: "12px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "12px",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#43463e",
-    borderRadius: "2px",
-    color: "#f4f1e8",
-    backgroundColor: "#151613",
-    fontSize: "11px",
-    textAlign: "left",
-    cursor: "pointer",
-    outline: "none",
-    transition: "border-color 130ms ease, box-shadow 130ms ease",
-    ":hover:not(:disabled)": { borderColor: "#696c63" },
-    ":focus-visible": {
-      borderColor: colors.accent,
-      boxShadow: "0 0 0 3px rgba(17, 197, 101, 0.1)",
-    },
-    "[data-popup-open]": { borderColor: colors.accent },
-    "[data-placeholder]": { color: "#85887e" },
-    "[data-disabled]": { color: "#85887e", cursor: "not-allowed", opacity: 0.65 },
-  },
-  selectIcon: {
-    width: "12px",
-    height: "8px",
-    flex: "0 0 auto",
-    color: "#85887e",
-    transition: "transform 130ms ease",
-    "[data-popup-open]": { transform: "rotate(180deg)" },
-  },
-  selectIconGraphic: {
-    width: "100%",
-    height: "100%",
-    display: "block",
-    stroke: "currentColor",
-    strokeWidth: "1.5",
-    strokeLinecap: "round",
-    strokeLinejoin: "round",
-  },
-  selectPositioner: {
-    zIndex: 120,
-  },
-  selectPopup: {
-    width: "var(--anchor-width)",
-    maxWidth: "calc(100vw - 32px)",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#55584f",
-    borderRadius: "3px",
-    color: "#f4f1e8",
-    backgroundColor: "#151613",
-    boxShadow: "0 16px 42px rgba(0, 0, 0, 0.52)",
-    outline: "none",
-    transformOrigin: "var(--transform-origin)",
-    transition: {
-      default: "opacity 130ms ease, transform 130ms cubic-bezier(0.23, 1, 0.32, 1)",
-      "@media (prefers-reduced-motion: reduce)": "opacity 130ms ease",
-    },
-    "[data-starting-style]": {
-      opacity: 0,
-      transform: {
-        default: "scale(0.98)",
-        "@media (prefers-reduced-motion: reduce)": "none",
-      },
-    },
-    "[data-ending-style]": {
-      opacity: 0,
-      transform: {
-        default: "scale(0.98)",
-        "@media (prefers-reduced-motion: reduce)": "none",
-      },
-    },
-  },
-  selectList: {
-    maxHeight: "min(276px, var(--available-height))",
-    padding: "6px",
-    overflowY: "auto",
-  },
-  selectItem: {
-    minHeight: "36px",
-    paddingInline: "8px",
-    display: "grid",
-    gridTemplateColumns: "18px minmax(0, 1fr)",
-    alignItems: "center",
-    gap: "5px",
-    borderRadius: "2px",
-    color: "#b8baaf",
-    fontSize: "10px",
-    cursor: "pointer",
-    outline: "none",
-    "[data-highlighted]": {
-      color: "#f4f1e8",
-      backgroundColor: "rgba(244, 241, 232, 0.065)",
-    },
-    "[data-selected]": { color: "#f4f1e8" },
-  },
-  selectIndicatorSlot: {
-    width: "18px",
-    height: "18px",
-    display: "grid",
-    placeItems: "center",
-  },
-  selectIndicator: {
-    color: colors.accent,
-    fontSize: "10px",
   },
   notice: {
     margin: "18px 0 0",

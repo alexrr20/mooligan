@@ -1,8 +1,8 @@
-import { Button } from "@base-ui/react/button";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 import { useMemo, useRef } from "react";
 
+import { Button } from "../../components/ui/button";
 import { colors } from "../../styles/tokens.stylex.js";
 import { useCatalogImageLoading } from "../catalog/catalog-image-loading";
 import { CatalogSetSymbol } from "../catalog/catalog-set-symbol";

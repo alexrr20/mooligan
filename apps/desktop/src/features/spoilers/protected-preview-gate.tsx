@@ -2,7 +2,7 @@ import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
 import * as stylex from "@stylexjs/stylex";
 import type { Ref } from "react";
 
-import { Button } from "../../components/button";
+import { Button } from "../../components/ui/button";
 import { colors } from "../../styles/tokens.stylex.js";
 import { typography } from "../../styles/typography";
 import { ReturnNavigation } from "../cards/card-detail";
@@ -60,7 +60,7 @@ export function ProtectedPreviewGate({ headingRef, origin, preview }: ProtectedP
             <div {...stylex.props(styles.action)}>
               <Button
                 disabled={spoilers.busy}
-                size="large"
+                size="lg"
                 type="button"
                 onClick={() => spoilers.revealPrinting(preview.printingId)}
               >
@@ -73,7 +73,7 @@ export function ProtectedPreviewGate({ headingRef, origin, preview }: ProtectedP
             <div {...stylex.props(styles.action)}>
               <Button
                 disabled={spoilers.busy}
-                size="large"
+                size="lg"
                 type="button"
                 variant="secondary"
                 onClick={() => spoilers.revealRelease(release.rootSetId)}

@@ -1,10 +1,10 @@
-import { Dialog } from "@base-ui/react/dialog";
 import * as stylex from "@stylexjs/stylex";
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 
 import { colors } from "../styles/tokens.stylex.js";
-import { Button } from "./button";
+import { Button } from "./ui/button";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
 
 type SetupState =
   | { kind: "checking" }
@@ -97,7 +97,7 @@ export function CatalogSetup() {
   }
 
   return (
-    <Dialog.Root
+    <Dialog
       open
       onOpenChange={(open) => {
         if (!open && !downloading) {
@@ -105,135 +105,125 @@ export function CatalogSetup() {
         }
       }}
     >
-      <Dialog.Portal>
-        <Dialog.Backdrop {...stylex.props(styles.backdrop)} />
-        <Dialog.Viewport {...stylex.props(styles.viewport)}>
-          <Dialog.Popup {...stylex.props(styles.dialog)}>
-            <motion.div
-              {...stylex.props(styles.panel)}
-              initial={{ opacity: 0, scale: 0.985, y: 12 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <div {...stylex.props(styles.topline)}>
-                <span>{updating ? "Catalog refresh / Card index" : "First run / Card index"}</span>
-                <span>
-                  {downloading
-                    ? indexing
-                      ? "Indexing locally"
-                      : "Receiving catalog"
-                    : updating
-                      ? "Update available"
-                      : "Local setup"}
-                </span>
-              </div>
+      <DialogContent showCloseButton={false}>
+        <motion.div
+          {...stylex.props(styles.panel)}
+          initial={{ opacity: 0, scale: 0.985, y: 12 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <div {...stylex.props(styles.topline)}>
+            <span>{updating ? "Catalog refresh / Card index" : "First run / Card index"}</span>
+            <span>
+              {downloading
+                ? indexing
+                  ? "Indexing locally"
+                  : "Receiving catalog"
+                : updating
+                  ? "Update available"
+                  : "Local setup"}
+            </span>
+          </div>
 
-              <div {...stylex.props(styles.layout)}>
-                <div {...stylex.props(styles.mark)} aria-hidden="true">
-                  <span {...stylex.props(styles.markNumber)}>∞</span>
-                  <span {...stylex.props(styles.markLabel)}>Cards</span>
-                </div>
+          <div {...stylex.props(styles.layout)}>
+            <div {...stylex.props(styles.mark)} aria-hidden="true">
+              <span {...stylex.props(styles.markNumber)}>∞</span>
+              <span {...stylex.props(styles.markLabel)}>Cards</span>
+            </div>
 
-                <div {...stylex.props(styles.copy)}>
-                  <p {...stylex.props(styles.eyebrow)}>
-                    {updating ? "A fresh catalog is ready" : "One quiet download"}
-                  </p>
-                  <Dialog.Title {...stylex.props(styles.title)}>
-                    {updating ? (
-                      <>
-                        Bring the whole index
-                        <br />
-                        up to date.
-                      </>
-                    ) : (
-                      <>
-                        Keep the whole index
-                        <br />
-                        close at hand.
-                      </>
-                    )}
-                  </Dialog.Title>
-                  <Dialog.Description {...stylex.props(styles.description)}>
-                    {updating
-                      ? "A newer card library is ready with the latest cards, sets, and corrections. Your current library stays available until the update is complete."
-                      : "Download the card library to this device for instant search and offline browsing. Prices will still be fetched when you ask for them."}
-                  </Dialog.Description>
+            <div {...stylex.props(styles.copy)}>
+              <p {...stylex.props(styles.eyebrow)}>
+                {updating ? "A fresh catalog is ready" : "One quiet download"}
+              </p>
+              <DialogTitle>
+                {updating ? (
+                  <>
+                    Bring the whole index
+                    <br />
+                    up to date.
+                  </>
+                ) : (
+                  <>
+                    Keep the whole index
+                    <br />
+                    close at hand.
+                  </>
+                )}
+              </DialogTitle>
+              <DialogDescription>
+                {updating
+                  ? "A newer card library is ready with the latest cards, sets, and corrections. Your current library stays available until the update is complete."
+                  : "Download the card library to this device for instant search and offline browsing. Prices will still be fetched when you ask for them."}
+              </DialogDescription>
 
-                  {state.kind === "error" ? (
-                    <p {...stylex.props(styles.error)} role="alert">
-                      {cleanError(state.message)}
-                    </p>
-                  ) : null}
+              {state.kind === "error" ? (
+                <p {...stylex.props(styles.error)} role="alert">
+                  {cleanError(state.message)}
+                </p>
+              ) : null}
 
-                  {downloading ? (
-                    <div {...stylex.props(styles.progressBlock)} aria-live="polite">
-                      <div {...stylex.props(styles.progressMeta)}>
-                        <span>
-                          {indexing
-                            ? "Indexing local catalog"
-                            : updating
-                              ? "Downloading catalog update"
-                              : "Downloading card catalog"}
-                        </span>
-                        <span>
-                          {progress?.totalBytes
-                            ? `${formatBytes(progress.completedBytes)} / ${formatBytes(progress.totalBytes)} · ${progress.completedCards.toLocaleString()} cards`
-                            : "Connecting…"}
-                        </span>
-                      </div>
-                      <div
-                        {...stylex.props(styles.progressTrack)}
-                        role="progressbar"
-                        aria-label={updating ? "Updating card library" : "Downloading card library"}
-                        aria-valuemax={progress?.totalBytes || undefined}
-                        aria-valuenow={progress?.totalBytes ? progress.completedBytes : undefined}
-                      >
-                        <motion.div
-                          {...stylex.props(styles.progressFill)}
-                          animate={{ scaleX: progressRatio }}
-                          transition={{ duration: 0.24, ease: "easeOut" }}
-                        />
-                      </div>
-                    </div>
-                  ) : null}
-
-                  <div {...stylex.props(styles.actions)}>
-                    <Button disabled={downloading} onClick={() => void download()} size="large">
-                      {downloading
-                        ? indexing
-                          ? "Indexing…"
-                          : "Downloading…"
-                        : state.kind === "error"
-                          ? updating
-                            ? "Try update again"
-                            : "Try again"
-                          : updating
-                            ? "Update library"
-                            : "Download library"}
-                      <span aria-hidden="true">↓</span>
-                    </Button>
-                    <Button
-                      disabled={downloading}
-                      render={<Dialog.Close />}
-                      size="large"
-                      variant="ghost"
-                    >
-                      Not now
-                    </Button>
+              {downloading ? (
+                <div {...stylex.props(styles.progressBlock)} aria-live="polite">
+                  <div {...stylex.props(styles.progressMeta)}>
+                    <span>
+                      {indexing
+                        ? "Indexing local catalog"
+                        : updating
+                          ? "Downloading catalog update"
+                          : "Downloading card catalog"}
+                    </span>
+                    <span>
+                      {progress?.totalBytes
+                        ? `${formatBytes(progress.completedBytes)} / ${formatBytes(progress.totalBytes)} · ${progress.completedCards.toLocaleString()} cards`
+                        : "Connecting…"}
+                    </span>
+                  </div>
+                  <div
+                    {...stylex.props(styles.progressTrack)}
+                    role="progressbar"
+                    aria-label={updating ? "Updating card library" : "Downloading card library"}
+                    aria-valuemax={progress?.totalBytes || undefined}
+                    aria-valuenow={progress?.totalBytes ? progress.completedBytes : undefined}
+                  >
+                    <motion.div
+                      {...stylex.props(styles.progressFill)}
+                      animate={{ scaleX: progressRatio }}
+                      transition={{ duration: 0.24, ease: "easeOut" }}
+                    />
                   </div>
                 </div>
-              </div>
+              ) : null}
 
-              <p {...stylex.props(styles.footnote)}>
-                {updating
-                  ? "The current library remains in place until its replacement is verified."
-                  : "Stored in Mooligan’s private application data. No folder selection needed."}
-              </p>
-            </motion.div>
-          </Dialog.Popup>
-        </Dialog.Viewport>
-      </Dialog.Portal>
-    </Dialog.Root>
+              <div {...stylex.props(styles.actions)}>
+                <Button disabled={downloading} onClick={() => void download()} size="lg">
+                  {downloading
+                    ? indexing
+                      ? "Indexing…"
+                      : "Downloading…"
+                    : state.kind === "error"
+                      ? updating
+                        ? "Try update again"
+                        : "Try again"
+                      : updating
+                        ? "Update library"
+                        : "Download library"}
+                  <span aria-hidden="true">↓</span>
+                </Button>
+                <Button disabled={downloading} render={<DialogClose />} size="lg" variant="ghost">
+                  Not now
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <p {...stylex.props(styles.footnote)}>
+            {updating
+              ? "The current library remains in place until its replacement is verified."
+              : "Stored in Mooligan’s private application data. No folder selection needed."}
+          </p>
+        </motion.div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -246,36 +236,6 @@ function formatBytes(value: number) {
 }
 
 const styles = stylex.create({
-  backdrop: {
-    position: "fixed",
-    inset: 0,
-    zIndex: 100,
-    backgroundColor: "rgba(13, 14, 12, 0.76)",
-    backdropFilter: "blur(5px)",
-  },
-  viewport: {
-    position: "fixed",
-    inset: 0,
-    zIndex: 100,
-    padding: "28px",
-    display: "grid",
-    placeItems: "center",
-    overflowY: "auto",
-  },
-  dialog: {
-    width: "min(760px, calc(100vw - 56px))",
-    maxWidth: "none",
-    padding: 0,
-    overflow: "visible",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#34362f",
-    borderRadius: "3px",
-    color: "#f4f1e8",
-    backgroundColor: "#0a0a0a",
-    boxShadow: "22px 24px 0 rgba(0, 0, 0, 0.4)",
-    outline: "none",
-  },
   panel: {
     padding: "0 30px 24px",
     backgroundImage:
@@ -337,21 +297,6 @@ const styles = stylex.create({
     fontSize: "8px",
     letterSpacing: "0.15em",
     textTransform: "uppercase",
-  },
-  title: {
-    margin: 0,
-    color: "#f4f1e8",
-    fontSize: "clamp(34px, 5vw, 49px)",
-    fontWeight: 400,
-    letterSpacing: "-0.045em",
-    lineHeight: 0.94,
-  },
-  description: {
-    maxWidth: "475px",
-    margin: "21px 0 0",
-    color: "#a6a89d",
-    fontSize: "12px",
-    lineHeight: 1.65,
   },
   error: {
     margin: "18px 0 0",

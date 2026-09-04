@@ -4,7 +4,8 @@ import { motion, MotionConfig } from "motion/react";
 
 import { BottomNavigation } from "../components/bottom-navigation";
 import { CatalogSetup } from "../components/catalog-setup";
-import { ProfileButton, SettingsButton } from "../components/profile-button";
+import { GlobalSearch } from "../components/global-search";
+import { HeaderActions } from "../components/header-actions";
 import { useMotionPreference } from "../features/preferences/use-motion-preference";
 
 export const Route = createRootRoute({
@@ -28,10 +29,8 @@ function AppShell() {
     <MotionConfig reducedMotion={reducedMotion}>
       <div {...stylex.props(styles.app)}>
         <header {...stylex.props(styles.chrome)} data-window-drag-region>
-          <div {...stylex.props(styles.headerActions)}>
-            <SettingsButton />
-            <ProfileButton />
-          </div>
+          <GlobalSearch />
+          <HeaderActions />
         </header>
 
         <BottomNavigation />
@@ -62,12 +61,13 @@ const styles = stylex.create({
     height: "100vh",
     display: "grid",
     gridTemplateColumns: "minmax(0, 1fr)",
-    gridTemplateRows: "46px minmax(0, 1fr)",
+    gridTemplateRows: "50px minmax(0, 1fr)",
     overflow: "hidden",
     backgroundColor: "#0a0a0a",
   },
   chrome: {
     gridColumn: "1 / -1",
+    position: "relative",
     display: "flex",
     alignItems: "center",
     minWidth: 0,
@@ -75,12 +75,6 @@ const styles = stylex.create({
     paddingRight: "12px",
     color: "#f4f1e8",
     backgroundColor: "#0a0a0a",
-  },
-  headerActions: {
-    marginLeft: "auto",
-    display: "flex",
-    alignItems: "center",
-    gap: "6px",
   },
   wordmark: {
     paddingLeft: {
@@ -93,7 +87,7 @@ const styles = stylex.create({
   main: {
     minWidth: 0,
     minHeight: 0,
-    padding: "0 12px 108px",
+    padding: "0 12px",
     overflowY: "auto",
     backgroundColor: "#0a0a0a",
   },

@@ -2,7 +2,7 @@ import type { CatalogReleaseSummary } from "@mooligan/domain/spoilers";
 import * as stylex from "@stylexjs/stylex";
 import { useId } from "react";
 
-import { Button } from "../../components/button";
+import { Button } from "../../components/ui/button";
 import { colors } from "../../styles/tokens.stylex.js";
 import { typography } from "../../styles/typography";
 import { CatalogSetSymbol } from "../catalog/catalog-set-symbol";
@@ -113,9 +113,9 @@ function UpcomingRelease({
           aria-describedby={descriptionId}
           aria-label={releaseActionAccessibleName(control.label, release.name)}
           disabled={busy || control.disabled}
-          size="small"
+          size="sm"
           type="button"
-          variant={control.action === "reveal" ? "primary" : "secondary"}
+          variant={control.action === "reveal" ? "default" : "secondary"}
           onClick={control.action === "reveal" ? onReveal : onProtect}
         >
           {control.label}

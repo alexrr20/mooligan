@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { createFileRoute } from "@tanstack/react-router";
 
-import { Button } from "../components/button";
+import { Button } from "../components/ui/button";
 import { PageFrame } from "../components/page-frame";
 import { useAuth } from "../features/auth/use-auth";
 import {

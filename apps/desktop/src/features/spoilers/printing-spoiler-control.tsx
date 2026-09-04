@@ -1,7 +1,7 @@
 import type { CatalogPrintingVisibility } from "@mooligan/domain/spoilers";
 import * as stylex from "@stylexjs/stylex";
 
-import { Button } from "../../components/button";
+import { Button } from "../../components/ui/button";
 import { typography } from "../../styles/typography";
 import { getPrintingProtectionControl } from "./spoiler-ui-state";
 import { useSpoilers } from "./use-spoilers";
@@ -33,7 +33,7 @@ export function PrintingSpoilerControl({ printingId, visibility }: PrintingSpoil
       <Button
         aria-describedby="printing-protection-description"
         disabled={control.disabled || spoilers.busy}
-        size="small"
+        size="sm"
         type="button"
         variant="secondary"
         onClick={() => spoilers.protectPrinting(printingId)}

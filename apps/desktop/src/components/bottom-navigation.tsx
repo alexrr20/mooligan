@@ -1,10 +1,10 @@
-import { Tooltip } from "@base-ui/react/tooltip";
 import * as stylex from "@stylexjs/stylex";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { motion, useReducedMotionConfig } from "motion/react";
 import { useState } from "react";
 
 import { colors } from "../styles/tokens.stylex.js";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 
 const navigation = [
   { to: "/", label: "Home", icon: "home" },
@@ -29,7 +29,7 @@ export function BottomNavigation() {
   const indicatorIndex = hoveredIndex;
 
   return (
-    <Tooltip.Provider delay={450} closeDelay={0} timeout={350}>
+    <TooltipProvider delay={450} closeDelay={0} timeout={350}>
       <span {...stylex.props(styles.navBackdrop)} aria-hidden="true" />
       <nav {...stylex.props(styles.navigation)} aria-label="Primary" data-window-no-drag>
         <div {...stylex.props(styles.navGroup)} onPointerLeave={() => setHoverVisible(false)}>
@@ -70,8 +70,8 @@ export function BottomNavigation() {
                   aria-hidden="true"
                 />
               ) : null}
-              <Tooltip.Root>
-                <Tooltip.Trigger
+              <Tooltip>
+                <TooltipTrigger
                   render={
                     <Link
                       {...stylex.props(styles.navItem, reduceMotion && styles.navItemReducedMotion)}
@@ -88,18 +88,14 @@ export function BottomNavigation() {
                   }
                 >
                   <NavigationIcon name={item.icon} />
-                </Tooltip.Trigger>
-                <Tooltip.Portal>
-                  <Tooltip.Positioner sideOffset={10}>
-                    <Tooltip.Popup {...stylex.props(styles.tooltip)}>{item.label}</Tooltip.Popup>
-                  </Tooltip.Positioner>
-                </Tooltip.Portal>
-              </Tooltip.Root>
+                </TooltipTrigger>
+                <TooltipContent sideOffset={10}>{item.label}</TooltipContent>
+              </Tooltip>
             </div>
           ))}
         </div>
       </nav>
-    </Tooltip.Provider>
+    </TooltipProvider>
   );
 }
 
@@ -245,42 +241,5 @@ const styles = stylex.create({
     strokeWidth: "1.7",
     strokeLinecap: "round",
     strokeLinejoin: "round",
-  },
-  tooltip: {
-    zIndex: 20,
-    padding: "7px 10px",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#4a4d45",
-    borderRadius: "7px",
-    color: "#f4f1e8",
-    backgroundColor: "#20221e",
-    boxShadow: "0 8px 24px rgb(0 0 0 / 38%)",
-    fontSize: "10px",
-    letterSpacing: "0.02em",
-    pointerEvents: "none",
-    transformOrigin: "var(--transform-origin)",
-    transition: {
-      default:
-        "opacity 140ms cubic-bezier(0.23, 1, 0.32, 1), transform 140ms cubic-bezier(0.23, 1, 0.32, 1)",
-      "@media (prefers-reduced-motion: reduce)": "opacity 140ms cubic-bezier(0.23, 1, 0.32, 1)",
-    },
-    "[data-starting-style]": {
-      opacity: 0,
-      transform: {
-        default: "translateY(3px) scale(0.97)",
-        "@media (prefers-reduced-motion: reduce)": "none",
-      },
-    },
-    "[data-ending-style]": {
-      opacity: 0,
-      transform: {
-        default: "translateY(3px) scale(0.97)",
-        "@media (prefers-reduced-motion: reduce)": "none",
-      },
-    },
-    "[data-instant]": {
-      transitionDuration: "0ms",
-    },
   },
 });

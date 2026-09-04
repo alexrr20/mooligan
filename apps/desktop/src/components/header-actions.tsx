@@ -1,15 +1,24 @@
-import { Tooltip } from "@base-ui/react/tooltip";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 
 import { useAuth } from "../features/auth/use-auth";
 import { colors } from "../styles/tokens.stylex.js";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 
-export function SettingsButton() {
+export function HeaderActions() {
   return (
-    <Tooltip.Provider delay={450} closeDelay={0} timeout={350}>
-      <Tooltip.Root>
-        <Tooltip.Trigger
+    <div {...stylex.props(styles.actions)}>
+      <SettingsButton />
+      <ProfileButton />
+    </div>
+  );
+}
+
+function SettingsButton() {
+  return (
+    <TooltipProvider delay={450} closeDelay={0} timeout={350}>
+      <Tooltip>
+        <TooltipTrigger
           render={
             <Link
               {...stylex.props(styles.button)}
@@ -25,26 +34,24 @@ export function SettingsButton() {
           }
         >
           <SettingsIcon />
-        </Tooltip.Trigger>
-        <Tooltip.Portal>
-          <Tooltip.Positioner align="end" side="bottom" sideOffset={9}>
-            <Tooltip.Popup {...stylex.props(styles.tooltip)}>Settings</Tooltip.Popup>
-          </Tooltip.Positioner>
-        </Tooltip.Portal>
-      </Tooltip.Root>
-    </Tooltip.Provider>
+        </TooltipTrigger>
+        <TooltipContent align="end" side="bottom" sideOffset={9}>
+          Settings
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
-export function ProfileButton() {
+function ProfileButton() {
   const { snapshot } = useAuth();
   const user = snapshot.user;
   const label = user ? `Profile settings for ${user.name}` : "Profile settings";
 
   return (
-    <Tooltip.Provider delay={450} closeDelay={0} timeout={350}>
-      <Tooltip.Root>
-        <Tooltip.Trigger
+    <TooltipProvider delay={450} closeDelay={0} timeout={350}>
+      <Tooltip>
+        <TooltipTrigger
           render={
             <Link
               {...stylex.props(styles.button, user && styles.buttonSignedIn)}
@@ -61,14 +68,12 @@ export function ProfileButton() {
           ) : (
             <ProfileIcon />
           )}
-        </Tooltip.Trigger>
-        <Tooltip.Portal>
-          <Tooltip.Positioner align="end" side="bottom" sideOffset={9}>
-            <Tooltip.Popup {...stylex.props(styles.tooltip)}>{label}</Tooltip.Popup>
-          </Tooltip.Positioner>
-        </Tooltip.Portal>
-      </Tooltip.Root>
-    </Tooltip.Provider>
+        </TooltipTrigger>
+        <TooltipContent align="end" side="bottom" sideOffset={9}>
+          {label}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
@@ -98,6 +103,12 @@ function initials(name: string) {
 }
 
 const styles = stylex.create({
+  actions: {
+    marginLeft: "auto",
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+  },
   button: {
     width: "24px",
     height: "24px",
@@ -105,14 +116,9 @@ const styles = stylex.create({
     placeItems: "center",
     flexShrink: 0,
     overflow: "hidden",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#3c3e38",
     borderRadius: "7px",
     color: "#b7b9af",
-    backgroundColor: "#151613",
     textDecoration: "none",
-    boxShadow: "0 1px 0 rgba(255, 255, 255, 0.04) inset",
     transition: {
       default:
         "border-color 140ms ease, background-color 140ms ease, color 140ms ease, transform 140ms cubic-bezier(0.23, 1, 0.32, 1)",
@@ -120,7 +126,6 @@ const styles = stylex.create({
         "border-color 140ms ease, background-color 140ms ease, color 140ms ease",
     },
     ":hover": {
-      borderColor: "#61645b",
       color: "#f7f4eb",
       backgroundColor: "#20221e",
     },
@@ -157,43 +162,5 @@ const styles = stylex.create({
     strokeWidth: "1.7",
     strokeLinecap: "round",
     strokeLinejoin: "round",
-  },
-  tooltip: {
-    zIndex: 20,
-    maxWidth: "220px",
-    padding: "7px 10px",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#4a4d45",
-    borderRadius: "7px",
-    color: "#f4f1e8",
-    backgroundColor: "#20221e",
-    boxShadow: "0 8px 24px rgb(0 0 0 / 38%)",
-    fontSize: "10px",
-    letterSpacing: "0.02em",
-    pointerEvents: "none",
-    transformOrigin: "var(--transform-origin)",
-    transition: {
-      default:
-        "opacity 140ms cubic-bezier(0.23, 1, 0.32, 1), transform 140ms cubic-bezier(0.23, 1, 0.32, 1)",
-      "@media (prefers-reduced-motion: reduce)": "opacity 140ms cubic-bezier(0.23, 1, 0.32, 1)",
-    },
-    "[data-starting-style]": {
-      opacity: 0,
-      transform: {
-        default: "translateY(-3px) scale(0.97)",
-        "@media (prefers-reduced-motion: reduce)": "none",
-      },
-    },
-    "[data-ending-style]": {
-      opacity: 0,
-      transform: {
-        default: "translateY(-3px) scale(0.97)",
-        "@media (prefers-reduced-motion: reduce)": "none",
-      },
-    },
-    "[data-instant]": {
-      transitionDuration: "0ms",
-    },
   },
 });

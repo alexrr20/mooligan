@@ -1,9 +1,9 @@
-import { Input } from "@base-ui/react/input";
-import { Switch } from "@base-ui/react/switch";
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useState } from "react";
 
-import { colors, letterSpacings } from "../../styles/tokens.stylex.js";
+import { Input } from "../../components/ui/input";
+import { Switch } from "../../components/ui/switch";
+import { colors } from "../../styles/tokens.stylex.js";
 import { reconcileCatalogSearchDraft, type UniverseFilter } from "./search-state";
 
 type SearchModeTabsProps = {
@@ -91,7 +91,6 @@ export function SearchForm({
         <path d="m20 20-4-4" />
       </svg>
       <Input
-        {...stylex.props(styles.searchInput)}
         aria-label={ariaLabel}
         autoFocus={autoFocus}
         id={id}
@@ -114,19 +113,10 @@ type SearchToggleProps = {
 
 export function SearchToggle({ checked, label, onChange }: SearchToggleProps) {
   return (
-    <Switch.Root
-      {...stylex.props(styles.filterToggle)}
-      checked={checked}
-      onCheckedChange={onChange}
-    >
-      <span
-        {...stylex.props(styles.toggleTrack, checked && styles.toggleTrackActive)}
-        aria-hidden="true"
-      >
-        <Switch.Thumb {...stylex.props(styles.toggleKnob, checked && styles.toggleKnobActive)} />
-      </span>
+    <div {...stylex.props(styles.filterToggle)}>
+      <Switch aria-label={label} checked={checked} size="sm" onCheckedChange={onChange} />
       {label}
-    </Switch.Root>
+    </div>
   );
 }
 
@@ -282,26 +272,6 @@ const styles = stylex.create({
     strokeLinejoin: "round",
     pointerEvents: "none",
   },
-  searchInput: {
-    width: "100%",
-    minWidth: 0,
-    height: "100%",
-    padding: 0,
-    borderWidth: 0,
-    borderStyle: "none",
-    borderRadius: 0,
-    color: "#f4f1e8",
-    backgroundColor: "transparent",
-    letterSpacing: letterSpacings.tighter,
-    fontSize: "15px",
-    fontWeight: "600",
-    lineHeight: 1,
-    outline: "none",
-    appearance: "none",
-    "::placeholder": {
-      color: "#727277",
-    },
-  },
   filterToggle: {
     padding: 0,
     display: "flex",
@@ -324,35 +294,6 @@ const styles = stylex.create({
       outlineColor: colors.accent,
       outlineOffset: "4px",
     },
-  },
-  toggleTrack: {
-    width: "28px",
-    height: "16px",
-    padding: "2px",
-    display: "flex",
-    alignItems: "center",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#55584f",
-    borderRadius: "999px",
-    backgroundColor: "#22241f",
-    transition: "background-color 160ms ease, border-color 160ms ease",
-  },
-  toggleTrackActive: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accent,
-  },
-  toggleKnob: {
-    width: "10px",
-    height: "10px",
-    borderRadius: "50%",
-    backgroundColor: "#a6a89d",
-    transform: "translateX(0)",
-    transition: "background-color 160ms ease, transform 160ms ease",
-  },
-  toggleKnobActive: {
-    backgroundColor: "#1b1d19",
-    transform: "translateX(12px)",
   },
   viewControl: {
     display: "flex",
