@@ -42,6 +42,11 @@ void test("grid image descriptors round-trip through the image protocol", () => 
   assert.deepEqual(parseCatalogImageUrl(catalogImageUrl(descriptor)), descriptor);
 });
 
+void test("commander artwork descriptors round-trip through the image protocol", () => {
+  const descriptor = { faceIndex: 0, printingId: "commander-1", size: "art_crop" } as const;
+  assert.deepEqual(parseCatalogImageUrl(catalogImageUrl(descriptor)), descriptor);
+});
+
 void test("catalog image URLs reject untrusted hosts, faces, sizes, and shapes", () => {
   assert.equal(parseCatalogImageUrl("https://catalog/printing-1/0/small"), null);
   assert.equal(parseCatalogImageUrl("mooligan-image://attacker/printing-1/0/small"), null);

@@ -7,6 +7,8 @@ import { EventSequenceNumber } from "@livestore/common/schema";
 import { createStorePromise, type Store } from "@livestore/livestore";
 import {
   collectionLotsQuery,
+  decksQuery,
+  deckEntriesQuery,
   events,
   initialSpoilerResetId,
   spoilerDecisionsQuery,
@@ -61,6 +63,135 @@ void test("two offline clients converge additive Holdings and protective spoiler
 
       assert.equal(holdingQuantity(first), 7);
       assert.equal(holdingQuantity(second), 7);
+    } finally {
+      yield* Effect.promise(() =>
+        Promise.all([first.shutdownPromise(), second?.shutdownPromise() ?? Promise.resolve()]),
+      );
+    }
+  }).pipe(Effect.scoped, Effect.runPromise);
+});
+
+void test("two offline devices converge deck cards, independent metadata and stale deletion conflicts", async () => {
+  await Effect.gen(function* () {
+    const server = yield* makeBroadcastSyncServer();
+    const first = yield* Effect.promise(() => openStore("deck-client-first", server));
+    let second: WorkspaceStore | undefined;
+    const updatedAt = "2026-09-04T10:00:00.000Z";
+    try {
+      first.commit(
+        events.deckCreated({
+          deck: {
+            id: "deck",
+            name: "Original",
+            formatId: "casual",
+            notes: "",
+            tags: [],
+            archived: false,
+            createdAt: updatedAt,
+            updatedAt,
+          },
+        }),
+      );
+      yield* Effect.promise(() => waitFor(() => server.eventCount() === 1));
+      second = yield* Effect.promise(() => openStore("deck-client-second", server));
+      yield* Effect.promise(() => waitFor(() => second!.query(decksQuery).length === 1));
+      yield* server.disconnect;
+      first.commit(
+        events.deckEntryAdded({
+          deckId: "deck",
+          entry: {
+            id: "first-card",
+            printingId: "printing",
+            finish: "foil",
+            quantity: 2,
+            section: "mainboard",
+          },
+          updatedAt,
+        }),
+      );
+      second.commit(
+        events.deckEntryAdded({
+          deckId: "deck",
+          entry: {
+            id: "second-card",
+            printingId: "printing",
+            finish: "foil",
+            quantity: 3,
+            section: "mainboard",
+          },
+          updatedAt,
+        }),
+      );
+      first.commit(events.deckChanged({ deckId: "deck", name: "Renamed offline", updatedAt }));
+      second.commit(
+        events.deckChanged({
+          deckId: "deck",
+          notes: "Notes from another device",
+          archived: true,
+          updatedAt,
+        }),
+      );
+      assert.equal(first.query(deckEntriesQuery)[0]?.quantity, 2);
+      assert.equal(second.query(deckEntriesQuery)[0]?.quantity, 3);
+      yield* server.connect;
+      yield* Effect.promise(() =>
+        waitFor(
+          () =>
+            first.query(deckEntriesQuery)[0]?.quantity === 5 &&
+            second!.query(deckEntriesQuery)[0]?.quantity === 5,
+        ),
+      );
+      yield* Effect.promise(() =>
+        waitFor(
+          () =>
+            first.query(decksQuery)[0]?.notes === "Notes from another device" &&
+            second!.query(decksQuery)[0]?.name === "Renamed offline",
+        ),
+      );
+      assert.deepEqual(first.query(decksQuery), second.query(decksQuery));
+      assert.deepEqual(first.query(deckEntriesQuery), second.query(deckEntriesQuery));
+      yield* server.disconnect;
+      // The second device's original card ID must remain addressable after merging.
+      second.commit(
+        events.deckEntryChanged({
+          deckId: "deck",
+          entryId: "second-card",
+          section: "sideboard",
+          updatedAt,
+        }),
+      );
+      yield* server.connect;
+      yield* Effect.promise(() =>
+        waitFor(() => first.query(deckEntriesQuery)[0]?.section === "sideboard"),
+      );
+      assert.equal(first.query(deckEntriesQuery)[0]?.quantity, 5);
+      yield* server.disconnect;
+      first.commit(events.deckDeleted({ deckId: "deck", updatedAt }));
+      second.commit(events.deckChanged({ deckId: "deck", name: "Stale name", updatedAt }));
+      second.commit(
+        events.deckEntryAdded({
+          deckId: "deck",
+          entry: {
+            id: "stale-card",
+            printingId: "another-printing",
+            finish: "nonfoil",
+            quantity: 1,
+            section: "commander",
+          },
+          updatedAt,
+        }),
+      );
+      yield* server.connect;
+      yield* Effect.promise(() =>
+        waitFor(
+          () =>
+            server.eventCount() === 9 &&
+            first.query(decksQuery).length === 0 &&
+            second!.query(decksQuery).length === 0,
+        ),
+      );
+      assert.deepEqual(first.query(deckEntriesQuery), []);
+      assert.deepEqual(second.query(deckEntriesQuery), []);
     } finally {
       yield* Effect.promise(() =>
         Promise.all([first.shutdownPromise(), second?.shutdownPromise() ?? Promise.resolve()]),

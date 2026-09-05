@@ -16,6 +16,7 @@ import { PrintingImage } from "./printing-image";
 import { PrintingViewer } from "./printing-viewer";
 import { PrintingSpoilerControl } from "../spoilers/printing-spoiler-control";
 import { AddToCollectionButton } from "../collection/collection-editor";
+import { AddToDeckButton } from "../decks/deck-card-picker";
 
 type CardDetailProps = {
   detail: CatalogCardDetailModel;
@@ -78,6 +79,7 @@ export function CardDetail({ detail, headingRef, origin, visibility }: CardDetai
           <PrintingDetails printing={detail.selectedPrinting} />
           <div {...stylex.props(styles.collectionAction)}>
             <AddToCollectionButton detail={detail} />
+            <AddToDeckButton detail={detail} />
           </div>
           <PrintingSpoilerControl printingId={detail.selectedPrinting.id} visibility={visibility} />
           <CardLegalities legalities={detail.legalities} />
@@ -150,6 +152,19 @@ export function CardDetailProblem({ headingRef, kind, onRetry, origin }: CardDet
 }
 
 export function ReturnNavigation({ origin }: { origin: CardDetailOrigin | null }) {
+  if (origin?.kind === "deck") {
+    return (
+      <nav {...stylex.props(styles.returnRow)} aria-label="Card detail return">
+        <Link
+          {...stylex.props(styles.returnLink)}
+          search={{ deck: origin.value.deckId }}
+          to="/decks"
+        >
+          Back to deck
+        </Link>
+      </nav>
+    );
+  }
   if (origin?.kind === "collection") {
     return (
       <nav {...stylex.props(styles.returnRow)} aria-label="Card detail return">

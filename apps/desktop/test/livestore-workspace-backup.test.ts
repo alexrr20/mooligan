@@ -17,7 +17,7 @@ import {
   restoreWorkspaceBackup,
 } from "../src/features/workspace/workspace-backup.ts";
 
-void test("backup v3 reads only collection and spoiler state from LiveStore", async () => {
+void test("backup v4 reads collection, deck, and spoiler state from LiveStore", async () => {
   const store = await openStore("backup-source");
   try {
     store.commit(events.spoilerPolicyChanged({ policy: "show" }));
@@ -67,13 +67,14 @@ void test("backup v3 reads only collection and spoiler state from LiveStore", as
           unitCost: undefined,
         },
       ],
+      decks: [],
       format: "mooligan-workspace",
       spoilers: {
         decisions: [{ scope: "printing", state: "reveal", targetId: "printing-one" }],
         policy: "show",
         resetGeneration: 4,
       },
-      version: 3,
+      version: 4,
     });
     assert.equal(Object.hasOwn(backup, "clientId"), false);
     assert.equal(Object.hasOwn(backup, "motion"), false);
@@ -82,7 +83,7 @@ void test("backup v3 reads only collection and spoiler state from LiveStore", as
   }
 });
 
-void test("backup v3 restore commits and verifies normal LiveStore events", async () => {
+void test("backup v4 restore commits and verifies normal LiveStore events", async () => {
   const store = await openStore("backup-target");
   try {
     await restoreWorkspaceBackup(store, backupFixture);
@@ -154,6 +155,7 @@ const backupFixture: WorkspaceBackup = {
       quantity: 4,
     },
   ],
+  decks: [],
   format: "mooligan-workspace",
   spoilers: {
     decisions: [
@@ -163,7 +165,7 @@ const backupFixture: WorkspaceBackup = {
     policy: "protect",
     resetGeneration: 7,
   },
-  version: 3,
+  version: 4,
 };
 
 function openStore(storeId: string) {

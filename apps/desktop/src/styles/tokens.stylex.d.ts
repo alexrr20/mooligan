@@ -4,6 +4,11 @@ export declare const colors: VarGroup<{
   accent: string;
 }>;
 
+export declare const pageInsets: VarGroup<{
+  top: string;
+  inline: string;
+}>;
+
 export declare const fontFamilies: VarGroup<{
   sans: string;
 }>;

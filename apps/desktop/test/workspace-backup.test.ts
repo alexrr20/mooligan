@@ -29,6 +29,7 @@ const backup: WorkspaceBackup = {
       unitCost: { amountMinor: 125, currency: "EUR" },
     },
   ],
+  decks: [],
   format: "mooligan-workspace",
   spoilers: {
     decisions: [
@@ -38,7 +39,7 @@ const backup: WorkspaceBackup = {
     policy: "show",
     resetGeneration: 3,
   },
-  version: 3,
+  version: 4,
 };
 
 void test("version 3 backups round trip without device or account metadata", () => {

@@ -145,6 +145,7 @@ void test("a single-face card normalizes card, printing, and sibling facts", () 
     finishes: ["nonfoil", "foil"],
     id: "printing-bolt",
     image_uris: {
+      art_crop: "https://cards.scryfall.io/art_crop/front/bolt.jpg",
       grid: "https://cards.scryfall.io/grid/front/bolt.webp",
       normal: "https://cards.scryfall.io/normal/front/bolt.jpg",
       small: "https://cards.scryfall.io/small/front/bolt.jpg",
@@ -193,6 +194,7 @@ void test("a single-face card normalizes card, printing, and sibling facts", () 
   assert.deepEqual(detail.selectedPrinting.images, [
     { faceIndex: 0, printingId: "printing-bolt", size: "normal" },
     { faceIndex: 0, printingId: "printing-bolt", size: "small" },
+    { faceIndex: 0, printingId: "printing-bolt", size: "art_crop" },
   ]);
   assert.deepEqual(
     detail.siblingPrintings.map(({ id, image, isDigital, isPromo }) => ({
@@ -226,6 +228,7 @@ void test("multi-face normalization preserves order, fields, artists, and image 
         {
           artist: "Front Artist",
           image_uris: {
+            art_crop: "https://cards.scryfall.io/art_crop/front/delver.jpg",
             normal: "https://cards.scryfall.io/normal/front/delver.jpg",
             small: "https://cards.scryfall.io/small/front/delver.jpg",
           },
@@ -240,6 +243,7 @@ void test("multi-face normalization preserves order, fields, artists, and image 
           artist: "Back Artist",
           defense: "4",
           image_uris: {
+            art_crop: "https://cards.scryfall.io/art_crop/back/delver.jpg",
             normal: "https://cards.scryfall.io/normal/back/delver.jpg",
             small: "https://cards.scryfall.io/small/back/delver.jpg",
           },
@@ -289,8 +293,10 @@ void test("multi-face normalization preserves order, fields, artists, and image 
     [
       { faceIndex: 0, size: "normal" },
       { faceIndex: 0, size: "small" },
+      { faceIndex: 0, size: "art_crop" },
       { faceIndex: 1, size: "normal" },
       { faceIndex: 1, size: "small" },
+      { faceIndex: 1, size: "art_crop" },
     ],
   );
 });

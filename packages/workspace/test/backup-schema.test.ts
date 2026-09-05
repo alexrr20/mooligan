@@ -13,7 +13,7 @@ const decodeBackup = Schema.decodeUnknownSync(workspaceBackupSchema, {
   onExcessProperty: "error",
 });
 
-void test("backup v3 validation is strict and rejects old versions", () => {
+void test("backup v4 validation is strict and rejects old versions", () => {
   const backup = fixture();
 
   assert.deepEqual(decodeBackup(backup), backup);
@@ -27,7 +27,7 @@ void test("backup v3 validation is strict and rejects old versions", () => {
   );
 });
 
-void test("backup v3 rejects duplicate state and invalid collection values", () => {
+void test("backup v4 rejects duplicate state and invalid collection values", () => {
   const backup = fixture();
 
   assert.throws(() =>
@@ -54,7 +54,7 @@ void test("backup v3 rejects duplicate state and invalid collection values", () 
 });
 
 void test(
-  "backup v3 round trips 100,000 lots and 100,000 spoiler decisions within 50 MiB",
+  "backup v4 round trips 100,000 lots and 100,000 spoiler decisions within 50 MiB",
   { timeout: 60_000 },
   () => {
     const largeBackup = {
@@ -66,6 +66,7 @@ void test(
         printingId: `printing-${index}`,
         quantity: 1,
       })),
+      decks: [],
       format: "mooligan-workspace" as const,
       spoilers: {
         decisions: Array.from({ length: 100_000 }, (_, index) => ({
@@ -76,7 +77,7 @@ void test(
         policy: "protect" as const,
         resetGeneration: 12,
       },
-      version: 3 as const,
+      version: 4 as const,
     } satisfies WorkspaceBackup;
     const serialized = JSON.stringify(largeBackup);
 
@@ -101,12 +102,13 @@ function fixture(): WorkspaceBackup {
         quantity: 1,
       },
     ],
+    decks: [],
     format: "mooligan-workspace",
     spoilers: {
       decisions: [{ scope: "printing", state: "reveal", targetId: "printing-one" }],
       policy: "protect",
       resetGeneration: 0,
     },
-    version: 3,
+    version: 4,
   };
 }

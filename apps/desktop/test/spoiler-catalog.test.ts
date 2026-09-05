@@ -59,7 +59,10 @@ void test("catalog reads enforce spoiler visibility before any card data crosses
     }),
     card({
       id: "secret-card",
-      image_uris: { normal: "https://cards.scryfall.io/normal/front/secret.jpg" },
+      image_uris: {
+        art_crop: "https://cards.scryfall.io/art_crop/front/secret.jpg",
+        normal: "https://cards.scryfall.io/normal/front/secret.jpg",
+      },
       name: "Secret Card",
       oracle_id: "oracle-secret",
       released_at: "2026-09-10",
@@ -200,6 +203,10 @@ void test("catalog reads enforce spoiler visibility before any card data crosses
         image({ faceIndex: 0, printingId: "secret-card", size: "normal" }, PROTECTED),
         null,
       );
+      assert.equal(
+        image({ faceIndex: 0, printingId: "secret-card", size: "art_crop" }, PROTECTED),
+        null,
+      );
 
       const printingReveal = {
         ...PROTECTED,
@@ -209,6 +216,10 @@ void test("catalog reads enforce spoiler visibility before any card data crosses
       const visibleSecret = detail("secret-card", printingReveal);
       assert.ok(visibleSecret && visibleSecret.status === "visible");
       assert.equal(visibleSecret.visibility.reason, "printing");
+      assert.equal(
+        image({ faceIndex: 0, printingId: "secret-card", size: "art_crop" }, printingReveal),
+        "https://cards.scryfall.io/art_crop/front/secret.jpg",
+      );
       assert.deepEqual(
         visibleSecret.detail.siblingPrintings.map(({ id }) => id),
         ["secret-card"],
