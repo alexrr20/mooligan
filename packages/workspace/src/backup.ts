@@ -1,7 +1,9 @@
 import { Schema } from "effect";
 
+import { deckEntrySchema, deckMetadataSchema } from "./deck-contract.ts";
+
 export const workspaceBackupFormat = "mooligan-workspace";
-export const workspaceBackupVersion = 3;
+export const workspaceBackupVersion = 4;
 export const workspaceBackupMaxBytes = 50 * 1024 * 1024;
 export const workspaceBackupMaxCollectionLots = 100_000;
 export const workspaceBackupMaxSpoilerDecisions = 100_000;
@@ -93,7 +95,37 @@ const SpoilerDecisions = Schema.Array(SpoilerDecision).pipe(
   }),
 );
 
+const Deck = Schema.Struct({
+  ...deckMetadataSchema.fields,
+  entries: Schema.Array(deckEntrySchema).pipe(
+    Schema.maxItems(10_000),
+    Schema.filter(
+      (entries) =>
+        new Set(entries.map(({ id }) => id)).size === entries.length &&
+        new Set(
+          entries.map(({ printingId, finish, section }) =>
+            [printingId, finish, section].join("\0"),
+          ),
+        ).size === entries.length,
+      { message: () => "Deck entry IDs and slots must be unique." },
+    ),
+  ),
+});
+
 export const workspaceBackupSchema = Schema.Struct({
+  decks: Schema.Array(Deck).pipe(
+    Schema.maxItems(10_000),
+    Schema.filter(
+      (decks) => {
+        const entries = decks.flatMap(({ entries }) => entries);
+        return (
+          new Set(decks.map(({ id }) => id)).size === decks.length &&
+          new Set(entries.map(({ id }) => id)).size === entries.length
+        );
+      },
+      { message: () => "Deck IDs and entry IDs must be unique across the workspace." },
+    ),
+  ),
   collectionLots: CollectionLots,
   format: Schema.Literal(workspaceBackupFormat),
   spoilers: Schema.Struct({

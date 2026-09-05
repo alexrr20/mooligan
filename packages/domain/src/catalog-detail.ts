@@ -29,7 +29,7 @@ export const CatalogCardIdentitySchema = z.object({
 });
 export type CatalogCardIdentity = z.infer<typeof CatalogCardIdentitySchema>;
 
-export const CatalogImageSizeSchema = z.enum(["grid", "normal", "small", "thumb"]);
+export const CatalogImageSizeSchema = z.enum(["art_crop", "grid", "normal", "small", "thumb"]);
 export type CatalogImageSize = z.infer<typeof CatalogImageSizeSchema>;
 
 export const CatalogImageDescriptorSchema = z.object({
@@ -351,7 +351,7 @@ function normalizeSiblingPrinting(card: ScryfallCardDownload): CatalogSiblingPri
 
 function normalizeImages(
   card: ScryfallCardDownload,
-  sizes: readonly CatalogImageSize[] = ["normal", "small"],
+  sizes: readonly CatalogImageSize[] = ["normal", "small", "art_crop"],
 ): CatalogImageDescriptor[] {
   const faceImages = card.card_faces?.some((face) => face.image_uris)
     ? card.card_faces.map((face) => face.image_uris)

@@ -4,7 +4,11 @@ import { Buffer } from "node:buffer";
 import { FetchHttpClient, KeyValueStore } from "@effect/platform";
 import { makeHttpSync } from "@livestore/sync-cf/client";
 import { SyncMessage } from "@livestore/sync-cf/common";
-import { workspaceEventSchemaVersion, workspaceIdForBindingSecret } from "@mooligan/workspace";
+import {
+  events,
+  workspaceEventSchemaVersion,
+  workspaceIdForBindingSecret,
+} from "@mooligan/workspace";
 import { env, exports } from "cloudflare:workers";
 import { Chunk, Effect, Option, Schema, Stream } from "effect";
 import { SignJWT } from "jose";
@@ -211,6 +215,102 @@ test("authorized push and pull survive Durable Object eviction", async () => {
 
     assert.equal(pulled.length, 1);
     assert.deepEqual(pulled[0]?.eventEncoded, event[0]);
+  } finally {
+    fetchMock.mockRestore();
+  }
+});
+
+test("deck events survive a Durable Object restart and invalid deck quantities are rejected", async () => {
+  const user = await authenticatedTestUser("sync-deck@example.com");
+  const workspaceId = await bindTestWorkspace(user.userId);
+  const { credential } = await issueCurrentCredential(user.userId, workspaceId);
+  const payload = { credential, workspaceId };
+  const updatedAt = "2026-09-04T10:00:00.000Z";
+  const changes = [
+    events.deckCreated({
+      deck: {
+        id: "deck",
+        name: "Synced deck",
+        formatId: "casual",
+        notes: "",
+        tags: [],
+        archived: false,
+        createdAt: updatedAt,
+        updatedAt,
+      },
+    }),
+    events.deckEntryAdded({
+      deckId: "deck",
+      entry: {
+        id: "card",
+        printingId: "printing",
+        finish: "nonfoil",
+        quantity: 4,
+        section: "mainboard",
+      },
+      updatedAt,
+    }),
+    events.deckChanged({ deckId: "deck", notes: "Edited offline", archived: true, updatedAt }),
+    events.deckEntryChanged({
+      deckId: "deck",
+      entryId: "card",
+      quantity: 3,
+      section: "sideboard",
+      updatedAt,
+    }),
+    events.deckEntryRemoved({ deckId: "deck", entryId: "card", updatedAt }),
+    events.deckDeleted({ deckId: "deck", updatedAt }),
+  ];
+  const batch = Schema.decodeUnknownSync(SyncMessage.PushRequest)({
+    backendId: { _tag: "None" },
+    batch: changes.map(({ name, args }, index) => ({
+      name,
+      args,
+      clientId: "deck-client",
+      sessionId: "deck-session",
+      parentSeqNum: index,
+      seqNum: index + 1,
+    })),
+  }).batch;
+  const fetchMock = routeFetchThroughWorker();
+  try {
+    await runSync(workspaceId, payload, (backend) => backend.push(batch));
+    await evictDurableObject(env.SYNC_BACKEND.get(env.SYNC_BACKEND.idFromName(workspaceId)), {
+      webSockets: "close",
+    });
+    const pulled = await runSync(workspaceId, payload, (backend) =>
+      Effect.gen(function* () {
+        const pages = yield* backend.pull(Option.none()).pipe(Stream.runCollect);
+        return Chunk.toReadonlyArray(pages).flatMap((page) =>
+          page.batch.map(({ eventEncoded }) => eventEncoded),
+        );
+      }),
+    );
+    assert.deepEqual(pulled, batch);
+    const invalid = Schema.decodeUnknownSync(SyncMessage.PushRequest)({
+      backendId: { _tag: "None" },
+      batch: [
+        {
+          name: "v1.DeckEntryAdded",
+          args: {
+            deckId: "deck",
+            entry: {
+              id: "invalid",
+              printingId: "printing",
+              finish: "nonfoil",
+              quantity: 0,
+              section: "mainboard",
+            },
+            updatedAt,
+          },
+          clientId: "deck-client",
+          sessionId: "deck-session",
+          parentSeqNum: 6,
+          seqNum: 7,
+        },
+      ],
+    }).batch;
+    await assert.rejects(runSync(workspaceId, payload, (backend) => backend.push(invalid)));
   } finally {
     fetchMock.mockRestore();
   }

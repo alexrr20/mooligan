@@ -1,7 +1,10 @@
 import { Events, makeSchema, queryDb, Schema, State } from "@livestore/livestore";
 
+import { deckEvents, deckMaterializers, deckTables } from "./decks.ts";
+export { decksQuery, deckEntriesQuery } from "./decks.ts";
+
 export const initialSpoilerResetId = "initial";
-export const workspaceEventSchemaVersion = 1;
+export const workspaceEventSchemaVersion = 2;
 
 const TargetId = Schema.String.pipe(Schema.minLength(1), Schema.maxLength(128));
 const DecisionId = Schema.String.pipe(Schema.minLength(1), Schema.maxLength(128));
@@ -98,6 +101,7 @@ const CollectionLot = Schema.Struct({
 });
 
 export const tables = {
+  ...deckTables,
   collectionLots: State.SQLite.table({
     indexes: [
       {
@@ -113,6 +117,7 @@ export const tables = {
 };
 
 export const events = {
+  ...deckEvents,
   collectionCopiesAdded: Events.synced({
     name: "v1.CollectionCopiesAdded",
     schema: Schema.Struct({
@@ -161,6 +166,22 @@ export const events = {
 } as const;
 
 export const workspaceSyncedEventSchema = Schema.Union(
+  Schema.Struct({ args: events.deckCreated.schema, name: Schema.Literal(events.deckCreated.name) }),
+  Schema.Struct({ args: events.deckChanged.schema, name: Schema.Literal(events.deckChanged.name) }),
+  Schema.Struct({ args: events.deckDeleted.schema, name: Schema.Literal(events.deckDeleted.name) }),
+  Schema.Struct({
+    args: events.deckEntryAdded.schema,
+    name: Schema.Literal(events.deckEntryAdded.name),
+  }),
+  Schema.Struct({
+    args: events.deckEntryChanged.schema,
+    name: Schema.Literal(events.deckEntryChanged.name),
+  }),
+  Schema.Struct({
+    args: events.deckEntryRemoved.schema,
+    name: Schema.Literal(events.deckEntryRemoved.name),
+  }),
+
   Schema.Struct({
     args: events.collectionCopiesAdded.schema,
     name: Schema.Literal(events.collectionCopiesAdded.name),
@@ -213,6 +234,7 @@ const matchingCollectionLotSql = (alias: string) => `
 `;
 
 const materializers = State.SQLite.materializers(events, {
+  ...deckMaterializers,
   "v1.CollectionCopiesAdded": ({ lot }) => {
     const row = toCollectionLotRow(lot);
     if (!isUnattributedLot(row)) {

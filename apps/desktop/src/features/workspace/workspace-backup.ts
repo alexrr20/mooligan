@@ -7,6 +7,8 @@ import {
 } from "@mooligan/workspace/backup";
 import {
   collectionLotsQuery,
+  decksQuery,
+  deckEntriesQuery,
   events,
   initialSpoilerResetId,
   spoilerDecisionsQuery,
@@ -14,8 +16,12 @@ import {
   workspaceSchema,
 } from "@mooligan/workspace/schema";
 
+import { materializeDecks } from "../decks/deck-state.ts";
+
 type WorkspaceLiveStore = Store<typeof workspaceSchema>;
 type RestoreEvent =
+  | ReturnType<typeof events.deckCreated>
+  | ReturnType<typeof events.deckEntryAdded>
   | ReturnType<typeof events.collectionCopiesAdded>
   | ReturnType<typeof events.spoilerDecisionChanged>
   | ReturnType<typeof events.spoilerPolicyChanged>
@@ -27,6 +33,7 @@ export function createWorkspaceBackup(store: WorkspaceLiveStore): WorkspaceBacku
   const settings = store.query(spoilerSettingsQuery);
   return {
     collectionLots: readBackupCollectionLots(store),
+    decks: readBackupDecks(store),
     format: workspaceBackupFormat,
     spoilers: {
       decisions: readBackupDecisions(store),
@@ -50,6 +57,21 @@ export async function restoreWorkspaceBackup(store: WorkspaceLiveStore, backup: 
         resetId: restoreResetId,
       }),
     );
+  }
+
+  for (const { entries, ...deck } of backup.decks) {
+    batch.push(events.deckCreated({ deck }));
+    if (batch.length >= RESTORE_EVENT_BATCH_SIZE) {
+      await commitRestoreBatch(store, batch);
+      batch = [];
+    }
+    for (const entry of entries) {
+      batch.push(events.deckEntryAdded({ deckId: deck.id, entry, updatedAt: deck.updatedAt }));
+      if (batch.length >= RESTORE_EVENT_BATCH_SIZE) {
+        await commitRestoreBatch(store, batch);
+        batch = [];
+      }
+    }
   }
 
   for (const lot of backup.collectionLots) {
@@ -97,6 +119,7 @@ export async function restoreWorkspaceBackup(store: WorkspaceLiveStore, backup: 
 
   const settings = store.query(spoilerSettingsQuery);
   if (
+    JSON.stringify(readBackupDecks(store)) !== JSON.stringify(sortedDecks(backup.decks)) ||
     settings.policy !== backup.spoilers.policy ||
     settings.resetGeneration !== backup.spoilers.resetGeneration ||
     JSON.stringify(readBackupDecisions(store)) !==
@@ -156,4 +179,32 @@ function sortedDecisions(decisions: WorkspaceBackup["spoilers"]["decisions"]) {
 
 function sortedCollectionLots(lots: WorkspaceBackup["collectionLots"]) {
   return [...lots].sort((left, right) => left.id.localeCompare(right.id));
+}
+
+function readBackupDecks(store: WorkspaceLiveStore): WorkspaceBackup["decks"] {
+  return sortedDecks(materializeDecks(store.query(decksQuery), store.query(deckEntriesQuery)));
+}
+
+function sortedDecks(decks: WorkspaceBackup["decks"]) {
+  return [...decks]
+    .sort((left, right) => left.id.localeCompare(right.id))
+    .map((deck) => ({
+      archived: deck.archived,
+      createdAt: deck.createdAt,
+      formatId: deck.formatId,
+      id: deck.id,
+      name: deck.name,
+      notes: deck.notes,
+      tags: deck.tags,
+      updatedAt: deck.updatedAt,
+      entries: [...deck.entries]
+        .sort((left, right) => left.id.localeCompare(right.id))
+        .map((entry) => ({
+          finish: entry.finish,
+          id: entry.id,
+          printingId: entry.printingId,
+          quantity: entry.quantity,
+          section: entry.section,
+        })),
+    }));
 }

@@ -130,6 +130,7 @@ function preferredFaceImages(images: readonly CatalogImageDescriptor[]) {
   const preferred = new Map<number, CatalogImageDescriptor>();
 
   for (const image of images) {
+    if (image.size === "art_crop") continue;
     const current = preferred.get(image.faceIndex);
     if (!current || (current.size === "small" && image.size === "normal")) {
       preferred.set(image.faceIndex, image);

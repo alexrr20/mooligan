@@ -1,5 +1,7 @@
 export {
   collectionLotsQuery,
+  decksQuery,
+  deckEntriesQuery,
   events,
   initialSpoilerResetId,
   spoilerDecisionsQuery,

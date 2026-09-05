@@ -4,6 +4,17 @@ export const colors = stylex.defineVars({
   accent: "#11C565",
 });
 
+export const pageInsets = stylex.defineVars({
+  top: {
+    default: "52px",
+    "@media (max-width: 820px)": "42px",
+  },
+  inline: {
+    default: "clamp(36px, 6vw, 88px)",
+    "@media (max-width: 820px)": "34px",
+  },
+});
+
 export const fontFamilies = stylex.defineVars({
   sans: '"Config Rounded", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
 });

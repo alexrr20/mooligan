@@ -23,14 +23,47 @@ signing out. Its stable local ID is not an anonymous online account.
 
 Mooligan refuses LiveStore's in-memory fallback if OPFS cannot open. It shows a
 reload screen and leaves the last persistent event log untouched. This is
-deliberate. Collection or spoiler changes must never appear saved when they
+deliberate. Collection, deck, or spoiler changes must never appear saved when they
 would disappear after a restart.
 
 The user-owned workspace is separate from the replaceable Scryfall catalog
 database. Motion and view preferences stay in renderer local storage on the
-current device. Workspace backup version 3 contains only materialized
-collection lots and spoiler state, and every restore creates a new unbound
+current device. Workspace backup version 4 contains only materialized
+collection lots, decks with their card entries, and spoiler state, and every restore creates a new unbound
 workspace before activation.
+
+## Decks
+
+The Decks page creates, searches, filters, duplicates, archives, and deletes decks.
+Each deck has a name, format, tags, notes, and exact printing/finish quantities in
+main deck, sideboard, commander, companion, and maybeboard sections. Add cards
+through the local catalog search or the card detail page. Editing a deck never
+changes collection ownership.
+
+Collection coverage counts exact printings and finishes across the deck, excludes
+the maybeboard, and does not reserve copies against other decks. The summary
+shows main-deck lands, nonlands, and average nonland mana value. Card legality
+labels come from the installed catalog; they are not a full deck-construction
+rules validator.
+
+Text import accepts quantity/name lists, Arena set and collector numbers, MTGO
+`SB:` lines, and section headings. Check the import before adding it. Unresolved
+names block the import. Text exports include `[printing:ID]` and `[finish:VALUE]`
+references so they can round trip through Mooligan even when that printing is
+absent from the local catalog or spoiler-protected. Exact unavailable references
+are retained with a warning. Workspace backups also retain deck metadata.
+
+Decks use the same persistent LiveStore event log and optional account sync as
+the collection. Concurrent additions to a matching slot add quantities. Metadata
+and entry edits only change the submitted fields; conflicting absolute edits to
+the same field resolve in the synchronized event order. Merged card IDs remain
+addressable by later offline edits. Removed cards cannot be revived by stale
+edits, and deleted decks reject later card additions and metadata changes.
+
+The workspace event schema is now version 2. Deploy the updated API alongside
+the desktop client to enable deck sync. Older clients must update before syncing;
+their local workspace remains available. Backup version 4 replaces version 3,
+with no backward compatibility for old backup files.
 
 ## Development
 
@@ -155,7 +188,7 @@ supported maximum. The desktop pauses sync and keeps local editing available.
 
 ### Reset development data
 
-Workspace backup version 3 is the only supported backup format. Export a backup
+Workspace backup version 4 is the only supported backup format. Export a backup
 from Settings before resetting any data you care about.
 
 For an unbound development Workspace, quit Mooligan, clear the renderer origin's
@@ -168,7 +201,7 @@ user-data directory aside before relaunching. The usual directory is
 `~/Library/Application Support/Mooligan` on macOS, `%APPDATA%\Mooligan` on
 Windows, and `$XDG_CONFIG_HOME/Mooligan` or `~/.config/Mooligan` on Linux. Moving
 the directory keeps the old files recoverable. The project does not migrate
-development-era Workspace registries or backup versions 1 and 2.
+development-era Workspace registries or backup versions 1 through 3.
 
 Deleting local Wrangler Durable Object state changes the sync backend identity.
 Mooligan shuts down that sync connection without clearing its local event log.

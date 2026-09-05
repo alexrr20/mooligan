@@ -138,6 +138,7 @@ function largeBackup(): WorkspaceBackup {
       printingId: `printing-${index}`,
       quantity: 1,
     })),
+    decks: [],
     format: "mooligan-workspace",
     spoilers: {
       decisions: Array.from({ length: spoilerDecisionCount }, (_, index) => ({
@@ -148,7 +149,7 @@ function largeBackup(): WorkspaceBackup {
       policy: "protect",
       resetGeneration: 1,
     },
-    version: 3,
+    version: 4,
   };
 }
 

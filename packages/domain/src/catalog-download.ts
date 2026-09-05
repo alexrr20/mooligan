@@ -54,6 +54,7 @@ export const ScryfallSetListSchema = z.strictObject({
 export type ScryfallSetList = z.infer<typeof ScryfallSetListSchema>;
 
 const ScryfallImageUrisSchema = z.object({
+  art_crop: z.url().nullish(),
   grid: z.url().nullish(),
   normal: z.url().nullish(),
   small: z.url().nullish(),

@@ -630,6 +630,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
       flavor_text: "A battle begins.",
       id: "printing-1",
       image_uris: {
+        art_crop: "https://cards.scryfall.io/art_crop/front/1.jpg",
         grid: "https://cards.scryfall.io/grid/front/1.webp",
         normal: "https://cards.scryfall.io/normal/front/1.jpg",
         small: "https://cards.scryfall.io/small/front/1.jpg",
@@ -712,6 +713,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
           power: "2",
           toughness: "3",
           image_uris: {
+            art_crop: "https://cards.scryfall.io/art_crop/front/2.jpg",
             grid: "https://cards.scryfall.io/grid/front/2.webp",
             normal: "https://cards.scryfall.io/normal/front/2.jpg",
             small: "https://cards.scryfall.io/small/front/2.jpg",
@@ -839,6 +841,14 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
       assert.equal(
         queryImageSource({ faceIndex: 0, printingId: "printing-1", size: "normal" }),
         "https://cards.scryfall.io/normal/front/1.jpg",
+      );
+      assert.equal(
+        queryImageSource({ faceIndex: 0, printingId: "printing-1", size: "art_crop" }),
+        "https://cards.scryfall.io/art_crop/front/1.jpg",
+      );
+      assert.equal(
+        queryImageSource({ faceIndex: 0, printingId: "printing-2", size: "art_crop" }),
+        "https://cards.scryfall.io/art_crop/front/2.jpg",
       );
       assert.equal(
         queryImageSource({ faceIndex: 1, printingId: "printing-2", size: "normal" }),
