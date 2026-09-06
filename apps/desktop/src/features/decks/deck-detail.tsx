@@ -2,7 +2,6 @@ import type { Deck, DeckEntry } from "@mooligan/domain/decks";
 import { collectionLotsQuery } from "@mooligan/workspace/schema";
 import * as stylex from "@stylexjs/stylex";
 import { useMutation, useQueries } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 
 import { Button } from "../../components/ui/button";
@@ -11,15 +10,15 @@ import { catalogCardDetailQueryOptions } from "../cards/use-card-detail";
 import { useWorkspaceLiveStore } from "../workspace/workspace-store-context";
 import { DeckActions } from "./deck-actions";
 import { DeckCardPicker } from "./deck-card-picker";
+import { DeckCards } from "./deck-cards";
 import { commanderArt } from "./deck-art";
 import { DeckMessage, deckStyles } from "./deck-controls";
 import { DeckEntryEditor } from "./deck-entry-editor";
 import { DeckImportExport } from "./deck-import-export";
 import { DeckHeader } from "./deck-header";
 import { DeckMetadataEditor } from "./deck-metadata-editor";
-import { withDeckOrigin } from "./deck-origin";
 import { DeckStats } from "./deck-stats";
-import { ownershipKey, summarizeDeck } from "./deck-summary";
+import { summarizeDeck } from "./deck-summary";
 import { useDeckMutations } from "./use-decks";
 
 export function DeckDetail({
@@ -79,83 +78,13 @@ export function DeckDetail({
         </DeckMessage>
       ) : null}
       <DeckCardPicker deckId={deck.id} />
-      {summary.sections.map(({ value, label, quantity, entries }) => (
-        <section key={value} {...stylex.props(deckStyles.panel)} aria-label={label}>
-          <h2 {...stylex.props(deckStyles.sectionTitle)}>
-            {label} · {quantity}
-          </h2>
-          {!quantity ? <p {...stylex.props(deckStyles.muted)}>No cards in this section.</p> : null}
-          <ul {...stylex.props(deckStyles.list)}>
-            {entries
-              .toSorted((a, b) => {
-                const left = printings.get(a.printingId);
-                const right = printings.get(b.printingId);
-                return (
-                  Number(b.section === "commander") - Number(a.section === "commander") ||
-                  (left?.status === "visible" ? left.detail.card.name : "").localeCompare(
-                    right?.status === "visible" ? right.detail.card.name : "",
-                  ) ||
-                  a.id.localeCompare(b.id)
-                );
-              })
-              .map((entry) => {
-                const printing = printings.get(entry.printingId);
-                const detail = printing?.status === "visible" ? printing.detail : null;
-                const name =
-                  detail?.card.name ??
-                  (printing?.status === "protected" ? "Protected preview" : "Printing unavailable");
-                const legality = detail?.legalities.find(
-                  ({ formatId }) => formatId === deck.formatId,
-                );
-                const owned = summary.owned.get(ownershipKey(entry)) ?? 0;
-                const needed = summary.required.get(ownershipKey(entry)) ?? 0;
-                return (
-                  <li key={entry.id} {...stylex.props(deckStyles.row)}>
-                    <strong>{entry.quantity}×</strong>
-                    <div {...stylex.props(deckStyles.grow)}>
-                      <Link
-                        to="/cards/$printingId"
-                        params={{ printingId: entry.printingId }}
-                        state={withDeckOrigin({ deckId: deck.id })}
-                        search={{}}
-                        {...stylex.props(deckStyles.link)}
-                      >
-                        {name}
-                      </Link>
-                      {entry.section === "commander" ? (
-                        <span {...stylex.props(deckStyles.commanderLabel)}>Commander</span>
-                      ) : null}
-                      <p {...stylex.props(deckStyles.muted)}>
-                        {detail
-                          ? `${detail.selectedPrinting.setCode.toUpperCase()} ${detail.selectedPrinting.collectorNumber}`
-                          : entry.printingId}{" "}
-                        · {entry.finish} · {owned} owned
-                        {needed ? ` / ${needed} needed across this deck` : ""}
-                        {legality && legality.status !== "legal"
-                          ? ` · ${legality.status.replaceAll("_", " ")}`
-                          : ""}
-                      </p>
-                    </div>
-                    <Button
-                      variant="secondary"
-                      onClick={() => setEntry(entry)}
-                      aria-label={`Edit ${name}`}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={() => action.mutate(() => mutations.removeEntry(deck.id, entry.id))}
-                      aria-label={`Remove ${name}`}
-                    >
-                      Remove
-                    </Button>
-                  </li>
-                );
-              })}
-          </ul>
-        </section>
-      ))}
+      <DeckCards
+        deck={deck}
+        printings={printings}
+        summary={summary}
+        onEdit={setEntry}
+        onRemove={(entry) => action.mutate(() => mutations.removeEntry(deck.id, entry.id))}
+      />
       {editing ? (
         <DeckMetadataEditor
           finalFocus={actionsRef}

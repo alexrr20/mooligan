@@ -1,3 +1,4 @@
+import { Tabs } from "@base-ui/react/tabs";
 import type { CatalogCardDetail as CatalogCardDetailModel } from "@mooligan/domain/catalog-detail";
 import type { CatalogPrintingVisibility } from "@mooligan/domain/spoilers";
 import * as stylex from "@stylexjs/stylex";
@@ -5,7 +6,7 @@ import { Link } from "@tanstack/react-router";
 import type { Ref } from "react";
 
 import { Button } from "../../components/ui/button";
-import { colors } from "../../styles/tokens.stylex.js";
+import { colors, pageInsets } from "../../styles/tokens.stylex.js";
 import { CardRules } from "./card-rules";
 import { ManaCost } from "./mana-cost";
 import { CardLegalities } from "./card-legalities";
@@ -52,6 +53,18 @@ export function CardDetail({ detail, headingRef, origin, visibility }: CardDetai
               faces={detail.card.faces}
               printing={detail.selectedPrinting}
             />
+            <div {...stylex.props(styles.printingCaption)}>
+              <strong {...stylex.props(styles.setName)}>{detail.selectedPrinting.setName}</strong>
+              <span {...stylex.props(styles.printingCode)}>
+                {detail.selectedPrinting.setCode.toUpperCase()} · #
+                {detail.selectedPrinting.collectorNumber}
+                {detail.selectedPrinting.isDigital ? " · Digital" : ""}
+              </span>
+            </div>
+            <div {...stylex.props(styles.collectionAction)}>
+              <AddToCollectionButton detail={detail} />
+              <AddToDeckButton detail={detail} />
+            </div>
           </div>
         </aside>
 
@@ -75,14 +88,29 @@ export function CardDetail({ detail, headingRef, origin, visibility }: CardDetai
             ) : null}
           </header>
 
-          <CardRules card={detail.card} />
-          <PrintingDetails printing={detail.selectedPrinting} />
-          <div {...stylex.props(styles.collectionAction)}>
-            <AddToCollectionButton detail={detail} />
-            <AddToDeckButton detail={detail} />
-          </div>
+          <Tabs.Root defaultValue="rules" {...stylex.props(styles.tabs)}>
+            <Tabs.List {...stylex.props(styles.tabList)} aria-label="Card information">
+              <Tabs.Tab {...stylex.props(styles.tab)} value="rules">
+                Oracle text
+              </Tabs.Tab>
+              <Tabs.Tab {...stylex.props(styles.tab)} value="printing">
+                Printing details
+              </Tabs.Tab>
+              <Tabs.Tab {...stylex.props(styles.tab)} value="formats">
+                Format legality
+              </Tabs.Tab>
+            </Tabs.List>
+            <Tabs.Panel value="rules" {...stylex.props(styles.tabPanel)}>
+              <CardRules card={detail.card} />
+            </Tabs.Panel>
+            <Tabs.Panel value="printing" {...stylex.props(styles.tabPanel)}>
+              <PrintingDetails printing={detail.selectedPrinting} />
+            </Tabs.Panel>
+            <Tabs.Panel value="formats" {...stylex.props(styles.tabPanel)}>
+              <CardLegalities legalities={detail.legalities} />
+            </Tabs.Panel>
+          </Tabs.Root>
           <PrintingSpoilerControl printingId={detail.selectedPrinting.id} visibility={visibility} />
-          <CardLegalities legalities={detail.legalities} />
         </div>
       </div>
 
@@ -160,6 +188,9 @@ export function ReturnNavigation({ origin }: { origin: CardDetailOrigin | null }
           search={{ deck: origin.value.deckId }}
           to="/decks"
         >
+          <span {...stylex.props(styles.returnArrow)} aria-hidden="true">
+            ←
+          </span>
           Back to deck
         </Link>
       </nav>
@@ -196,203 +227,148 @@ const styles = stylex.create({
     maxWidth: "1480px",
     minHeight: "100%",
     marginInline: "auto",
-    padding: {
-      default: "32px clamp(30px, 5vw, 76px) 78px",
-      "@media (max-width: 820px)": "28px 28px 58px",
-    },
+    paddingTop: "28px",
+    paddingInline: pageInsets.inline,
+    paddingBottom: "100px",
   },
-  returnRow: {
-    minHeight: "43px",
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: "24px",
-  },
+  returnRow: { display: "flex", alignItems: "center", minHeight: "32px", marginBottom: "32px" },
   returnLink: {
-    minHeight: "30px",
     display: "inline-flex",
     alignItems: "center",
     gap: "10px",
-    color: "#b8baaf",
-    fontSize: "8px",
-    letterSpacing: "0.11em",
+    color: "#989b92",
+    fontSize: "13px",
     textDecoration: "none",
-    textTransform: "uppercase",
-    transition: "color 150ms ease",
-    ":hover": {
-      color: "#f4f1e8",
-    },
-    ":focus-visible": {
-      outlineWidth: "2px",
-      outlineStyle: "solid",
-      outlineColor: colors.accent,
-      outlineOffset: "3px",
-    },
+    ":hover": { color: "#f4f1e8" },
+    ":focus-visible": { outline: `2px solid ${colors.accent}`, outlineOffset: "4px" },
   },
-  returnArrow: {
-    color: colors.accent,
-    fontSize: "15px",
-    lineHeight: 1,
-  },
+  returnArrow: { color: "#989b92", fontSize: "18px", lineHeight: 1 },
   detailGrid: {
-    paddingTop: {
-      default: "36px",
-      "@media (max-width: 820px)": "28px",
-    },
     display: "grid",
-    gridTemplateColumns: {
-      default: "minmax(240px, 0.76fr) minmax(0, 1.24fr)",
-      "@media (max-width: 820px)": "minmax(0, 1fr)",
-    },
+    gridTemplateColumns: "minmax(240px, 340px) minmax(0, 1fr)",
     alignItems: "start",
-    gap: {
-      default: "clamp(36px, 5vw, 78px)",
-      "@media (max-width: 820px)": "44px",
-    },
+    gap: "clamp(36px, 5vw, 72px)",
+    "@media (max-width: 820px)": { gridTemplateColumns: "minmax(0, 1fr)", gap: "36px" },
   },
   artworkRail: {
     minWidth: 0,
     alignSelf: "start",
-    "@media (min-width: 821px) and (min-height: 720px)": {
-      position: "sticky",
-      top: "28px",
-    },
+    "@media (min-width: 821px) and (min-height: 820px)": { position: "sticky", top: "28px" },
   },
   artworkSizer: {
     width: "100%",
-    maxWidth: {
-      default: "410px",
-      "@media (max-width: 820px)": "390px",
-      "@media (min-width: 821px) and (min-height: 720px)":
-        "min(410px, calc((100vh - 176px) * 0.7142857))",
-    },
-    marginInline: {
-      default: 0,
-      "@media (max-width: 820px)": "auto",
-    },
+    maxWidth: "340px",
+    "@media (max-width: 820px)": { marginInline: "auto" },
   },
-  information: {
-    minWidth: 0,
-  },
+  printingCaption: { display: "grid", gap: "5px", marginTop: "18px" },
+  setName: { color: "#c6c8bd", fontSize: "14px", fontWeight: 400, lineHeight: 1.4 },
+  printingCode: { color: "#85887f", fontSize: "12px", lineHeight: 1.5, overflowWrap: "anywhere" },
   collectionAction: {
     marginTop: "18px",
-  },
-  identityHeader: {
-    minWidth: 0,
-  },
-  titleRow: {
-    marginTop: 0,
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: "24px",
-  },
-  title: {
-    maxWidth: "760px",
-    margin: 0,
-    color: "#f4f1e8",
-    fontSize: {
-      default: "clamp(44px, 5.9vw, 76px)",
-      "@media (max-width: 1040px)": "44px",
-      "@media (max-width: 820px)": "clamp(40px, 8vw, 60px)",
-    },
-    fontWeight: 400,
-    letterSpacing: "-0.055em",
-    lineHeight: 0.91,
-    overflowWrap: "anywhere",
-    outline: "none",
-    ":focus-visible": {
-      outlineWidth: "1px",
-      outlineStyle: "solid",
-      outlineColor: colors.accent,
-      outlineOffset: "8px",
-    },
-  },
-  primaryType: {
-    margin: "20px 0 0",
-    color: "#a6a89d",
-    fontSize: "12px",
-    lineHeight: 1.55,
-  },
-  skeletonArtwork: {
-    width: "100%",
-    maxWidth: "410px",
-  },
-  skeletonInformation: {
-    minWidth: 0,
-    minHeight: "520px",
-    borderTopWidth: "1px",
-    borderTopStyle: "solid",
-    borderTopColor: "#34362f",
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
-    backgroundColor: "#171815",
-  },
-  problem: {
-    minHeight: "min(590px, calc(100vh - 150px))",
-    paddingBlock: "72px",
-    borderTopWidth: "1px",
-    borderTopStyle: "solid",
-    borderTopColor: "#55584f",
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
-  },
-  problemTitle: {
-    maxWidth: "650px",
-    margin: 0,
-    color: "#f4f1e8",
-    fontSize: "clamp(42px, 6vw, 72px)",
-    fontWeight: 400,
-    letterSpacing: "-0.052em",
-    lineHeight: 0.94,
-    outline: "none",
-    ":focus-visible": {
-      outlineWidth: "1px",
-      outlineStyle: "solid",
-      outlineColor: colors.accent,
-      outlineOffset: "8px",
-    },
-  },
-  problemDescription: {
-    maxWidth: "520px",
-    margin: "24px 0 0",
-    color: "#a6a89d",
-    fontSize: "12px",
-    lineHeight: 1.7,
-  },
-  problemActions: {
-    marginTop: "30px",
     display: "flex",
     alignItems: "center",
     flexWrap: "wrap",
     gap: "10px",
   },
-  secondaryAction: {
-    minHeight: "34px",
-    paddingInline: "15px",
-    display: "inline-flex",
+  information: { minWidth: 0 },
+  identityHeader: { minWidth: 0 },
+  titleRow: {
+    display: "flex",
     alignItems: "center",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#55584f",
-    borderRadius: "2px",
-    color: "#e1ded5",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: "16px 24px",
+  },
+  title: {
+    flex: "1 1 240px",
+    margin: 0,
+    color: "#f4f1e8",
+    fontSize: "clamp(30px, 3.2vw, 42px)",
+    fontWeight: 500,
+    letterSpacing: "-.03em",
+    lineHeight: 1.12,
+    overflowWrap: "anywhere",
+    outline: "none",
+    ":focus-visible": { outline: `2px solid ${colors.accent}`, outlineOffset: "6px" },
+  },
+  primaryType: { margin: "14px 0 0", color: "#989b92", fontSize: "14px", lineHeight: 1.6 },
+  tabs: { marginTop: "30px" },
+  tabList: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "4px",
+    padding: "4px",
+    width: "fit-content",
+    borderRadius: "10px",
+    backgroundColor: "#171817",
+  },
+  tab: {
+    padding: "9px 13px",
+    borderWidth: 0,
+    borderRadius: "7px",
     backgroundColor: "transparent",
-    fontSize: "8px",
-    letterSpacing: "0.09em",
+    color: "#989b92",
+    fontSize: "13px",
+    cursor: "pointer",
+    "[data-active]": { backgroundColor: "#30322e", color: "#f4f1e8" },
+    ":hover": { color: "#f4f1e8" },
+    ":focus-visible": { outline: `2px solid ${colors.accent}`, outlineOffset: "3px" },
+  },
+  tabPanel: {
+    marginTop: "28px",
+    outline: "none",
+    ":focus-visible": { outline: `2px solid ${colors.accent}`, outlineOffset: "6px" },
+  },
+  skeletonArtwork: {
+    width: "100%",
+    maxWidth: "340px",
+    "@media (max-width: 820px)": { marginInline: "auto" },
+  },
+  skeletonInformation: {
+    minWidth: 0,
+    minHeight: "360px",
+    borderRadius: "12px",
+    backgroundColor: "#151615",
+  },
+  problem: {
+    minHeight: "360px",
+    padding: "48px 32px",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "start",
+    backgroundColor: "#131413",
+    borderRadius: "12px",
+  },
+  problemTitle: {
+    margin: 0,
+    color: "#f4f1e8",
+    fontSize: "32px",
+    fontWeight: 500,
+    letterSpacing: "-.025em",
+    lineHeight: 1.2,
+    outline: "none",
+    ":focus-visible": { outline: `2px solid ${colors.accent}`, outlineOffset: "6px" },
+  },
+  problemDescription: {
+    maxWidth: "520px",
+    margin: "16px 0 0",
+    color: "#989b92",
+    fontSize: "14px",
+    lineHeight: 1.6,
+  },
+  problemActions: {
+    marginTop: "24px",
+    display: "flex",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: "16px",
+  },
+  secondaryAction: {
+    color: colors.accent,
+    fontSize: "13px",
     textDecoration: "none",
-    textTransform: "uppercase",
-    ":hover": {
-      borderColor: "#85887e",
-      backgroundColor: "rgba(255, 255, 255, 0.035)",
-    },
-    ":focus-visible": {
-      outlineWidth: "2px",
-      outlineStyle: "solid",
-      outlineColor: colors.accent,
-      outlineOffset: "3px",
-    },
+    ":hover": { textDecoration: "underline" },
+    ":focus-visible": { outline: `2px solid ${colors.accent}`, outlineOffset: "4px" },
   },
 });

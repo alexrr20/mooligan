@@ -2,16 +2,13 @@ import type { Store } from "@livestore/livestore";
 import type {
   AddCollectionHoldingRequest,
   CollectionMutationResult,
+  CollectionPrintingValidationRequest,
   RemoveCollectionHoldingRequest,
   UpdateCollectionHoldingRequest,
 } from "@mooligan/domain/collection";
 import { collectionLotsQuery, events, tables, workspaceSchema } from "@mooligan/workspace/schema";
 
-type ValidateCollectionPrinting = (request: {
-  existingFinish?: "etched" | "foil" | "glossy" | "nonfoil";
-  finish: "etched" | "foil" | "glossy" | "nonfoil";
-  printingId: string;
-}) => Promise<void>;
+type ValidateCollectionPrinting = (request: CollectionPrintingValidationRequest) => Promise<void>;
 
 export function createCollectionMutations(
   store: Store<typeof workspaceSchema>,
@@ -19,7 +16,7 @@ export function createCollectionMutations(
 ) {
   return {
     async add(request: AddCollectionHoldingRequest): Promise<CollectionMutationResult> {
-      await validatePrinting(request);
+      await validatePrinting({ finish: request.finish, printingId: request.printingId });
       const existing = store
         .query(collectionLotsQuery)
         .find((lot) => sameHolding(lot, request) && isUnattributed(lot));

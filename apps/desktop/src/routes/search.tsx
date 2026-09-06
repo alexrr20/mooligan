@@ -1,14 +1,15 @@
+import { Tabs } from "@base-ui/react/tabs";
 import * as stylex from "@stylexjs/stylex";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
 
+import { BrowseViewToggle, browseStyles } from "../components/browse-layout";
 import { PageFrame } from "../components/page-frame";
 import {
   SearchForm,
   SearchModeTabs,
   SearchToggle,
   SearchUniverseFilter,
-  SearchViewToggle,
 } from "../features/search/search-controls";
 import { SearchResults, UpcomingSearchResults } from "../features/search/search-results";
 import { createCatalogSearchOrigin } from "../features/search/catalog-search-origin";
@@ -70,208 +71,132 @@ function SearchPage() {
 
   return (
     <PageFrame>
-      <section {...stylex.props(styles.catalog)} aria-label="Catalog search">
-        <SearchModeTabs
-          mode={mode}
-          onChange={(nextMode) =>
-            updateSearch({ mode: nextMode === "upcoming" ? "upcoming" : undefined })
-          }
-        />
+      <Tabs.Root
+        {...stylex.props(browseStyles.page)}
+        value={mode}
+        onValueChange={(value) =>
+          updateSearch({ mode: value === "upcoming" ? "upcoming" : undefined })
+        }
+      >
+        <header {...stylex.props(browseStyles.header)}>
+          <div>
+            <h1 {...stylex.props(browseStyles.title)}>Search cards</h1>
+            <p {...stylex.props(browseStyles.description)}>
+              Explore your catalog by card name, set, or Scryfall syntax.
+            </p>
+          </div>
+          <SearchModeTabs />
+        </header>
+        <Tabs.Panel value="cards">
+          <SearchForm activeQuery={activeQuery} onSearch={search} />
 
-        {mode === "cards" ? (
-          <div aria-labelledby="card-index-tab" id="card-index-panel" role="tabpanel">
-            <SearchForm activeQuery={activeQuery} onSearch={search} />
-
-            <div {...stylex.props(styles.indexMeta)}>
-              <div {...stylex.props(styles.indexActions)}>
-                <SearchToggle
-                  checked={uniqueCards}
-                  label="One print per card"
-                  onChange={(checked) => updateSearch({ uniqueCards: checked || undefined })}
-                />
-                <SearchToggle
-                  checked={includeTokens}
-                  label="Tokens"
-                  onChange={(checked) => updateSearch({ tokens: checked || undefined })}
-                />
-                <SearchToggle
-                  checked={includeArtSeries}
-                  label="Art series"
-                  onChange={(checked) => updateSearch({ artSeries: checked || undefined })}
-                />
-                <SearchToggle
-                  checked={includeAdCards}
-                  label="Ad cards"
-                  onChange={(checked) => updateSearch({ adCards: checked || undefined })}
-                />
-                <SearchToggle
-                  checked={includeDigital}
-                  label="Digital cards"
-                  onChange={(checked) => updateSearch({ digital: checked || undefined })}
-                />
-                <SearchUniverseFilter
-                  value={searchState.universe}
-                  onChange={(universe) => updateSearch({ universe })}
-                />
-                <SearchViewToggle
-                  grid={gridView}
-                  onChange={(grid) => {
-                    setView(grid ? "grid" : "list");
-                    updateSearch({ grid: grid || undefined });
-                  }}
-                />
-                <span {...stylex.props(styles.count)} aria-live="polite">
-                  {catalog.queryError
-                    ? "Query error"
-                    : catalog.loading && catalog.cards.length === 0
-                      ? activeQuery
-                        ? "Searching…"
-                        : "Reading index…"
-                      : `${(catalog.total ?? catalog.cards.length).toLocaleString()}${catalog.total === null && catalog.hasMore ? "+" : ""} ${activeQuery ? "matches" : uniqueCards ? (catalog.total === 1 ? "card" : "cards") : catalog.total === 1 ? "printing" : "printings"}`}
-                </span>
-              </div>
+          <div {...stylex.props(styles.filters)}>
+            <div {...stylex.props(styles.filterOptions)}>
+              <SearchToggle
+                checked={uniqueCards}
+                label="One printing per card"
+                onChange={(checked) => updateSearch({ uniqueCards: checked || undefined })}
+              />
+              <SearchToggle
+                checked={includeTokens}
+                label="Tokens"
+                onChange={(checked) => updateSearch({ tokens: checked || undefined })}
+              />
+              <SearchToggle
+                checked={includeArtSeries}
+                label="Art series"
+                onChange={(checked) => updateSearch({ artSeries: checked || undefined })}
+              />
+              <SearchToggle
+                checked={includeAdCards}
+                label="Ad cards"
+                onChange={(checked) => updateSearch({ adCards: checked || undefined })}
+              />
+              <SearchToggle
+                checked={includeDigital}
+                label="Digital cards"
+                onChange={(checked) => updateSearch({ digital: checked || undefined })}
+              />
+              <SearchUniverseFilter
+                value={searchState.universe}
+                onChange={(universe) => updateSearch({ universe })}
+              />
             </div>
-
-            <SearchResults
-              key={`${resultIdentity}:${gridView}`}
-              cards={catalog.cards}
-              error={catalog.error}
+          </div>
+          <div {...stylex.props(browseStyles.resultsBar)}>
+            <span {...stylex.props(browseStyles.count)} aria-live="polite">
+              {catalog.queryError
+                ? "Query error"
+                : catalog.loading && catalog.cards.length === 0
+                  ? activeQuery
+                    ? "Searching…"
+                    : "Reading index…"
+                  : `${(catalog.total ?? catalog.cards.length).toLocaleString()}${catalog.total === null && catalog.hasMore ? "+" : ""} ${activeQuery ? "matches" : uniqueCards ? (catalog.total === 1 ? "card" : "cards") : catalog.total === 1 ? "printing" : "printings"}`}
+            </span>
+            <BrowseViewToggle
+              label="Card view"
               grid={gridView}
-              hasMore={catalog.hasMore}
-              imagesReady={catalog.imagesReady}
-              loading={catalog.loading}
-              origin={createCatalogSearchOrigin(searchState)}
-              queryError={catalog.queryError}
-              total={catalog.total}
-              onLoadMore={catalog.loadMore}
+              onChange={(grid) => {
+                setView(grid ? "grid" : "list");
+                updateSearch({ grid: grid || undefined });
+              }}
             />
           </div>
-        ) : (
-          <div aria-labelledby="upcoming-card-tab" id="upcoming-card-panel" role="tabpanel">
-            <header {...stylex.props(styles.upcomingHeader)}>
-              <div {...stylex.props(styles.upcomingIntro)}>
-                <p {...stylex.props(styles.upcomingKicker)}>Catalog / Future printings</p>
-                <h1 {...stylex.props(styles.upcomingTitle)}>Upcoming cards.</h1>
-                <p {...stylex.props(styles.upcomingCopy)}>
-                  Every future printing is listed here. Protected entries hide the card until you
-                  choose to reveal that printing.
-                </p>
-              </div>
-              <div {...stylex.props(styles.upcomingMeta)}>
-                <SearchViewToggle
-                  grid={gridView}
-                  onChange={(grid) => {
-                    setView(grid ? "grid" : "list");
-                    updateSearch({ grid: grid || undefined });
-                  }}
-                />
-                <span {...stylex.props(styles.count)} aria-live="polite">
-                  {upcomingCards.loading && upcomingCards.printings.length === 0
-                    ? "Reading upcoming cards…"
-                    : `${(upcomingCards.total ?? upcomingCards.printings.length).toLocaleString()} upcoming ${upcomingCards.total === 1 ? "printing" : "printings"}`}
-                </span>
-              </div>
-            </header>
 
-            <UpcomingSearchResults
-              key={`${resultIdentity}:${gridView}`}
-              error={upcomingCards.error}
+          <SearchResults
+            key={`${resultIdentity}:${gridView}`}
+            cards={catalog.cards}
+            error={catalog.error}
+            grid={gridView}
+            hasMore={catalog.hasMore}
+            imagesReady={catalog.imagesReady}
+            loading={catalog.loading}
+            origin={createCatalogSearchOrigin(searchState)}
+            queryError={catalog.queryError}
+            total={catalog.total}
+            onLoadMore={catalog.loadMore}
+          />
+        </Tabs.Panel>
+        <Tabs.Panel value="upcoming">
+          <p {...stylex.props(styles.upcomingCopy)}>
+            Browse future printings. Protected previews stay concealed until you reveal them.
+          </p>
+          <div {...stylex.props(browseStyles.resultsBar)}>
+            <span {...stylex.props(browseStyles.count)} aria-live="polite">
+              {upcomingCards.loading && upcomingCards.printings.length === 0
+                ? "Reading upcoming cards…"
+                : `${(upcomingCards.total ?? upcomingCards.printings.length).toLocaleString()} upcoming ${upcomingCards.total === 1 ? "printing" : "printings"}`}
+            </span>
+            <BrowseViewToggle
+              label="Card view"
               grid={gridView}
-              hasMore={upcomingCards.hasMore}
-              imagesReady={upcomingCards.imagesReady}
-              loading={upcomingCards.loading}
-              origin={createCatalogSearchOrigin(searchState)}
-              printings={upcomingCards.printings}
-              total={upcomingCards.total}
-              onLoadMore={upcomingCards.loadMore}
+              onChange={(grid) => {
+                setView(grid ? "grid" : "list");
+                updateSearch({ grid: grid || undefined });
+              }}
             />
           </div>
-        )}
-      </section>
+
+          <UpcomingSearchResults
+            key={`${resultIdentity}:${gridView}`}
+            error={upcomingCards.error}
+            grid={gridView}
+            hasMore={upcomingCards.hasMore}
+            imagesReady={upcomingCards.imagesReady}
+            loading={upcomingCards.loading}
+            origin={createCatalogSearchOrigin(searchState)}
+            printings={upcomingCards.printings}
+            total={upcomingCards.total}
+            onLoadMore={upcomingCards.loadMore}
+          />
+        </Tabs.Panel>
+      </Tabs.Root>
     </PageFrame>
   );
 }
 
 const styles = stylex.create({
-  catalog: {
-    borderTopWidth: "1px",
-    borderTopStyle: "solid",
-    borderTopColor: "#55584f",
-  },
-  indexMeta: {
-    minHeight: "66px",
-    paddingBlock: "12px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    flexWrap: "wrap",
-    gap: "24px",
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
-  },
-  indexActions: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    flexWrap: "wrap",
-    gap: {
-      default: "24px",
-      "@media (max-width: 820px)": "12px",
-    },
-  },
-  upcomingHeader: {
-    minHeight: "178px",
-    paddingBlock: "30px 24px",
-    display: "flex",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    flexWrap: "wrap",
-    gap: "28px",
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
-  },
-  upcomingIntro: {
-    maxWidth: "620px",
-  },
-  upcomingKicker: {
-    margin: "0 0 10px",
-    color: "#9da091",
-    fontSize: "8px",
-    letterSpacing: "0.14em",
-    textTransform: "uppercase",
-  },
-  upcomingTitle: {
-    margin: 0,
-    color: "#f4f1e8",
-    fontSize: {
-      default: "40px",
-      "@media (max-width: 820px)": "32px",
-    },
-    fontWeight: 400,
-    letterSpacing: "-0.035em",
-    lineHeight: 1,
-  },
-  upcomingCopy: {
-    maxWidth: "540px",
-    margin: "14px 0 0",
-    color: "#a6a89d",
-    fontSize: "11px",
-    lineHeight: 1.6,
-  },
-  upcomingMeta: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    flexWrap: "wrap",
-    gap: "22px",
-  },
-  count: {
-    color: "#8f9287",
-    fontSize: "8px",
-    letterSpacing: "0.11em",
-    textTransform: "uppercase",
-    whiteSpace: "nowrap",
-  },
+  filters: { marginTop: "16px" },
+  filterOptions: { display: "flex", alignItems: "center", flexWrap: "wrap", gap: "8px 12px" },
+  upcomingCopy: { margin: 0, color: "#989b92", fontSize: "14px", lineHeight: 1.6 },
 });

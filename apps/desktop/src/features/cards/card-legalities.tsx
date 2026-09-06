@@ -26,7 +26,11 @@ const formatRank = new Map<string, number>(formatOrder.map((format, index) => [f
 
 export function CardLegalities({ legalities }: CardLegalitiesProps) {
   if (!legalities.length) {
-    return null;
+    return (
+      <p {...stylex.props(styles.empty)}>
+        No format legality information is available for this card.
+      </p>
+    );
   }
 
   const ordered = legalities
@@ -42,6 +46,9 @@ export function CardLegalities({ legalities }: CardLegalitiesProps) {
 
   return (
     <section {...stylex.props(styles.section)} aria-labelledby="legalities-heading">
+      <h2 id="legalities-heading" {...stylex.props(styles.title)}>
+        Format legality
+      </h2>
       <ul {...stylex.props(styles.grid)}>
         {ordered.map(({ legality }) => (
           <li {...stylex.props(styles.item)} key={legality.formatId}>
@@ -72,60 +79,41 @@ const statusNames = {
 } as const;
 
 const styles = stylex.create({
-  section: {
-    marginTop: "46px",
-    borderTopWidth: "1px",
-    borderTopStyle: "solid",
-    borderTopColor: "#55584f",
-  },
+  section: { minWidth: 0 },
+  title: { margin: "0 0 18px", color: "#dedfd5", fontSize: "16px", fontWeight: 500 },
+  empty: { margin: 0, color: "#989b92", fontSize: "14px", lineHeight: 1.6 },
   grid: {
     margin: 0,
-    padding: "14px 0 0",
+    padding: 0,
     display: "grid",
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "1px",
+    gap: "4px 24px",
     listStyle: "none",
-    backgroundColor: "#34362f",
+    "@media (max-width: 1100px) and (min-width: 821px)": { gridTemplateColumns: "minmax(0, 1fr)" },
+    "@media (max-width: 540px)": { gridTemplateColumns: "minmax(0, 1fr)" },
   },
   item: {
-    minHeight: "46px",
-    padding: "10px 12px",
+    minHeight: "40px",
+    padding: "8px 10px",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     gap: "12px",
-    backgroundColor: "#11120f",
+    borderRadius: "6px",
+    ":nth-child(4n+1)": { backgroundColor: "#151615" },
+    ":nth-child(4n+2)": { backgroundColor: "#151615" },
   },
-  format: {
-    overflow: "hidden",
-    color: "#c6c6bd",
-    fontSize: "9px",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  },
+  format: { minWidth: 0, color: "#c6c8bd", fontSize: "13px", overflowWrap: "anywhere" },
   status: {
-    flex: "0 0 auto",
+    flexShrink: 0,
     display: "inline-flex",
     alignItems: "center",
-    gap: "6px",
-    color: "#85887e",
-    fontSize: "7px",
-    letterSpacing: "0.07em",
-    textTransform: "uppercase",
+    gap: "7px",
+    color: "#85887f",
+    fontSize: "12px",
   },
-  statusLegal: {
-    color: "#69d799",
-  },
-  statusRestricted: {
-    color: "#dec26d",
-  },
-  statusBanned: {
-    color: "#dc8175",
-  },
-  statusDot: {
-    width: "5px",
-    height: "5px",
-    borderRadius: "50%",
-    backgroundColor: "currentColor",
-  },
+  statusLegal: { color: "#69d799" },
+  statusRestricted: { color: "#dec26d" },
+  statusBanned: { color: "#dc8175" },
+  statusDot: { width: "5px", height: "5px", borderRadius: "50%", backgroundColor: "currentColor" },
 });

@@ -74,7 +74,7 @@ export class CollectionProjection {
       return this.#requireResync();
     }
 
-    await this.#applyDelta(delta);
+    await this.#applyDelta({ deletedLotIds: delta.deletedLotIds, upserts: delta.upserts });
     for (const lotId of delta.deletedLotIds) this.#lots.delete(lotId);
     for (const lot of delta.upserts) this.#lots.set(lot.id, lot);
     this.#ready = true;

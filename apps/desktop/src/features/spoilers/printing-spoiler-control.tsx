@@ -2,7 +2,6 @@ import type { CatalogPrintingVisibility } from "@mooligan/domain/spoilers";
 import * as stylex from "@stylexjs/stylex";
 
 import { Button } from "../../components/ui/button";
-import { typography } from "../../styles/typography";
 import { getPrintingProtectionControl } from "./spoiler-ui-state";
 import { useSpoilers } from "./use-spoilers";
 
@@ -22,11 +21,8 @@ export function PrintingSpoilerControl({ printingId, visibility }: PrintingSpoil
   return (
     <section {...stylex.props(styles.section)} aria-label="Spoiler protection for this printing">
       <div {...stylex.props(styles.copy)}>
-        <span {...stylex.props(typography.label, styles.label)}>Preview visibility</span>
-        <p
-          {...stylex.props(typography.bodySmall, styles.description)}
-          id="printing-protection-description"
-        >
+        <span {...stylex.props(styles.label)}>Preview visibility</span>
+        <p {...stylex.props(styles.description)} id="printing-protection-description">
           {control.description}
         </p>
       </div>
@@ -41,7 +37,7 @@ export function PrintingSpoilerControl({ printingId, visibility }: PrintingSpoil
         {control.label}
       </Button>
       {spoilers.error ? (
-        <p {...stylex.props(typography.bodySmall, styles.error)} role="alert">
+        <p {...stylex.props(styles.error)} role="alert">
           The preview choice could not be saved. Try again.
         </p>
       ) : null}
@@ -58,10 +54,9 @@ const styles = stylex.create({
     justifyContent: "space-between",
     flexWrap: "wrap",
     gap: "16px",
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
-    backgroundColor: "#171914",
+    marginTop: "24px",
+    borderRadius: "10px",
+    backgroundColor: "#142018",
   },
   copy: {
     minWidth: 0,
@@ -69,16 +64,20 @@ const styles = stylex.create({
     gap: "7px",
   },
   label: {
-    color: "#85887e",
+    color: "#b0bdaf",
+    fontSize: "13px",
   },
   description: {
     maxWidth: "460px",
     margin: 0,
-    color: "#a6a89d",
+    color: "#989b92",
+    fontSize: "12px",
+    lineHeight: 1.5,
   },
   error: {
     width: "100%",
     margin: 0,
     color: "#ef9a8f",
+    fontSize: "12px",
   },
 });

@@ -7,6 +7,7 @@ import * as stylex from "@stylexjs/stylex";
 import { AnimatePresence, motion, useReducedMotionConfig } from "motion/react";
 import { useMemo, useState } from "react";
 
+import { ToggleGroup, ToggleGroupItem } from "../../components/ui/toggle-group";
 import { catalogImageUrl } from "../catalog/catalog-image";
 import { colors } from "../../styles/tokens.stylex.js";
 import { PrintingImage } from "./printing-image";
@@ -100,27 +101,34 @@ export function PrintingViewer({ faces, printing }: PrintingViewerProps) {
       </PrintingImage>
 
       {images.length > 1 ? (
-        <div {...stylex.props(styles.faceControls)} role="group" aria-label="Artwork face">
+        <ToggleGroup
+          style={styles.faceControls}
+          orientation="vertical"
+          aria-label="Artwork face"
+          value={requestedImage ? [imageKey(requestedImage)] : []}
+          onValueChange={(values) => {
+            const next = images.find((image) => imageKey(image) === values[0]);
+            if (next) setActiveFaceIndex(next.faceIndex);
+          }}
+        >
           {images.map((image, index) => {
             const face = faces[image.faceIndex];
-            const selected = image.faceIndex === requestedImage?.faceIndex;
 
             return (
-              <button
-                {...stylex.props(styles.faceButton, selected && styles.faceButtonSelected)}
+              <ToggleGroupItem
+                style={styles.faceButton}
+                value={imageKey(image)}
                 key={imageKey(image)}
-                aria-pressed={selected}
                 type="button"
-                onClick={() => setActiveFaceIndex(image.faceIndex)}
               >
                 <span {...stylex.props(styles.faceNumber)}>
                   {String(index + 1).padStart(2, "0")}
                 </span>
                 <span {...stylex.props(styles.faceName)}>{face?.name ?? `Face ${index + 1}`}</span>
-              </button>
+              </ToggleGroupItem>
             );
           })}
-        </div>
+        </ToggleGroup>
       ) : null}
     </figure>
   );
@@ -177,79 +185,42 @@ const styles = stylex.create({
     color: "#b8baaf",
   },
   placeholderMark: {
-    width: "56px",
-    height: "74px",
-    marginBottom: "22px",
+    width: "52px",
+    height: "70px",
+    marginBottom: "20px",
     display: "grid",
     placeItems: "center",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#55584f",
-    borderRadius: "3px",
+    borderRadius: "6px",
     color: colors.accent,
-    fontSize: "16px",
-    boxShadow: "6px 6px 0 #242620",
+    backgroundColor: "#213326",
+    fontSize: "22px",
+    boxShadow: "6px 5px 0 #1b231d",
   },
-  placeholderTitle: {
-    color: "#f4f1e8",
-    fontSize: "12px",
-    fontWeight: 400,
-    lineHeight: 1.3,
-  },
+  placeholderTitle: { color: "#c6c8bd", fontSize: "14px", fontWeight: 400, lineHeight: 1.5 },
   faceControls: {
+    width: "100%",
     marginTop: "12px",
-    display: "grid",
-    gap: "6px",
+    padding: "4px",
+    gap: "4px",
+    borderRadius: "9px",
+    backgroundColor: "#171817",
   },
   faceButton: {
     width: "100%",
-    minHeight: "42px",
-    padding: "0 12px",
+    height: "auto",
+    minHeight: "40px",
+    padding: "8px 12px",
     display: "grid",
-    gridTemplateColumns: "29px minmax(0, 1fr)",
+    gridTemplateColumns: "24px minmax(0, 1fr)",
     alignItems: "center",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#34362f",
-    borderRadius: "2px",
-    color: "#a6a89d",
+    gap: "8px",
+    borderWidth: 0,
+    borderRadius: "6px",
+    color: "#989b92",
     backgroundColor: "transparent",
     textAlign: "left",
-    cursor: "pointer",
-    transition: "color 150ms ease, border-color 150ms ease, background-color 150ms ease",
-    ":hover": {
-      color: "#f4f1e8",
-      borderColor: "#696c63",
-      backgroundColor: "rgba(255, 255, 255, 0.035)",
-    },
-    ":focus-visible": {
-      outlineWidth: "2px",
-      outlineStyle: "solid",
-      outlineColor: colors.accent,
-      outlineOffset: "3px",
-    },
+    "[data-pressed]": { color: "#f4f1e8", backgroundColor: "#30322e" },
   },
-  faceButtonSelected: {
-    borderColor: colors.accent,
-    color: "#1b1d19",
-    backgroundColor: colors.accent,
-    ":hover": {
-      borderColor: colors.accent,
-      color: "#1b1d19",
-      backgroundColor: colors.accent,
-    },
-  },
-  faceNumber: {
-    fontSize: "7px",
-    letterSpacing: "0.08em",
-    opacity: 0.7,
-  },
-  faceName: {
-    overflow: "hidden",
-    fontSize: "9px",
-    letterSpacing: "0.04em",
-    textOverflow: "ellipsis",
-    textTransform: "uppercase",
-    whiteSpace: "nowrap",
-  },
+  faceNumber: { fontSize: "11px", color: "#989b92", fontVariantNumeric: "tabular-nums" },
+  faceName: { fontSize: "13px", lineHeight: 1.4, whiteSpace: "normal", overflowWrap: "anywhere" },
 });

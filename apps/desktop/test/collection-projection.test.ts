@@ -8,18 +8,28 @@ import { test } from "node:test";
 
 import type { CollectionLot } from "@mooligan/domain/collection";
 
-import { createCollectionProjection } from "../electron/catalog/collection-projection.ts";
+import {
+  createCollectionProjection,
+  parseCollectionProjectionWorkerRequest,
+} from "../electron/catalog/collection-projection.ts";
 import { CollectionProjection } from "../electron/collection/projection.ts";
 import { diffCollectionLots } from "../src/features/workspace/collection-projection-diff.ts";
 
 const workspaceId = "b279410a-a855-4ee4-8827-51e4ca39770a";
 
-void test("collection projection accepts a snapshot and ordered deltas", async () => {
+void test("Holding edits and removals send valid catalog worker deltas without reconnecting", async () => {
   const projected = new Map<string, CollectionLot>();
   const projection = new CollectionProjection(() => workspaceId, {
-    applyDelta: ({ deletedLotIds, upserts }) => {
-      for (const lotId of deletedLotIds) projected.delete(lotId);
-      for (const lot of upserts) projected.set(lot.id, lot);
+    applyDelta: (delta) => {
+      const request = parseCollectionProjectionWorkerRequest({
+        id: 1,
+        operation: { ...delta, type: "collection-projection-apply" },
+      });
+      assert.ok(request, "The catalog worker must accept the collection delta.");
+      assert.equal(request.operation.type, "collection-projection-apply");
+      if (request.operation.type !== "collection-projection-apply") assert.fail();
+      for (const lotId of request.operation.deletedLotIds) projected.delete(lotId);
+      for (const lot of request.operation.upserts) projected.set(lot.id, lot);
       return Promise.resolve();
     },
     replace: (lots) => {
@@ -49,6 +59,20 @@ void test("collection projection accepts a snapshot and ordered deltas", async (
     { revision: 2, status: "applied" },
   );
   assert.deepEqual([...projected.values()], [changed]);
+  assert.deepEqual(projection.lots(), [changed]);
+
+  assert.deepEqual(
+    await projection.apply(7, {
+      ...connection,
+      deletedLotIds: [changed.id],
+      revision: 3,
+      upserts: [],
+    }),
+    { revision: 3, status: "applied" },
+  );
+  assert.deepEqual([...projected.values()], []);
+  assert.deepEqual(projection.lots(), []);
+  assert.equal(projection.isReady(), true);
 });
 
 void test("a revision gap clears collection state and requires a full replacement", async () => {

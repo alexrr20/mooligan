@@ -10,6 +10,7 @@ import * as stylex from "@stylexjs/stylex";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
 
+import { BrowseViewToggle, browseStyles } from "../components/browse-layout";
 import { PageFrame } from "../components/page-frame";
 import { Button } from "../components/ui/button";
 import {
@@ -19,7 +20,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import { ToggleGroup, ToggleGroupItem } from "../components/ui/toggle-group";
 import { createCollectionOrigin } from "../features/collection/collection-origin";
 import { CollectionResults } from "../features/collection/collection-results";
 import {
@@ -70,183 +70,191 @@ function CollectionPage() {
 
   return (
     <PageFrame>
-      <section {...stylex.props(styles.page)} aria-labelledby="collection-heading">
-        <header {...stylex.props(styles.header)}>
+      <section {...stylex.props(browseStyles.page)} aria-labelledby="collection-heading">
+        <header {...stylex.props(browseStyles.header)}>
           <div>
-            <p {...stylex.props(styles.kicker)}>Workspace / Paper cards</p>
-            <h1 {...stylex.props(styles.title)} id="collection-heading">
-              Collection.
+            <h1 {...stylex.props(browseStyles.title)} id="collection-heading">
+              Collection
             </h1>
+            <p {...stylex.props(browseStyles.description)}>
+              The paper cards you own, down to the printing.
+            </p>
           </div>
-          <div {...stylex.props(styles.total)} aria-live="polite">
-            <strong>{collection.total.copies.toLocaleString()}</strong>
-            <span>
-              copies across {collection.total.cards.toLocaleString()}{" "}
-              {collection.total.cards === 1 ? "card" : "cards"}
-            </span>
-            {collection.protectedCopies ? (
-              <span>plus {collection.protectedCopies.toLocaleString()} protected copies</span>
-            ) : null}
-          </div>
+          <Link {...stylex.props(styles.addLink)} search={{}} to="/search">
+            <span aria-hidden="true">+</span> Add cards
+          </Link>
         </header>
-
-        <SearchForm
-          activeQuery={search.query ?? ""}
-          ariaLabel="Search your Collection"
-          autoFocus={false}
-          id="collection-search"
-          placeholder="SEARCH OWNED CARDS"
-          onSearch={searchCollection}
-        />
-
-        <div {...stylex.props(styles.controls)}>
-          <Filter
-            label="Set"
-            options={[
-              { label: "All sets", value: null },
-              ...collection.sets.map(({ code, name }) => ({
-                label: `${name} · ${code.toUpperCase()}`,
-                value: code,
-              })),
-            ]}
-            value={search.set ?? ""}
-            onChange={(set) => update({ set: set || undefined })}
-          />
-          <Filter
-            label="Finish"
-            options={[
-              { label: "All finishes", value: null },
-              { label: "Nonfoil", value: "nonfoil" },
-              { label: "Foil", value: "foil" },
-              { label: "Etched", value: "etched" },
-              { label: "Glossy", value: "glossy" },
-            ]}
-            value={search.finish ?? ""}
-            onChange={(finish) => {
-              const parsed = FinishSchema.safeParse(finish);
-              update({ finish: parsed.success ? parsed.data : undefined });
-            }}
-          />
-          <Filter
-            label="Language"
-            options={[
-              { label: "All languages", value: null },
-              ...cardLanguages.map(({ label, value }) => ({ label, value })),
-            ]}
-            value={search.language ?? ""}
-            onChange={(language) => {
-              const parsed = CardLanguageSchema.safeParse(language);
-              update({ language: parsed.success ? parsed.data : undefined });
-            }}
-          />
-          <Filter
-            label="Condition"
-            options={[
-              { label: "All conditions", value: null },
-              ...cardConditions.map(({ label, value }) => ({ label, value })),
-            ]}
-            value={search.condition ?? ""}
-            onChange={(condition) => {
-              const parsed = CardConditionSchema.safeParse(condition);
-              update({ condition: parsed.success ? parsed.data : undefined });
-            }}
-          />
-          <Filter
-            label="Sort"
-            options={[
-              { label: "Name", value: "name" },
-              { label: "Set", value: "set" },
-              { label: "Quantity", value: "quantity" },
-            ]}
-            value={search.sort ?? "name"}
-            onChange={(sort) => {
-              const parsed = CollectionSortSchema.safeParse(sort);
-              update({
-                sort: parsed.success && parsed.data !== "name" ? parsed.data : undefined,
-              });
-            }}
-          />
-          <div {...stylex.props(styles.viewControl)}>
-            <span {...stylex.props(styles.controlLabel)}>View</span>
-            <ToggleGroup
-              aria-label="Collection view"
-              value={[view]}
-              onValueChange={(nextViews) => {
-                const nextView = nextViews[0];
-                if (nextView) setView(nextView);
-              }}
-            >
-              {(["list", "grid"] as const).map((option) => (
-                <ToggleGroupItem key={option} type="button" value={option}>
-                  {option}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
+        <dl {...stylex.props(styles.totals)} aria-live="polite">
+          <div {...stylex.props(styles.stat)}>
+            <dt {...stylex.props(styles.statLabel)}>Copies</dt>
+            <dd {...stylex.props(styles.statValue)}>{collection.total.copies.toLocaleString()}</dd>
           </div>
-          {activeFilters ? (
-            <Button size="sm" type="button" variant="ghost" onClick={clearFilters}>
-              Clear
-            </Button>
+          <div {...stylex.props(styles.stat)}>
+            <dt {...stylex.props(styles.statLabel)}>Unique cards</dt>
+            <dd {...stylex.props(styles.statValue)}>{collection.total.cards.toLocaleString()}</dd>
+          </div>
+          <div {...stylex.props(styles.stat)}>
+            <dt {...stylex.props(styles.statLabel)}>Holdings</dt>
+            <dd {...stylex.props(styles.statValue)}>
+              {collection.total.holdings.toLocaleString()}
+            </dd>
+          </div>
+          {collection.protectedCopies ? (
+            <div {...stylex.props(styles.stat)}>
+              <dt {...stylex.props(styles.statLabel)}>Protected copies</dt>
+              <dd {...stylex.props(styles.statValue)}>
+                {collection.protectedCopies.toLocaleString()}
+              </dd>
+            </div>
           ) : null}
-        </div>
-
-        {activeFilters ? (
-          <p {...stylex.props(styles.filteredCount)} aria-live="polite">
-            {collection.filtered.holdings.toLocaleString()} matching Holdings ·{" "}
-            {collection.filtered.copies.toLocaleString()} copies
-          </p>
-        ) : null}
-
-        {collection.error ? (
-          <Message mark="!" title="Collection unavailable" copy={collection.error}>
-            <Button size="sm" onClick={() => void collection.retry()}>
-              Retry
-            </Button>
-          </Message>
-        ) : emptyCollection ? (
-          <Message
-            mark="+"
-            title="Start with an exact printing"
-            copy="Find a paper card, choose its physical properties, and save the first copies you own."
-          >
-            <Link {...stylex.props(styles.messageLink)} search={{}} to="/search">
-              Find cards to add
-            </Link>
-          </Message>
-        ) : filteredEmpty ? (
-          <Message
-            mark="0"
-            title="No matching Holdings"
-            copy="Your Collection has cards, but none match this search and filter combination."
-          >
-            <Button size="sm" variant="secondary" onClick={clearFilters}>
-              Clear search and filters
-            </Button>
-          </Message>
-        ) : collection.loading && collection.holdings.length === 0 ? (
-          <Message
-            mark="…"
-            title="Reading your Collection"
-            copy="Grouping copies into Holdings from this workspace."
+        </dl>
+        <div>
+          <SearchForm
+            activeQuery={search.query ?? ""}
+            ariaLabel="Search your Collection"
+            autoFocus={false}
+            id="collection-search"
+            placeholder="Search cards in your collection"
+            onSearch={searchCollection}
           />
-        ) : (
-          <>
-            <CollectionResults
-              grid={view === "grid"}
-              holdings={collection.holdings}
-              origin={createCollectionOrigin(search)}
+
+          <div {...stylex.props(styles.controls)}>
+            <Filter
+              label="Set"
+              options={[
+                { label: "All sets", value: null },
+                ...collection.sets.map(({ code, name }) => ({
+                  label: `${name} · ${code.toUpperCase()}`,
+                  value: code,
+                })),
+              ]}
+              value={search.set ?? ""}
+              onChange={(set) => update({ set: set || undefined })}
             />
-            {collection.hasMore ? (
-              <Button
-                disabled={collection.loading}
-                variant="secondary"
-                onClick={() => collection.loadMore()}
-              >
-                {collection.loading ? "Reading…" : "Load 100 more Holdings"}
+            <Filter
+              label="Finish"
+              options={[
+                { label: "All finishes", value: null },
+                { label: "Nonfoil", value: "nonfoil" },
+                { label: "Foil", value: "foil" },
+                { label: "Etched", value: "etched" },
+                { label: "Glossy", value: "glossy" },
+              ]}
+              value={search.finish ?? ""}
+              onChange={(finish) => {
+                const parsed = FinishSchema.safeParse(finish);
+                update({ finish: parsed.success ? parsed.data : undefined });
+              }}
+            />
+            <Filter
+              label="Language"
+              options={[
+                { label: "All languages", value: null },
+                ...cardLanguages.map(({ label, value }) => ({ label, value })),
+              ]}
+              value={search.language ?? ""}
+              onChange={(language) => {
+                const parsed = CardLanguageSchema.safeParse(language);
+                update({ language: parsed.success ? parsed.data : undefined });
+              }}
+            />
+            <Filter
+              label="Condition"
+              options={[
+                { label: "All conditions", value: null },
+                ...cardConditions.map(({ label, value }) => ({ label, value })),
+              ]}
+              value={search.condition ?? ""}
+              onChange={(condition) => {
+                const parsed = CardConditionSchema.safeParse(condition);
+                update({ condition: parsed.success ? parsed.data : undefined });
+              }}
+            />
+            <Filter
+              label="Sort"
+              options={[
+                { label: "Name", value: "name" },
+                { label: "Set", value: "set" },
+                { label: "Quantity", value: "quantity" },
+              ]}
+              value={search.sort ?? "name"}
+              onChange={(sort) => {
+                const parsed = CollectionSortSchema.safeParse(sort);
+                update({
+                  sort: parsed.success && parsed.data !== "name" ? parsed.data : undefined,
+                });
+              }}
+            />
+            {activeFilters ? (
+              <Button size="sm" type="button" variant="ghost" onClick={clearFilters}>
+                Clear filters
               </Button>
             ) : null}
-          </>
-        )}
+          </div>
+          <div {...stylex.props(browseStyles.resultsBar)}>
+            <p {...stylex.props(browseStyles.count)} aria-live="polite">
+              {activeFilters
+                ? `${collection.filtered.holdings.toLocaleString()} matching holdings · ${collection.filtered.copies.toLocaleString()} copies`
+                : `${collection.total.holdings.toLocaleString()} ${collection.total.holdings === 1 ? "holding" : "holdings"}`}
+            </p>
+            <BrowseViewToggle
+              label="Collection view"
+              grid={view === "grid"}
+              onChange={(grid) => setView(grid ? "grid" : "list")}
+            />
+          </div>
+
+          {collection.error ? (
+            <Message mark="!" title="Collection unavailable" copy={collection.error}>
+              <Button size="sm" onClick={() => void collection.retry()}>
+                Retry
+              </Button>
+            </Message>
+          ) : emptyCollection ? (
+            <Message
+              mark="+"
+              title="Make room for your first card"
+              copy="Find a card in the catalog, choose a printing, and add the copies you own."
+            >
+              <Link {...stylex.props(browseStyles.link)} search={{}} to="/search">
+                Find cards to add
+              </Link>
+            </Message>
+          ) : filteredEmpty ? (
+            <Message
+              mark="0"
+              title="No matching holdings"
+              copy="No cards match these filters. Try another search or clear the filters."
+            >
+              <Button size="sm" variant="secondary" onClick={clearFilters}>
+                Clear search and filters
+              </Button>
+            </Message>
+          ) : collection.loading && collection.holdings.length === 0 ? (
+            <Message
+              mark="…"
+              title="Reading your collection"
+              copy="Loading the cards saved in this workspace."
+            />
+          ) : (
+            <>
+              <CollectionResults
+                grid={view === "grid"}
+                holdings={collection.holdings}
+                origin={createCollectionOrigin(search)}
+              />
+              {collection.hasMore ? (
+                <Button
+                  disabled={collection.loading}
+                  variant="secondary"
+                  onClick={() => collection.loadMore()}
+                >
+                  {collection.loading ? "Reading…" : "Show 100 more holdings"}
+                </Button>
+              ) : null}
+            </>
+          )}
+        </div>
       </section>
     </PageFrame>
   );
@@ -271,7 +279,7 @@ function Filter({
         value={value || null}
         onValueChange={(nextValue) => onChange(nextValue ?? "")}
       >
-        <SelectTrigger aria-label={label}>
+        <SelectTrigger aria-label={label} style={browseStyles.select}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent align="start" alignItemWithTrigger={false}>
@@ -312,113 +320,70 @@ function Message({
 }
 
 const styles = stylex.create({
-  page: {
-    borderTopWidth: "1px",
-    borderTopStyle: "solid",
-    borderTopColor: "#55584f",
+  addLink: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "8px",
+    padding: "10px 16px",
+    borderRadius: "8px",
+    backgroundColor: colors.accent,
+    color: "#052e16",
+    fontSize: "14px",
+    fontWeight: 500,
+    textDecoration: "none",
+    ":hover": { backgroundColor: "#30d77d" },
+    ":focus-visible": { outline: `2px solid ${colors.accent}`, outlineOffset: "4px" },
   },
-  header: {
-    minHeight: "210px",
-    paddingBlock: "42px 30px",
-    display: "flex",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    gap: "32px",
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
-    "@media (max-width: 700px)": { alignItems: "flex-start", flexDirection: "column" },
-  },
-  kicker: {
-    margin: "0 0 14px",
-    color: colors.accent,
-    fontSize: "8px",
-    letterSpacing: ".14em",
-    textTransform: "uppercase",
-  },
-  title: {
+  totals: { display: "flex", flexWrap: "wrap", gap: "24px 56px", margin: "4px 0 8px" },
+  stat: { display: "flex", flexDirection: "column-reverse", gap: "6px" },
+  statLabel: { fontSize: "13px", color: "#989b92" },
+  statValue: {
     margin: 0,
-    fontSize: "clamp(52px, 8vw, 88px)",
+    fontSize: "30px",
     fontWeight: 400,
-    letterSpacing: "-.06em",
-    lineHeight: 0.86,
-  },
-  total: {
-    minWidth: "190px",
-    paddingBottom: "5px",
-    display: "grid",
-    gap: "4px",
-    color: "#85887e",
-    fontSize: "8px",
-    textAlign: "right",
-    textTransform: "uppercase",
-    "@media (max-width: 700px)": { textAlign: "left" },
+    letterSpacing: "-.025em",
+    fontVariantNumeric: "tabular-nums",
+    lineHeight: 1.1,
   },
   controls: {
-    minHeight: "82px",
-    paddingBlock: "13px",
     display: "flex",
-    alignItems: "flex-end",
+    alignItems: "end",
     flexWrap: "wrap",
-    gap: "13px",
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
+    gap: "12px",
+    marginTop: "18px",
   },
-  filter: { minWidth: "120px", display: "grid", gap: "7px" },
-  controlLabel: {
-    color: "#85887e",
-    fontSize: "7px",
-    letterSpacing: ".12em",
-    textTransform: "uppercase",
-  },
-  viewControl: { display: "grid", gap: "7px" },
-  filteredCount: {
-    margin: 0,
-    paddingBlock: "12px",
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
-    color: "#85887e",
-    fontSize: "8px",
-    textTransform: "uppercase",
-  },
+  filter: { minWidth: "110px", maxWidth: "100%", display: "grid", gap: "7px" },
+  controlLabel: { color: "#989b92", fontSize: "12px", paddingLeft: "2px" },
   message: {
     minHeight: "300px",
-    paddingBlock: "64px",
-    display: "grid",
-    gridTemplateColumns: "62px minmax(0, 520px)",
-    gap: "25px",
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
+    padding: "54px 24px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    textAlign: "center",
+    gap: "24px",
+    backgroundColor: "#131413",
+    borderRadius: "12px",
   },
   messageMark: {
     width: "48px",
-    height: "66px",
+    height: "64px",
     display: "grid",
     placeItems: "center",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#55584f",
-    borderRadius: "3px",
+    borderRadius: "6px",
     color: colors.accent,
-    fontSize: "18px",
-    boxShadow: "6px 6px 0 #242620",
+    backgroundColor: "#213326",
+    fontSize: "24px",
+    boxShadow: "7px 5px 0 #1b231d",
   },
-  messageTitle: { color: "#f4f1e8", fontSize: "26px", fontWeight: 400 },
-  messageCopy: { margin: "12px 0 0", color: "#a6a89d", fontSize: "11px", lineHeight: 1.65 },
-  messageActions: { marginTop: "20px" },
-  messageLink: {
-    minHeight: "36px",
-    paddingInline: "13px",
-    display: "inline-flex",
-    alignItems: "center",
-    borderRadius: "3px",
-    color: "#064e3b",
-    backgroundColor: colors.accent,
-    fontSize: "8px",
-    textDecoration: "none",
-    textTransform: "uppercase",
+  messageTitle: { color: "#f4f1e8", fontSize: "22px", fontWeight: 400 },
+  messageCopy: {
+    maxWidth: "400px",
+    margin: "12px auto 0",
+    color: "#989b92",
+    fontSize: "14px",
+    lineHeight: 1.65,
   },
+  messageActions: { marginTop: "22px" },
 });

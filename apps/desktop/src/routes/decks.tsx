@@ -9,6 +9,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { DeckDetail } from "../features/decks/deck-detail";
 import { DeckSelect, deckStyles } from "../features/decks/deck-controls";
+import { DeckGrid } from "../features/decks/deck-grid";
 import { DeckMetadataEditor, emptyDeck } from "../features/decks/deck-metadata-editor";
 import { useDeckMutations, useDecks } from "../features/decks/use-decks";
 
@@ -131,32 +132,7 @@ function DecksPage() {
             </p>
           </section>
         ) : null}
-        <ul {...stylex.props(deckStyles.list)}>
-          {shown.map((deck) => (
-            <li key={deck.id} {...stylex.props(deckStyles.panel)}>
-              <div {...stylex.props(deckStyles.header)}>
-                <Link
-                  to="/decks"
-                  search={{ deck: deck.id }}
-                  {...stylex.props(deckStyles.link, deckStyles.sectionTitle)}
-                >
-                  {deck.name}
-                </Link>
-                <span>
-                  {getCatalogFormatName(deck.formatId)}
-                  {deck.archived ? " · Archived" : ""}
-                </span>
-              </div>
-              <p {...stylex.props(deckStyles.muted)}>
-                {deck.entries
-                  .filter(({ section }) => section !== "maybeboard")
-                  .reduce((total, entry) => total + entry.quantity, 0)}{" "}
-                cards · Updated {new Date(deck.updatedAt).toLocaleDateString()}
-                {deck.tags.length ? ` · ${deck.tags.join(", ")}` : ""}
-              </p>
-            </li>
-          ))}
-        </ul>
+        <DeckGrid decks={shown} />
         {creating ? (
           <DeckMetadataEditor
             title="Create deck"

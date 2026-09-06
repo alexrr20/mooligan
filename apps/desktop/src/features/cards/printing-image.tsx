@@ -98,11 +98,9 @@ const styles = stylex.create({
     backgroundSize: "13px 13px",
   },
   detail: {
-    borderColor: "#55584f",
-    backgroundColor: "#141512",
-    backgroundImage:
-      "linear-gradient(135deg, transparent 0 49.7%, rgba(244, 241, 232, 0.055) 49.8% 50.2%, transparent 50.3%), linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px)",
-    backgroundSize: "auto, 24px 24px, 24px 24px",
+    borderWidth: 0,
+    backgroundColor: "#171817",
+    boxShadow: "0 12px 32px #0004",
   },
   image: {
     width: "100%",

@@ -7,7 +7,6 @@ import { colors } from "../../styles/tokens.stylex.js";
 import { useCatalogImageLoading } from "../catalog/catalog-image-loading";
 import { CatalogSetSymbol } from "../catalog/catalog-set-symbol";
 import { PrintingImage } from "../cards/printing-image";
-import { PrintingPrices } from "../cards/printing-prices";
 import { type CatalogSearchOrigin, withCatalogSearchOrigin } from "./catalog-search-origin";
 import { formatSpoilerReleaseDate } from "../spoilers/spoiler-ui-state";
 import { AddToCollectionButton } from "../collection/collection-editor";
@@ -159,14 +158,13 @@ function CatalogResults({
     <>
       {!grid ? (
         <div {...stylex.props(styles.columnHead)} aria-hidden="true">
-          <span>No.</span>
-          <span>Image</span>
           <span>Card</span>
+          <span />
           <span>Printing</span>
         </div>
       ) : null}
       <ol ref={listRef} {...stylex.props(styles.cardList, grid && styles.cardGrid)} start={1}>
-        {items.map((item, index) => {
+        {items.map((item) => {
           const card = item.status === "visible" ? item.card : null;
           const printingId = item.status === "visible" ? item.card.id : item.printingId;
           const image = card ? (grid ? card.gridImage : card.image) : null;
@@ -181,11 +179,6 @@ function CatalogResults({
                 state={withCatalogSearchOrigin(origin)}
                 to="/cards/$printingId"
               >
-                {!grid ? (
-                  <span {...stylex.props(styles.rowNumber)}>
-                    {String(index + 1).padStart(3, "0")}
-                  </span>
-                ) : null}
                 <PrintingImage
                   alt={card ? `${card.name}, ${card.setName ?? card.setCode} printing` : ""}
                   compact={!grid}
@@ -211,11 +204,6 @@ function CatalogResults({
                   onImageError={() => imageLoading.settle(printingId, true)}
                   onImageLoad={() => imageLoading.settle(printingId)}
                 />
-                {grid && item.status === "visible" ? (
-                  <div {...stylex.props(styles.tilePrices)}>
-                    <PrintingPrices />
-                  </div>
-                ) : null}
                 <div {...stylex.props(styles.cardIdentity, grid && styles.tileIdentity)}>
                   <strong {...stylex.props(styles.cardName, grid && styles.tileName)}>
                     {card?.name ?? "Protected preview"}
@@ -241,14 +229,13 @@ function CatalogResults({
                       {formatSpoilerReleaseDate(item.releasedOn)}
                     </time>
                   ) : null}
-                  {!grid && item.status === "visible" ? <PrintingPrices /> : null}
                 </div>
               </Link>
               {card && !card.isDigital ? (
                 <div
                   {...stylex.props(styles.collectionAction, grid && styles.tileCollectionAction)}
                 >
-                  <AddToCollectionButton printingId={card.id} />
+                  <AddToCollectionButton compact printingId={card.id} />
                 </div>
               ) : null}
             </li>
@@ -257,8 +244,9 @@ function CatalogResults({
       </ol>
       {hasMore ? (
         <Button
-          {...stylex.props(styles.moreButton)}
+          style={styles.moreButton}
           disabled={loading}
+          variant="secondary"
           type="button"
           onClick={onLoadMore}
         >
@@ -275,246 +263,112 @@ function CatalogResults({
 
 const styles = stylex.create({
   columnHead: {
-    minHeight: "34px",
+    padding: "8px 64px 12px 12px",
     display: "grid",
-    gridTemplateColumns: {
-      default: "54px 62px minmax(0, 1fr) minmax(180px, 0.72fr)",
-      "@media (max-width: 820px)": "42px 52px minmax(0, 1fr) 150px",
-    },
+    gridTemplateColumns: "64px minmax(0, 1fr) minmax(180px, .7fr)",
     alignItems: "center",
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
-    color: "#8f9287",
-    fontSize: "7px",
-    letterSpacing: "0.15em",
-    textTransform: "uppercase",
+    color: "#85887f",
+    fontSize: "12px",
+    "@media (max-width: 700px)": { display: "none" },
   },
-  cardList: {
-    margin: 0,
-    padding: 0,
-    listStyle: "none",
-  },
-  cardItem: {
-    minWidth: 0,
-    position: "relative",
-  },
-  collectionAction: {
-    position: "absolute",
-    zIndex: 3,
-    right: "8px",
-    top: "27px",
-  },
-  tileCollectionAction: {
-    right: "7px",
-    top: "7px",
-  },
+  cardList: { margin: 0, padding: 0, listStyle: "none", display: "grid", gap: "4px" },
+  cardItem: { minWidth: 0, position: "relative" },
+  collectionAction: { position: "absolute", zIndex: 3, right: "12px", top: "28px" },
+  tileCollectionAction: { right: "8px", top: "8px" },
   cardGrid: {
-    paddingBlock: "22px 30px",
+    paddingBlock: "4px 32px",
     display: "grid",
-    gridTemplateColumns: {
-      default: "repeat(auto-fill, minmax(164px, 1fr))",
-      "@media (max-width: 820px)": "repeat(auto-fill, minmax(148px, 1fr))",
-    },
-    gap: "28px 18px",
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
+    gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 180px), 1fr))",
+    gap: "30px 22px",
   },
   cardRow: {
     minHeight: "88px",
-    paddingBlock: "10px",
+    padding: "10px 64px 10px 12px",
     display: "grid",
-    gridTemplateColumns: {
-      default: "54px 62px minmax(0, 1fr) minmax(180px, 0.72fr)",
-      "@media (max-width: 820px)": "42px 52px minmax(0, 1fr) 150px",
-    },
+    gridTemplateColumns: "64px minmax(0, 1fr) minmax(180px, .7fr)",
     alignItems: "center",
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
+    borderRadius: "9px",
     color: "inherit",
     textDecoration: "none",
-    transition: "background-color 140ms ease, padding 140ms ease",
-    ":hover": {
-      paddingInline: "8px",
-      backgroundColor: "rgba(255, 255, 255, 0.04)",
-    },
-    ":focus-visible": {
-      position: "relative",
-      zIndex: 2,
-      outlineWidth: "2px",
-      outlineStyle: "solid",
-      outlineColor: colors.accent,
-      outlineOffset: "3px",
-    },
-  },
-  rowNumber: {
-    color: "#85887e",
-    fontSize: "8px",
-    letterSpacing: "0.06em",
+    ":hover": { backgroundColor: "#191b18" },
+    ":focus-visible": { outline: `2px solid ${colors.accent}`, outlineOffset: "2px" },
+    "@media (max-width: 700px)": { gridTemplateColumns: "54px minmax(0, 1fr)", rowGap: "4px" },
   },
   cardTile: {
     minWidth: 0,
     minHeight: 0,
-    paddingBlock: 0,
-    position: "relative",
+    padding: 0,
     display: "grid",
     gridTemplateColumns: "minmax(0, 1fr)",
     alignItems: "start",
     alignContent: "start",
-    borderBottomWidth: 0,
-    transition: "transform 160ms cubic-bezier(0.23, 1, 0.32, 1)",
-    ":hover": {
-      paddingInline: 0,
-      backgroundColor: "transparent",
-    },
-    "@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)": {
-      ":hover": {
-        transform: "translateY(-4px)",
-      },
-    },
+    ":hover": { backgroundColor: "transparent" },
+    "@media (max-width: 700px)": { gridTemplateColumns: "minmax(0, 1fr)", rowGap: 0 },
   },
-  protectedArtwork: {
-    display: "grid",
-    placeItems: "center",
-    gap: "14px",
-  },
-  protectedArtworkLabel: {
-    color: "#a6a89d",
-    fontSize: "7px",
-    letterSpacing: "0.14em",
-    textTransform: "uppercase",
-  },
-  cardIdentity: {
-    minWidth: 0,
-    paddingRight: "22px",
-    display: "grid",
-    gap: "3px",
-  },
+  protectedArtwork: { display: "grid", placeItems: "center", gap: "14px" },
+  protectedArtworkLabel: { color: "#a6a89d", fontSize: "12px" },
+  cardIdentity: { minWidth: 0, paddingRight: "20px", display: "grid", gap: "6px" },
   cardName: {
-    overflow: "hidden",
     color: "#f4f1e8",
-    fontSize: "18px",
+    fontSize: "16px",
     fontWeight: 400,
-    letterSpacing: "-0.015em",
-    lineHeight: 1.1,
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
+    letterSpacing: "-.01em",
+    lineHeight: 1.35,
+    overflowWrap: "anywhere",
   },
-  tileIdentity: {
-    padding: "12px 4px 0",
-  },
-  tileName: {
-    overflow: "visible",
-    fontSize: "17px",
-    lineHeight: 1.05,
-    textOverflow: "clip",
-    whiteSpace: "normal",
-  },
-  protectedCopy: {
-    color: colors.accent,
-    fontSize: "7px",
-    letterSpacing: "0.11em",
-    lineHeight: 1.4,
-    textTransform: "uppercase",
-  },
-  printing: {
-    minWidth: 0,
-  },
-  tilePrinting: {
-    padding: "10px 4px 0",
-  },
+  tileIdentity: { padding: "13px 2px 0" },
+  tileName: { fontSize: "15px", lineHeight: 1.35 },
+  protectedCopy: { color: "#9eaf9e", fontSize: "11px", lineHeight: 1.4 },
+  printing: { minWidth: 0, "@media (max-width: 700px)": { gridColumn: "2", paddingBottom: "4px" } },
+  tilePrinting: { padding: "5px 2px 0", "@media (max-width: 700px)": { gridColumn: "auto" } },
   printingCopy: {
-    overflow: "hidden",
-    color: "#8f9287",
-    fontSize: "7px",
-    letterSpacing: "0.05em",
-    lineHeight: 1.55,
+    color: "#989b92",
+    fontSize: "12px",
+    lineHeight: 1.5,
     display: "block",
-    textOverflow: "ellipsis",
-    textTransform: "uppercase",
-    whiteSpace: "nowrap",
+    overflowWrap: "anywhere",
   },
-  printingNumber: {
-    marginTop: "2px",
-  },
-  releaseDate: {
-    marginTop: "6px",
-    color: "#c0c2b8",
-  },
-  tilePrices: {
-    paddingInline: "4px",
-  },
+  printingNumber: { display: "inline-block", color: "#787d73", fontSize: "11px", marginTop: "2px" },
+  releaseDate: { marginTop: "5px", color: "#b5b8ae" },
   message: {
-    minHeight: "180px",
+    minHeight: "240px",
+    padding: "40px 24px",
     display: "flex",
     alignItems: "center",
-    gap: "22px",
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: "24px",
+    backgroundColor: "#131413",
+    borderRadius: "12px",
   },
   messageMark: {
-    width: "54px",
-    height: "72px",
-    flex: "0 0 auto",
+    width: "48px",
+    height: "64px",
+    flexShrink: 0,
     display: "grid",
     placeItems: "center",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#1b1d19",
-    borderRadius: "3px",
-    color: "#1b1d19",
-    backgroundColor: colors.accent,
-    fontSize: "9px",
-    boxShadow: "6px 6px 0 #242620",
+    borderRadius: "6px",
+    color: colors.accent,
+    backgroundColor: "#213326",
+    fontSize: "24px",
+    boxShadow: "7px 5px 0 #1b231d",
   },
-  messageTitle: {
-    color: "#f4f1e8",
-    fontSize: "22px",
-    fontWeight: 400,
-  },
+  messageTitle: { color: "#f4f1e8", fontSize: "22px", fontWeight: 400 },
   messageCopy: {
-    margin: "6px 0 0",
-    color: "#a6a89d",
-    fontSize: "11px",
+    maxWidth: "440px",
+    margin: "10px 0 0",
+    color: "#989b92",
+    fontSize: "14px",
+    lineHeight: 1.6,
   },
   moreButton: {
-    width: "100%",
-    minHeight: "58px",
-    paddingInline: "14px",
     display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderWidth: "0 0 1px",
-    borderStyle: "solid",
-    borderColor: "#55584f",
-    borderRadius: 0,
-    color: "#f4f1e8",
-    backgroundColor: "transparent",
-    fontSize: "8px",
-    letterSpacing: "0.12em",
-    textTransform: "uppercase",
-    cursor: "pointer",
-    transition: "background-color 160ms ease",
-    ":hover:not(:disabled)": {
-      color: "#1b1d19",
-      backgroundColor: colors.accent,
-    },
-    ":focus-visible": {
-      outlineWidth: "2px",
-      outlineStyle: "solid",
-      outlineColor: colors.accent,
-      outlineOffset: "3px",
-    },
-    ":disabled": {
-      cursor: "wait",
-      opacity: 0.58,
-    },
+    gap: "20px",
+    margin: "24px auto 0",
+    height: "40px",
+    paddingInline: "18px",
+    borderWidth: 0,
+    fontSize: "13px",
   },
-  moreCount: {
-    color: "inherit",
-    opacity: 0.72,
-  },
+  moreCount: { color: "#989b92", fontVariantNumeric: "tabular-nums" },
 });

@@ -1,10 +1,11 @@
 import type { CatalogReleaseSummary } from "@mooligan/domain/spoilers";
 import * as stylex from "@stylexjs/stylex";
+import { Link } from "@tanstack/react-router";
 import { useId } from "react";
 
+import { browseStyles } from "../../components/browse-layout";
 import { Button } from "../../components/ui/button";
 import { colors } from "../../styles/tokens.stylex.js";
-import { typography } from "../../styles/typography";
 import { CatalogSetSymbol } from "../catalog/catalog-set-symbol";
 import {
   formatSpoilerReleaseDate,
@@ -17,21 +18,53 @@ import { useUpcomingReleases } from "./use-upcoming-releases";
 export function UpcomingReleases() {
   const upcoming = useUpcomingReleases();
   const spoilers = useSpoilers();
+  const months = new Map<string, CatalogReleaseSummary[]>();
+  for (const release of upcoming.releases) {
+    const month = release.nextReleaseOn.slice(0, 7);
+    const releases = months.get(month) ?? [];
+    releases.push(release);
+    months.set(month, releases);
+  }
 
   return (
-    <section {...stylex.props(styles.section)} aria-labelledby="upcoming-releases-heading">
-      <header {...stylex.props(styles.header)}>
+    <section {...stylex.props(browseStyles.page)} aria-labelledby="upcoming-releases-heading">
+      <header {...stylex.props(browseStyles.header)}>
         <div>
-          <p {...stylex.props(typography.label, styles.kicker)}>Catalog / Upcoming</p>
-          <h1 {...stylex.props(styles.title)} id="upcoming-releases-heading">
-            Upcoming releases.
+          <h1 {...stylex.props(browseStyles.title)} id="upcoming-releases-heading">
+            Sets
           </h1>
+          <p {...stylex.props(browseStyles.description)}>
+            Upcoming releases from your local catalog.
+          </p>
         </div>
-        <p {...stylex.props(typography.body, styles.intro)}>
-          Preview cards stay out of search until their release date. Reveal a release family here
-          when you want to see it early.
-        </p>
+        <Link {...stylex.props(browseStyles.link)} to="/search" search={{ mode: "upcoming" }}>
+          Browse upcoming cards <span aria-hidden="true">↗</span>
+        </Link>
       </header>
+      <aside {...stylex.props(styles.notice)} aria-label="Spoiler protection">
+        <svg width="20" height="22" viewBox="0 0 20 22" fill="none" aria-hidden="true">
+          <path
+            d="M10 2 3 5v5c0 5 7 9 7 9s7-4 7-9V5l-7-3Z"
+            stroke="currentColor"
+            strokeWidth="1.4"
+          />
+          <path
+            d="m7 10 2 2 4-4"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <p {...stylex.props(styles.noticeCopy)}>
+          {spoilers.state.policy === "show"
+            ? "All previews are visible. You can turn spoiler protection on in Settings."
+            : "Previews stay hidden until release day. Reveal a release family whenever you're ready."}
+        </p>
+        <Link {...stylex.props(browseStyles.link)} to="/settings">
+          Spoiler settings
+        </Link>
+      </aside>
 
       {upcoming.error ? (
         <ReleaseMessage mark="!" title="Upcoming releases unavailable">
@@ -40,31 +73,52 @@ export function UpcomingReleases() {
       ) : upcoming.loading ? (
         <div {...stylex.props(styles.loading)} aria-label="Reading upcoming releases" role="status">
           <span {...stylex.props(styles.loadingSymbol)} aria-hidden="true" />
-          <span {...stylex.props(typography.label, styles.loadingCopy)}>
-            Reading local release calendar…
-          </span>
+          <span {...stylex.props(styles.loadingCopy)}>Reading local release calendar…</span>
         </div>
       ) : upcoming.releases.length === 0 ? (
         <ReleaseMessage mark="0" title="No upcoming releases">
           The installed catalog has no future release families.
         </ReleaseMessage>
       ) : (
-        <ul {...stylex.props(styles.list)}>
-          {upcoming.releases.map((release) => (
-            <UpcomingRelease
-              key={release.rootSetId}
-              busy={spoilers.busy}
-              release={release}
-              state={spoilers.state}
-              onProtect={() => spoilers.protectRelease(release.rootSetId)}
-              onReveal={() => spoilers.revealRelease(release.rootSetId)}
-            />
-          ))}
-        </ul>
+        <div {...stylex.props(styles.calendar)}>
+          {[...months]
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([month, releases]) => (
+              <section
+                key={month}
+                {...stylex.props(styles.month)}
+                aria-labelledby={`release-month-${month}`}
+              >
+                <h2 {...stylex.props(styles.monthTitle)} id={`release-month-${month}`}>
+                  <time dateTime={month}>
+                    {new Intl.DateTimeFormat("en", { month: "long", timeZone: "UTC" }).format(
+                      new Date(`${month}-01T00:00:00Z`),
+                    )}
+                    <span {...stylex.props(styles.year)}>{month.slice(0, 4)}</span>
+                  </time>
+                  <span {...stylex.props(styles.monthCount)}>
+                    {releases.length} {releases.length === 1 ? "release" : "releases"}
+                  </span>
+                </h2>
+                <ul {...stylex.props(styles.list)}>
+                  {releases.map((release) => (
+                    <UpcomingRelease
+                      key={release.rootSetId}
+                      busy={spoilers.busy}
+                      release={release}
+                      state={spoilers.state}
+                      onProtect={() => spoilers.protectRelease(release.rootSetId)}
+                      onReveal={() => spoilers.revealRelease(release.rootSetId)}
+                    />
+                  ))}
+                </ul>
+              </section>
+            ))}
+        </div>
       )}
 
       {spoilers.error ? (
-        <p {...stylex.props(typography.bodySmall, styles.error)} role="alert">
+        <p {...stylex.props(styles.error)} role="alert">
           The preview choice could not be saved. Try again.
         </p>
       ) : null}
@@ -90,22 +144,29 @@ function UpcomingRelease({
 
   return (
     <li {...stylex.props(styles.item)}>
+      <time
+        {...stylex.props(styles.date)}
+        dateTime={release.nextReleaseOn}
+        aria-label={formatSpoilerReleaseDate(release.nextReleaseOn)}
+      >
+        <span {...stylex.props(styles.day)}>{Number(release.nextReleaseOn.slice(8, 10))}</span>
+        <span {...stylex.props(styles.weekday)}>
+          {new Intl.DateTimeFormat("en", { weekday: "short", timeZone: "UTC" }).format(
+            new Date(`${release.nextReleaseOn}T00:00:00Z`),
+          )}
+        </span>
+      </time>
       <div {...stylex.props(styles.identity)}>
-        <CatalogSetSymbol code={release.code} symbol={release.symbol} />
+        <CatalogSetSymbol code={release.code} symbol={release.symbol} size="large" />
         <div {...stylex.props(styles.names)}>
-          <strong {...stylex.props(typography.heading, styles.name)}>{release.name}</strong>
-          <span {...stylex.props(typography.label, styles.code)}>{release.code}</span>
+          <h3 {...stylex.props(styles.name)}>{release.name}</h3>
+          <div {...stylex.props(styles.releaseMeta)}>
+            <span {...stylex.props(styles.code)}>{release.code}</span>
+            <span>
+              {control.action === "reveal" ? "Release family protected" : "Release family revealed"}
+            </span>
+          </div>
         </div>
-      </div>
-
-      <div {...stylex.props(styles.date)}>
-        <span {...stylex.props(typography.label, styles.term)}>Next release</span>
-        <time
-          {...stylex.props(typography.bodySmall, styles.dateValue)}
-          dateTime={release.nextReleaseOn}
-        >
-          {formatSpoilerReleaseDate(release.nextReleaseOn)}
-        </time>
       </div>
 
       <div {...stylex.props(styles.action)}>
@@ -115,12 +176,13 @@ function UpcomingRelease({
           disabled={busy || control.disabled}
           size="sm"
           type="button"
-          variant={control.action === "reveal" ? "default" : "secondary"}
+          variant="secondary"
+          style={styles.releaseButton}
           onClick={control.action === "reveal" ? onReveal : onProtect}
         >
           {control.label}
         </Button>
-        <p {...stylex.props(typography.bodySmall, styles.actionCopy)} id={descriptionId}>
+        <p {...stylex.props(styles.actionCopy)} id={descriptionId}>
           {control.description}
         </p>
       </div>
@@ -144,172 +206,145 @@ function ReleaseMessage({
       </span>
       <div>
         <strong {...stylex.props(styles.messageTitle)}>{title}</strong>
-        <p {...stylex.props(typography.bodySmall, styles.messageCopy)}>{children}</p>
+        <p {...stylex.props(styles.messageCopy)}>{children}</p>
       </div>
     </div>
   );
 }
 
 const styles = stylex.create({
-  section: {
-    width: "100%",
-    maxWidth: "1120px",
-  },
-  header: {
-    paddingBlock: "26px 38px",
-    display: "grid",
-    gridTemplateColumns: {
-      default: "minmax(260px, 0.85fr) minmax(320px, 1fr)",
-      "@media (max-width: 820px)": "1fr",
-    },
-    alignItems: "end",
-    gap: {
-      default: "64px",
-      "@media (max-width: 820px)": "20px",
-    },
-    borderTopWidth: "1px",
-    borderTopStyle: "solid",
-    borderTopColor: "#55584f",
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
-  },
-  kicker: {
-    margin: "0 0 13px",
-    color: colors.accent,
-  },
-  title: {
-    maxWidth: "660px",
-    margin: 0,
-    color: "#f4f1e8",
-    fontSize: "clamp(42px, 6vw, 72px)",
-    fontWeight: 400,
-    letterSpacing: "-0.052em",
-    lineHeight: 0.94,
-  },
-  intro: {
-    maxWidth: "520px",
-    margin: 0,
-    color: "#a6a89d",
-  },
-  list: {
-    margin: 0,
-    padding: 0,
-    listStyle: "none",
-  },
-  item: {
-    minHeight: "128px",
-    paddingBlock: "20px",
-    display: "grid",
-    gridTemplateColumns: {
-      default: "minmax(260px, 1fr) minmax(160px, 0.48fr) minmax(280px, 0.8fr)",
-      "@media (max-width: 900px)": "minmax(240px, 1fr) minmax(150px, 0.65fr)",
-      "@media (max-width: 620px)": "1fr",
-    },
+  notice: {
+    display: "flex",
     alignItems: "center",
-    gap: {
-      default: "30px",
-      "@media (max-width: 620px)": "20px",
-    },
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
+    flexWrap: "wrap",
+    gap: "12px 16px",
+    padding: "18px 20px",
+    borderRadius: "10px",
+    backgroundColor: "#142018",
+    color: "#84b593",
   },
+  noticeCopy: { flex: "1 1 320px", margin: 0, color: "#b0bdaf", fontSize: "13px", lineHeight: 1.6 },
+  calendar: { display: "grid", gap: "40px", marginTop: "10px" },
+  month: {
+    display: "grid",
+    gridTemplateColumns: "150px minmax(0, 1fr)",
+    gap: "28px",
+    "@media (max-width: 900px)": { gridTemplateColumns: "minmax(0, 1fr)", gap: "16px" },
+  },
+  monthTitle: {
+    margin: 0,
+    paddingTop: "18px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "10px",
+    fontSize: "20px",
+    fontWeight: 400,
+    lineHeight: 1.3,
+    color: "#f4f1e8",
+    "@media (max-width: 900px)": {
+      flexDirection: "row",
+      alignItems: "baseline",
+      justifyContent: "space-between",
+      paddingTop: 0,
+    },
+  },
+  year: {
+    color: "#85887f",
+    display: "block",
+    fontSize: "14px",
+    marginTop: "4px",
+    "@media (max-width: 900px)": { display: "inline", marginLeft: "8px" },
+  },
+  monthCount: { color: "#85887f", fontSize: "12px" },
+  list: { display: "grid", gap: "12px", margin: 0, padding: 0, listStyle: "none" },
+  item: {
+    padding: "24px",
+    display: "grid",
+    gridTemplateColumns: "44px minmax(0, 1fr) 210px",
+    alignItems: "center",
+    gap: "24px",
+    borderRadius: "12px",
+    backgroundColor: "#151615",
+    "@media (max-width: 1100px)": { gridTemplateColumns: "44px minmax(0, 1fr)" },
+    "@media (max-width: 620px)": { padding: "18px", gap: "18px" },
+  },
+  date: { display: "grid", gap: "4px", textAlign: "center" },
+  day: {
+    color: "#f4f1e8",
+    fontSize: "28px",
+    lineHeight: 1,
+    fontVariantNumeric: "tabular-nums",
+    letterSpacing: "-.025em",
+  },
+  weekday: { color: "#85887f", fontSize: "12px" },
   identity: {
     minWidth: 0,
     display: "flex",
     alignItems: "center",
-    gap: "16px",
+    gap: "20px",
+    "@media (max-width: 620px)": { flexDirection: "column", alignItems: "start", gap: "12px" },
   },
-  names: {
-    minWidth: 0,
-    display: "grid",
-    gap: "8px",
-  },
+  names: { minWidth: 0, display: "grid", gap: "10px" },
   name: {
+    margin: 0,
     overflowWrap: "anywhere",
     color: "#f4f1e8",
+    fontSize: "20px",
+    fontWeight: 400,
+    letterSpacing: "-.015em",
+    lineHeight: 1.3,
   },
-  code: {
-    color: colors.accent,
+  releaseMeta: {
+    display: "flex",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: "8px 12px",
+    color: "#85887f",
+    fontSize: "12px",
   },
-  date: {
-    display: "grid",
-    gap: "8px",
-  },
-  term: {
-    color: "#85887e",
-  },
-  dateValue: {
-    color: "#d7d5cc",
-  },
+  code: { color: "#b5b8ae", fontSize: "11px", textTransform: "uppercase", letterSpacing: ".06em" },
   action: {
     display: "grid",
     justifyItems: "start",
-    gap: "8px",
-    "@media (max-width: 900px) and (min-width: 621px)": {
-      gridColumn: "1 / -1",
-      paddingLeft: "54px",
-    },
+    gap: "10px",
+    "@media (max-width: 1100px)": { gridColumn: "2", paddingLeft: "88px" },
+    "@media (max-width: 620px)": { paddingLeft: 0 },
   },
-  actionCopy: {
-    maxWidth: "340px",
-    margin: 0,
-    color: "#85887e",
-  },
+  releaseButton: { height: "34px", paddingInline: "12px", borderWidth: 0, fontSize: "12px" },
+  actionCopy: { maxWidth: "300px", margin: 0, color: "#989b92", fontSize: "12px", lineHeight: 1.5 },
   loading: {
     minHeight: "180px",
     display: "flex",
     alignItems: "center",
+    justifyContent: "center",
     gap: "18px",
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
   },
-  loadingSymbol: {
-    width: "38px",
-    height: "38px",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#55584f",
-    borderRadius: "50%",
-    backgroundColor: "#171914",
-  },
-  loadingCopy: {
-    color: "#85887e",
-  },
+  loadingSymbol: { width: "38px", height: "38px", borderRadius: "50%", backgroundColor: "#20231f" },
+  loadingCopy: { color: "#989b92", fontSize: "13px" },
   message: {
-    minHeight: "180px",
+    minHeight: "220px",
     display: "flex",
     alignItems: "center",
-    gap: "22px",
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: "24px",
+    padding: "32px",
+    borderRadius: "12px",
+    backgroundColor: "#131413",
   },
   messageMark: {
-    width: "54px",
-    height: "72px",
-    flex: "0 0 auto",
+    width: "48px",
+    height: "64px",
+    flexShrink: 0,
     display: "grid",
     placeItems: "center",
-    borderRadius: "3px",
-    color: "#1b1d19",
-    backgroundColor: colors.accent,
-    fontSize: "9px",
-    boxShadow: "6px 6px 0 #242620",
+    borderRadius: "6px",
+    color: colors.accent,
+    backgroundColor: "#213326",
+    fontSize: "24px",
+    boxShadow: "7px 5px 0 #1b231d",
   },
-  messageTitle: {
-    color: "#f4f1e8",
-    fontSize: "22px",
-    fontWeight: 400,
-  },
-  messageCopy: {
-    margin: "6px 0 0",
-    color: "#a6a89d",
-  },
-  error: {
-    margin: "18px 0 0",
-    color: "#ef9a8f",
-  },
+  messageTitle: { color: "#f4f1e8", fontSize: "22px", fontWeight: 400 },
+  messageCopy: { margin: "10px 0 0", color: "#989b92", fontSize: "14px", lineHeight: 1.6 },
+  error: { margin: 0, color: "#ef9a8f", fontSize: "13px" },
 });
