@@ -1,43 +1,23 @@
+import { Tabs } from "@base-ui/react/tabs";
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useState } from "react";
 
 import { Input } from "../../components/ui/input";
-import { Switch } from "../../components/ui/switch";
+import { Toggle } from "../../components/ui/toggle";
+import { ToggleGroup, ToggleGroupItem } from "../../components/ui/toggle-group";
 import { colors } from "../../styles/tokens.stylex.js";
 import { reconcileCatalogSearchDraft, type UniverseFilter } from "./search-state";
 
-type SearchModeTabsProps = {
-  mode: "cards" | "upcoming";
-  onChange: (mode: "cards" | "upcoming") => void;
-};
-
-export function SearchModeTabs({ mode, onChange }: SearchModeTabsProps) {
+export function SearchModeTabs() {
   return (
-    <div {...stylex.props(styles.modeTabs)} aria-label="Catalog section" role="tablist">
-      <button
-        {...stylex.props(styles.modeTab, mode === "cards" && styles.modeTabActive)}
-        aria-controls="card-index-panel"
-        aria-selected={mode === "cards"}
-        id="card-index-tab"
-        role="tab"
-        type="button"
-        onClick={() => onChange("cards")}
-      >
+    <Tabs.List {...stylex.props(styles.modeTabs)} aria-label="Catalog section">
+      <Tabs.Tab {...stylex.props(styles.modeTab)} value="cards">
         Card index
-      </button>
-      <button
-        {...stylex.props(styles.modeTab, mode === "upcoming" && styles.modeTabActive)}
-        aria-controls="upcoming-card-panel"
-        aria-selected={mode === "upcoming"}
-        id="upcoming-card-tab"
-        role="tab"
-        type="button"
-        onClick={() => onChange("upcoming")}
-      >
+      </Tabs.Tab>
+      <Tabs.Tab {...stylex.props(styles.modeTab)} value="upcoming">
         Upcoming
-        <span {...stylex.props(styles.modeTabMark)} aria-hidden="true" />
-      </button>
-    </div>
+      </Tabs.Tab>
+    </Tabs.List>
   );
 }
 
@@ -55,7 +35,7 @@ export function SearchForm({
   ariaLabel = "Search cards",
   autoFocus = true,
   id = "card-search",
-  placeholder = "CARD NAME OR SCRYFALL QUERY",
+  placeholder = "Card name or Scryfall query",
   onSearch,
 }: SearchFormProps) {
   const [query, setQuery] = useState(activeQuery);
@@ -91,6 +71,7 @@ export function SearchForm({
         <path d="m20 20-4-4" />
       </svg>
       <Input
+        style={styles.searchInput}
         aria-label={ariaLabel}
         autoFocus={autoFocus}
         id={id}
@@ -113,10 +94,12 @@ type SearchToggleProps = {
 
 export function SearchToggle({ checked, label, onChange }: SearchToggleProps) {
   return (
-    <div {...stylex.props(styles.filterToggle)}>
-      <Switch aria-label={label} checked={checked} size="sm" onCheckedChange={onChange} />
+    <Toggle pressed={checked} onPressedChange={onChange} style={styles.filterToggle}>
+      <span {...stylex.props(styles.toggleMark)} aria-hidden="true">
+        {checked ? "✓" : "+"}
+      </span>
       {label}
-    </div>
+    </Toggle>
   );
 }
 
@@ -126,236 +109,96 @@ type SearchUniverseFilterProps = {
 };
 
 const universeOptions = [
-  { label: "All", value: undefined },
+  { label: "All universes", value: "all" },
   { label: "Within", value: "within" },
   { label: "Beyond", value: "beyond" },
 ] as const;
 
 export function SearchUniverseFilter({ onChange, value }: SearchUniverseFilterProps) {
   return (
-    <div {...stylex.props(styles.viewControl)}>
-      <span {...stylex.props(styles.viewLabel)}>Universe</span>
-      <div {...stylex.props(styles.viewToggle)} aria-label="Universe" role="group">
-        {universeOptions.map((option) => (
-          <button
-            {...stylex.props(
-              styles.viewOption,
-              styles.universeOption,
-              value === option.value && styles.viewOptionActive,
-            )}
-            aria-pressed={value === option.value}
-            key={option.label}
-            type="button"
-            onClick={() => onChange(option.value)}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-type SearchViewToggleProps = {
-  grid: boolean;
-  onChange: (grid: boolean) => void;
-};
-
-export function SearchViewToggle({ grid, onChange }: SearchViewToggleProps) {
-  return (
-    <div {...stylex.props(styles.viewControl)}>
-      <span {...stylex.props(styles.viewLabel)}>View</span>
-      <div {...stylex.props(styles.viewToggle)} aria-label="Card view" role="group">
-        <button
-          {...stylex.props(styles.viewOption, !grid && styles.viewOptionActive)}
-          aria-label="List view"
-          aria-pressed={!grid}
-          title="List view"
-          type="button"
-          onClick={() => onChange(false)}
-        >
-          <svg {...stylex.props(styles.viewIcon)} aria-hidden="true" viewBox="0 0 16 16">
-            <path d="M2 3.5h2v2H2zM6 4h8v1H6zM2 7h2v2H2zM6 7.5h8v1H6zM2 10.5h2v2H2zM6 11h8v1H6z" />
-          </svg>
-        </button>
-        <button
-          {...stylex.props(styles.viewOption, grid && styles.viewOptionActive)}
-          aria-label="Grid view"
-          aria-pressed={grid}
-          title="Grid view"
-          type="button"
-          onClick={() => onChange(true)}
-        >
-          <svg {...stylex.props(styles.viewIcon)} aria-hidden="true" viewBox="0 0 16 16">
-            <path d="M2 2h5v5H2zM9 2h5v5H9zM2 9h5v5H2zM9 9h5v5H9z" />
-          </svg>
-        </button>
-      </div>
-    </div>
+    <ToggleGroup
+      aria-label="Universe"
+      spacing={1}
+      value={[value ?? "all"]}
+      onValueChange={(values) => {
+        const next = values[0];
+        if (next) onChange(next === "within" || next === "beyond" ? next : undefined);
+      }}
+    >
+      {universeOptions.map((option) => (
+        <ToggleGroupItem key={option.value} value={option.value} style={styles.universeOption}>
+          {option.label}
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
   );
 }
 
 const styles = stylex.create({
   modeTabs: {
-    minHeight: "48px",
     display: "flex",
-    alignItems: "stretch",
-    gap: "30px",
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
+    gap: "4px",
+    padding: "4px",
+    borderRadius: "10px",
+    backgroundColor: "#171817",
   },
   modeTab: {
-    padding: "0 2px",
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "8px",
+    padding: "9px 16px",
     borderWidth: 0,
-    borderStyle: "solid",
-    borderColor: "transparent",
-    color: "#85887e",
+    borderRadius: "7px",
     backgroundColor: "transparent",
-    boxShadow: "inset 0 -2px 0 transparent",
-    fontSize: "9px",
-    letterSpacing: "0.12em",
-    textTransform: "uppercase",
+    color: "#989b92",
+    fontSize: "13px",
     cursor: "pointer",
-    transition: "color 140ms ease, box-shadow 140ms ease",
-    ":hover": {
-      color: "#f4f1e8",
-    },
-    ":focus-visible": {
-      outlineWidth: "2px",
-      outlineStyle: "solid",
-      outlineColor: colors.accent,
-      outlineOffset: "4px",
-    },
-  },
-  modeTabActive: {
-    color: "#f4f1e8",
-    boxShadow: `inset 0 -2px 0 ${colors.accent}`,
-  },
-  modeTabMark: {
-    width: "5px",
-    height: "5px",
-    borderRadius: "50%",
-    backgroundColor: colors.accent,
+    "[data-active]": { color: "#f4f1e8", backgroundColor: "#30322e" },
+    ":hover": { color: "#f4f1e8" },
+    ":focus-visible": { outline: `2px solid ${colors.accent}`, outlineOffset: "3px" },
   },
   searchBar: {
     width: "100%",
-    height: "52px",
-    marginBlock: "16px",
-    paddingInline: "17px",
+    minHeight: "52px",
+    paddingInline: "16px",
     display: "flex",
     alignItems: "center",
     gap: "12px",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#2d2d30",
-    borderRadius: "12px",
-    backgroundColor: "#121213",
-    boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.025)",
-    transition: "border-color 160ms ease, box-shadow 160ms ease",
-    ":focus-within": {
-      borderColor: colors.accent,
-      boxShadow: "0 0 0 3px rgba(17, 197, 101, 0.12)",
-    },
+    borderRadius: "10px",
+    backgroundColor: "#1b1c1b",
+    ":focus-within": { outline: `2px solid ${colors.accent}`, outlineOffset: "2px" },
+  },
+  searchInput: {
+    height: "50px",
+    padding: 0,
+    borderWidth: 0,
+    backgroundColor: "transparent",
+    fontSize: "15px",
+    boxShadow: "none",
+    ":focus-visible": { boxShadow: "none" },
   },
   searchIcon: {
-    width: "19px",
-    height: "19px",
-    flex: "0 0 auto",
-    color: "#77777c",
+    width: "20px",
+    height: "20px",
+    flexShrink: 0,
+    color: "#85887f",
     stroke: "currentColor",
-    strokeWidth: "1.8",
+    strokeWidth: "1.6",
     strokeLinecap: "round",
     strokeLinejoin: "round",
-    pointerEvents: "none",
   },
   filterToggle: {
-    padding: 0,
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
+    height: "32px",
+    paddingInline: "10px",
     borderWidth: 0,
     color: "#a6a89d",
-    backgroundColor: "transparent",
-    fontSize: "8px",
-    letterSpacing: "0.08em",
-    textTransform: "uppercase",
-    whiteSpace: "nowrap",
-    cursor: "pointer",
-    ":hover": {
-      color: "#f4f1e8",
-    },
-    ":focus-visible": {
-      outlineWidth: "2px",
-      outlineStyle: "solid",
-      outlineColor: colors.accent,
-      outlineOffset: "4px",
-    },
+    fontSize: "12px",
+    gap: "6px",
+    "[data-pressed]": { color: colors.accent, backgroundColor: "#13271c" },
   },
-  viewControl: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-  },
-  viewLabel: {
-    color: "#a6a89d",
-    fontSize: "8px",
-    letterSpacing: "0.08em",
-    textTransform: "uppercase",
-  },
-  viewToggle: {
-    padding: "2px",
-    display: "flex",
-    gap: "2px",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#55584f",
-    borderRadius: "3px",
-    backgroundColor: "#22241f",
-  },
-  viewOption: {
-    width: "27px",
-    height: "23px",
-    padding: "5px",
-    display: "grid",
-    placeItems: "center",
-    borderWidth: 0,
-    borderRadius: "2px",
-    color: "#a6a89d",
-    backgroundColor: "transparent",
-    cursor: "pointer",
-    transition: "color 140ms ease, background-color 140ms ease",
-    ":hover": {
-      color: "#f4f1e8",
-    },
-    ":focus-visible": {
-      outlineWidth: "2px",
-      outlineStyle: "solid",
-      outlineColor: colors.accent,
-      outlineOffset: "3px",
-    },
-  },
-  viewOptionActive: {
-    color: "#1b1d19",
-    backgroundColor: colors.accent,
-    ":hover": {
-      color: "#1b1d19",
-    },
-  },
+  toggleMark: { fontSize: "14px", width: "12px" },
   universeOption: {
-    width: "auto",
-    minWidth: "42px",
-    paddingInline: "7px",
-    fontSize: "7px",
-    letterSpacing: "0.05em",
-    textTransform: "uppercase",
-  },
-  viewIcon: {
-    width: "13px",
-    height: "13px",
-    fill: "currentColor",
+    height: "32px",
+    borderWidth: 0,
+    color: "#989b92",
+    fontSize: "12px",
+    "[data-pressed]": { color: "#f4f1e8", backgroundColor: "#252724" },
   },
 });

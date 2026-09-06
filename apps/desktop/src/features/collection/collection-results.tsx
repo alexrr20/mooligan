@@ -3,6 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { Button } from "../../components/ui/button";
 import { colors } from "../../styles/tokens.stylex.js";
 import { PrintingImage } from "../cards/printing-image";
 import { withCollectionOrigin, type CollectionOrigin } from "./collection-origin";
@@ -52,8 +53,8 @@ export function CollectionResults({ grid, holdings, origin }: CollectionResultsP
       ) : null}
       {!grid ? (
         <div {...stylex.props(styles.columnHead)} aria-hidden="true">
-          <span>Art</span>
-          <span>Card / Printing</span>
+          <span>Card</span>
+          <span />
           <span>Properties</span>
           <span>Copies</span>
           <span>Actions</span>
@@ -74,8 +75,8 @@ export function CollectionResults({ grid, holdings, origin }: CollectionResultsP
               {holding.status !== "protected" ? (
                 <div {...stylex.props(styles.properties, grid && styles.tileProperties)}>
                   <span>{finishLabel(holding.finish)}</span>
-                  <span>{languageLabel(holding.language)}</span>
-                  <span>{conditionLabel(holding.condition)}</span>
+                  <span>· {languageLabel(holding.language)}</span>
+                  <span>· {conditionLabel(holding.condition)}</span>
                 </div>
               ) : (
                 <div {...stylex.props(styles.properties, grid && styles.tileProperties)}>
@@ -89,22 +90,26 @@ export function CollectionResults({ grid, holdings, origin }: CollectionResultsP
               <div {...stylex.props(styles.actions, grid && styles.tileActions)}>
                 {editable ? (
                   <>
-                    <button
-                      {...stylex.props(styles.action)}
+                    <Button
+                      style={styles.action}
+                      variant="ghost"
+                      size="sm"
                       disabled={pendingLotId === editable.editableLotId}
                       type="button"
                       onClick={() => setEditing(editable)}
                     >
                       Edit
-                    </button>
-                    <button
-                      {...stylex.props(styles.action, styles.removeAction)}
+                    </Button>
+                    <Button
+                      style={[styles.action, styles.removeAction]}
+                      variant="ghost"
+                      size="sm"
                       disabled={pendingLotId === editable.editableLotId}
                       type="button"
                       onClick={() => void remove(editable)}
                     >
                       Remove
-                    </button>
+                    </Button>
                   </>
                 ) : (
                   <span {...stylex.props(styles.readOnly)}>
@@ -122,6 +127,7 @@ export function CollectionResults({ grid, holdings, origin }: CollectionResultsP
           availableFinishes={
             editing.status === "visible" ? editing.availableFinishes : [editing.finish]
           }
+          cardName={editing.status === "visible" ? editing.name : editing.label}
           finishLocked={editing.status === "unavailable"}
           initial={{
             condition: editing.condition,
@@ -133,10 +139,11 @@ export function CollectionResults({ grid, holdings, origin }: CollectionResultsP
           open
           printingLabel={
             editing.status === "visible"
-              ? `${editing.name} · ${editing.setName} #${editing.collectorNumber}`
-              : `${editing.label} · ${editing.printingId}`
+              ? `${editing.setName} · #${editing.collectorNumber}`
+              : editing.printingId
           }
-          title="Edit Holding."
+          submitLabel="Save changes"
+          title="Edit holding"
           onOpenChange={(open) => {
             if (!open) setEditing(null);
           }}
@@ -273,138 +280,124 @@ function conditionLabel(value: string) {
 const styles = stylex.create({
   error: {
     margin: "18px 0",
-    padding: "10px 12px",
-    borderLeftWidth: "3px",
-    borderLeftStyle: "solid",
-    borderLeftColor: "#d98c83",
+    padding: "12px 16px",
+    borderRadius: "8px",
     color: "#f1c7c3",
     backgroundColor: "#2d1e1e",
-    fontSize: "10px",
+    fontSize: "13px",
   },
   columnHead: {
-    minHeight: "34px",
+    padding: "8px 12px 14px",
     display: "grid",
-    gridTemplateColumns: "64px minmax(150px, 1.25fr) minmax(220px, 1fr) 90px 120px",
+    gridTemplateColumns: "56px minmax(150px, 1.3fr) minmax(180px, 1fr) 70px 132px",
     alignItems: "center",
     gap: "16px",
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
-    color: "#85887e",
-    fontSize: "7px",
-    letterSpacing: "0.14em",
-    textTransform: "uppercase",
+    color: "#85887f",
+    fontSize: "12px",
     "@media (max-width: 980px)": { display: "none" },
   },
-  list: { margin: 0, padding: 0, listStyle: "none" },
+  list: { margin: 0, padding: 0, listStyle: "none", display: "grid", gap: "4px" },
   item: {
-    minHeight: "104px",
-    paddingBlock: "12px",
+    minHeight: "100px",
+    padding: "12px",
     display: "grid",
-    gridTemplateColumns: "64px minmax(150px, 1.25fr) minmax(220px, 1fr) 90px 120px",
+    gridTemplateColumns: "56px minmax(150px, 1.3fr) minmax(180px, 1fr) 70px 132px",
     alignItems: "center",
     gap: "16px",
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
+    borderRadius: "9px",
+    ":hover": { backgroundColor: "#191b18" },
     "@media (max-width: 980px)": {
-      gridTemplateColumns: "54px minmax(0, 1fr) auto",
+      gridTemplateColumns: "48px minmax(0, 1fr) auto",
+      gap: "8px 14px",
     },
   },
   grid: {
-    paddingBlock: "24px 34px",
+    paddingBlock: "4px 32px",
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))",
-    gap: "30px 18px",
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
+    gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 190px), 1fr))",
+    gap: "32px 24px",
   },
   tile: {
     minHeight: 0,
+    minWidth: 0,
     padding: 0,
-    display: "grid",
     gridTemplateColumns: "minmax(0, 1fr)",
     alignItems: "start",
     alignContent: "start",
     gap: 0,
-    borderBottomWidth: 0,
-    "@media (max-width: 980px)": {
-      gridTemplateColumns: "minmax(0, 1fr)",
-    },
+    ":hover": { backgroundColor: "transparent" },
+    "@media (max-width: 980px)": { gridTemplateColumns: "minmax(0, 1fr)", gap: 0 },
   },
   artwork: {
     width: "100%",
     color: "inherit",
     textDecoration: "none",
-    ":focus-visible": {
-      outlineWidth: "2px",
-      outlineStyle: "solid",
-      outlineColor: colors.accent,
-      outlineOffset: "4px",
-    },
+    ":focus-visible": { outline: `2px solid ${colors.accent}`, outlineOffset: "4px" },
   },
   protectedMark: { color: colors.accent, fontSize: "24px" },
-  identity: { minWidth: 0, display: "grid", gap: "7px" },
-  tileIdentity: { padding: "13px 3px 0" },
+  identity: { minWidth: 0, display: "grid", gap: "6px" },
+  tileIdentity: { padding: "13px 2px 0" },
   name: {
-    overflow: "hidden",
     color: "#f4f1e8",
-    fontSize: "13px",
+    fontSize: "15px",
     fontWeight: 400,
-    lineHeight: 1.25,
+    lineHeight: 1.35,
     textDecoration: "none",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
+    overflowWrap: "anywhere",
     ":hover": { color: colors.accent },
+    ":focus-visible": { outline: `2px solid ${colors.accent}`, outlineOffset: "3px" },
   },
-  printing: { color: "#85887e", fontSize: "8px", lineHeight: 1.45 },
+  printing: { color: "#989b92", fontSize: "12px", lineHeight: 1.5, overflowWrap: "anywhere" },
   properties: {
     display: "flex",
     alignItems: "center",
     flexWrap: "wrap",
-    gap: "5px",
-    color: "#b8baaf",
-    fontSize: "8px",
-    textTransform: "uppercase",
+    gap: "3px",
+    color: "#989b92",
+    fontSize: "12px",
+    lineHeight: 1.5,
     "@media (max-width: 980px)": { gridColumn: "2 / -1" },
   },
   tileProperties: {
-    marginTop: "10px",
+    marginTop: "8px",
     gridColumn: "auto",
     "@media (max-width: 980px)": { gridColumn: "auto" },
   },
-  quantity: { display: "grid", gap: "2px" },
-  tileQuantity: { marginTop: "13px", display: "flex", alignItems: "baseline", gap: "6px" },
+  quantity: {
+    display: "flex",
+    alignItems: "baseline",
+    flexWrap: "wrap",
+    gap: "5px",
+    fontSize: "13px",
+    color: "#b8baaf",
+    fontVariantNumeric: "tabular-nums",
+    "@media (max-width: 980px)": { gridColumn: "3", gridRow: "1" },
+  },
+  tileQuantity: {
+    marginTop: "12px",
+    color: "#f4f1e8",
+    "@media (max-width: 980px)": { gridColumn: "auto", gridRow: "auto" },
+  },
   actions: {
     display: "flex",
     justifyContent: "flex-end",
     flexWrap: "wrap",
-    gap: "4px",
+    gap: "2px",
     "@media (max-width: 980px)": { gridColumn: "2 / -1", justifyContent: "flex-start" },
   },
   tileActions: {
-    marginTop: "10px",
+    marginTop: "6px",
     gridColumn: "auto",
     justifyContent: "flex-start",
     "@media (max-width: 980px)": { gridColumn: "auto" },
   },
   action: {
-    minHeight: "30px",
-    paddingInline: "9px",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#43463e",
-    borderRadius: "2px",
+    borderWidth: 0,
     color: "#b8baaf",
-    backgroundColor: "transparent",
-    fontSize: "7px",
-    letterSpacing: "0.08em",
-    textTransform: "uppercase",
-    cursor: "pointer",
-    ":hover": { borderColor: colors.accent, color: "#f4f1e8" },
-    ":disabled": { opacity: 0.45, cursor: "not-allowed" },
+    fontSize: "12px",
+    height: "32px",
+    paddingInline: "8px",
   },
-  removeAction: { ":hover": { borderColor: "#d98c83", color: "#f1c7c3" } },
-  readOnly: { color: "#6f7269", fontSize: "7px", textTransform: "uppercase" },
+  removeAction: { color: "#989b92", ":hover": { color: "#f1c7c3", backgroundColor: "#2d1e1e" } },
+  readOnly: { color: "#989b92", fontSize: "11px", lineHeight: 1.5 },
 });

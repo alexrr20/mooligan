@@ -3,8 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import type { Ref } from "react";
 
 import { Button } from "../../components/ui/button";
-import { colors } from "../../styles/tokens.stylex.js";
-import { typography } from "../../styles/typography";
+import { colors, pageInsets } from "../../styles/tokens.stylex.js";
 import { ReturnNavigation } from "../cards/card-detail";
 import type { CardDetailOrigin } from "../cards/card-detail-origin";
 import { CatalogSetSymbol } from "../catalog/catalog-set-symbol";
@@ -30,26 +29,26 @@ export function ProtectedPreviewGate({ headingRef, origin, preview }: ProtectedP
       <section {...stylex.props(styles.gate)}>
         <div {...stylex.props(styles.symbolColumn)}>
           <CatalogSetSymbol code={release.code} size="large" symbol={release.symbol} />
-          <span {...stylex.props(typography.label, styles.code)}>{release.code}</span>
+          <span {...stylex.props(styles.code)}>{release.code}</span>
         </div>
 
         <div {...stylex.props(styles.content)}>
-          <p {...stylex.props(typography.label, styles.kicker)}>Spoiler protection</p>
+          <p {...stylex.props(styles.kicker)}>Spoiler protection</p>
           <h1
             ref={headingRef}
             {...stylex.props(styles.title)}
             id="protected-preview-heading"
             tabIndex={-1}
           >
-            Protected preview.
+            Protected preview
           </h1>
           <div {...stylex.props(styles.release)}>
             <div {...stylex.props(styles.releaseFact)}>
-              <span {...stylex.props(typography.label, styles.term)}>Release family</span>
+              <span {...stylex.props(styles.term)}>Release family</span>
               <strong {...stylex.props(styles.releaseName)}>{release.name}</strong>
             </div>
             <div {...stylex.props(styles.releaseFact)}>
-              <span {...stylex.props(typography.label, styles.term)}>Release date</span>
+              <span {...stylex.props(styles.term)}>Release date</span>
               <time {...stylex.props(styles.releaseDate)} dateTime={preview.releasedOn}>
                 {formatSpoilerReleaseDate(preview.releasedOn)}
               </time>
@@ -66,9 +65,7 @@ export function ProtectedPreviewGate({ headingRef, origin, preview }: ProtectedP
               >
                 Reveal this printing
               </Button>
-              <p {...stylex.props(typography.bodySmall, styles.actionCopy)}>
-                Reveal this exact printing only.
-              </p>
+              <p {...stylex.props(styles.actionCopy)}>Reveal this exact printing only.</p>
             </div>
             <div {...stylex.props(styles.action)}>
               <Button
@@ -80,14 +77,14 @@ export function ProtectedPreviewGate({ headingRef, origin, preview }: ProtectedP
               >
                 Reveal this release
               </Button>
-              <p {...stylex.props(typography.bodySmall, styles.actionCopy)}>
+              <p {...stylex.props(styles.actionCopy)}>
                 Includes every current and future subset in this release family.
               </p>
             </div>
           </div>
 
           {spoilers.error ? (
-            <p {...stylex.props(typography.bodySmall, styles.error)} role="alert">
+            <p {...stylex.props(styles.error)} role="alert">
               The preview choice could not be saved. Try again.
             </p>
           ) : null}
@@ -103,120 +100,58 @@ const styles = stylex.create({
     maxWidth: "1480px",
     minHeight: "100%",
     marginInline: "auto",
-    padding: {
-      default: "32px clamp(30px, 5vw, 76px) 78px",
-      "@media (max-width: 820px)": "28px 28px 58px",
-    },
+    paddingTop: "28px",
+    paddingInline: pageInsets.inline,
+    paddingBottom: "100px",
   },
   gate: {
-    minHeight: "min(590px, calc(100vh - 150px))",
-    paddingBlock: {
-      default: "72px",
-      "@media (max-width: 820px)": "52px",
-    },
+    minHeight: "440px",
+    padding: "48px",
     display: "grid",
-    gridTemplateColumns: {
-      default: "116px minmax(0, 670px)",
-      "@media (max-width: 620px)": "1fr",
-    },
+    gridTemplateColumns: "88px minmax(0, 670px)",
     alignContent: "center",
-    gap: {
-      default: "clamp(38px, 6vw, 84px)",
-      "@media (max-width: 620px)": "34px",
+    gap: "40px",
+    backgroundColor: "#131413",
+    borderRadius: "12px",
+    "@media (max-width: 700px)": {
+      padding: "28px",
+      gridTemplateColumns: "minmax(0, 1fr)",
+      gap: "24px",
     },
-    borderTopWidth: "1px",
-    borderTopStyle: "solid",
-    borderTopColor: "#55584f",
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
   },
   symbolColumn: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: "15px",
+    gap: "14px",
+    "@media (max-width: 700px)": { alignItems: "start" },
   },
-  code: {
-    color: colors.accent,
-  },
-  content: {
-    minWidth: 0,
-  },
-  kicker: {
-    margin: "0 0 18px",
-    color: colors.accent,
-  },
+  code: { color: "#989b92", fontSize: "12px", textTransform: "uppercase", letterSpacing: ".06em" },
+  content: { minWidth: 0 },
+  kicker: { margin: "0 0 12px", color: colors.accent, fontSize: "13px" },
   title: {
-    maxWidth: "650px",
     margin: 0,
     color: "#f4f1e8",
-    fontSize: "clamp(44px, 6vw, 76px)",
-    fontWeight: 400,
-    letterSpacing: "-0.052em",
-    lineHeight: 0.94,
+    fontSize: "clamp(28px, 3.2vw, 40px)",
+    fontWeight: 500,
+    letterSpacing: "-.03em",
+    lineHeight: 1.15,
     outline: "none",
-    ":focus-visible": {
-      outlineWidth: "1px",
-      outlineStyle: "solid",
-      outlineColor: colors.accent,
-      outlineOffset: "8px",
-    },
+    ":focus-visible": { outline: `2px solid ${colors.accent}`, outlineOffset: "6px" },
   },
-  release: {
-    maxWidth: "650px",
-    marginTop: "36px",
-    display: "grid",
-    gridTemplateColumns: {
-      default: "minmax(0, 1.2fr) minmax(170px, 0.8fr)",
-      "@media (max-width: 620px)": "1fr",
-    },
-    gap: "1px",
-    borderBlockWidth: "1px",
-    borderBlockStyle: "solid",
-    borderBlockColor: "#34362f",
-    backgroundColor: "#34362f",
-  },
-  term: {
-    color: "#85887e",
-  },
-  releaseFact: {
-    minHeight: "86px",
-    padding: "17px 18px",
-    display: "grid",
-    alignContent: "center",
-    gap: "8px",
-    backgroundColor: "#11120f",
-  },
-  releaseName: {
-    color: "#e1ded5",
-    fontSize: "16px",
-    fontWeight: 400,
-    lineHeight: 1.25,
-  },
-  releaseDate: {
-    color: "#d7d5cc",
-    fontSize: "11px",
-    lineHeight: 1.4,
-  },
+  release: { marginTop: "28px", display: "flex", flexWrap: "wrap", gap: "24px 40px" },
+  term: { color: "#989b92", fontSize: "12px" },
+  releaseFact: { display: "grid", alignContent: "start", gap: "8px" },
+  releaseName: { color: "#dedfd5", fontSize: "16px", fontWeight: 400, lineHeight: 1.4 },
+  releaseDate: { color: "#c6c8bd", fontSize: "14px", lineHeight: 1.5 },
   actions: {
     marginTop: "32px",
     display: "flex",
-    alignItems: "flex-start",
+    alignItems: "start",
     flexWrap: "wrap",
     gap: "24px",
   },
-  action: {
-    display: "grid",
-    gap: "8px",
-  },
-  actionCopy: {
-    maxWidth: "250px",
-    margin: 0,
-    color: "#85887e",
-  },
-  error: {
-    margin: "24px 0 0",
-    color: "#ef9a8f",
-  },
+  action: { display: "grid", gap: "10px" },
+  actionCopy: { maxWidth: "250px", margin: 0, color: "#989b92", fontSize: "12px", lineHeight: 1.5 },
+  error: { margin: "24px 0 0", color: "#ef9a8f", fontSize: "13px" },
 });

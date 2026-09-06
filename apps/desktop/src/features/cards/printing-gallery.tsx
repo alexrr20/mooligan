@@ -3,6 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
+import { Button } from "../../components/ui/button";
 import { colors } from "../../styles/tokens.stylex.js";
 import { useCatalogImageLoading } from "../catalog/catalog-image-loading";
 import { type CardDetailOrigin, withCardDetailOrigin } from "./card-detail-origin";
@@ -11,7 +12,6 @@ import {
   getInitialGalleryVisibleCount,
   getNextGalleryVisibleCount,
 } from "./printing-gallery-pagination";
-import { PrintingPrices } from "./printing-prices";
 
 type PrintingGalleryProps = {
   cardName: string;
@@ -54,10 +54,12 @@ export function PrintingGallery({
     <section {...stylex.props(styles.section)} aria-labelledby="printing-gallery-heading">
       <div {...stylex.props(styles.headingRow)}>
         <div>
-          <p {...stylex.props(styles.eyebrow)}>04 / Editions</p>
           <h2 {...stylex.props(styles.title)} id="printing-gallery-heading">
-            Sibling printings
+            Printings
           </h2>
+          <p {...stylex.props(styles.description)}>
+            Choose an edition to see its artwork and printing details.
+          </p>
         </div>
         <p {...stylex.props(styles.count)}>
           Showing {visiblePrintings.length.toLocaleString()} / {printings.length.toLocaleString()}
@@ -85,9 +87,6 @@ export function PrintingGallery({
                   image={printing.image}
                   imageActive={imageActive}
                   imageKey={`${imageLoading.generation}:${printing.id}`}
-                  overlay={
-                    selected ? <span {...stylex.props(styles.currentLabel)}>Selected</span> : null
-                  }
                   onImageError={() => imageLoading.settle(printing.id, true)}
                   onImageLoad={() => imageLoading.settle(printing.id)}
                 />
@@ -95,15 +94,14 @@ export function PrintingGallery({
                 <div {...stylex.props(styles.identity)}>
                   <div {...stylex.props(styles.setLine)}>
                     <strong {...stylex.props(styles.setName)}>{printing.setName}</strong>
-                    <span {...stylex.props(styles.setCode)}>{printing.setCode.toUpperCase()}</span>
+                    {selected ? <span {...stylex.props(styles.currentLabel)}>Selected</span> : null}
                   </div>
                   <p {...stylex.props(styles.printingMeta)}>
-                    #{printing.collectorNumber}
+                    {printing.setCode.toUpperCase()} · #{printing.collectorNumber}
                     {printing.releasedOn ? ` · ${printing.releasedOn.slice(0, 4)}` : ""}
                     {` · ${titleCase(printing.rarity)}`}
                     {printing.language ? ` · ${printing.language.toUpperCase()}` : ""}
                   </p>
-                  <PrintingPrices />
                   {printing.isPromo || printing.isDigital ? (
                     <div {...stylex.props(styles.labels)}>
                       {printing.isPromo ? <span {...stylex.props(styles.label)}>Promo</span> : null}
@@ -120,8 +118,9 @@ export function PrintingGallery({
       </ul>
 
       {visibleCount < printings.length ? (
-        <button
-          {...stylex.props(styles.moreButton)}
+        <Button
+          style={styles.moreButton}
+          variant="secondary"
           type="button"
           onClick={() =>
             setVisibleCount((current) => getNextGalleryVisibleCount(printings.length, current))
@@ -131,7 +130,7 @@ export function PrintingGallery({
           <span {...stylex.props(styles.moreCount)}>
             {visibleCount.toLocaleString()} / {printings.length.toLocaleString()}
           </span>
-        </button>
+        </Button>
       ) : null}
     </section>
   );
@@ -142,180 +141,90 @@ function titleCase(value: string) {
 }
 
 const styles = stylex.create({
-  section: {
-    marginTop: {
-      default: "82px",
-      "@media (max-width: 820px)": "62px",
-    },
-    paddingTop: "30px",
-    borderTopWidth: "1px",
-    borderTopStyle: "solid",
-    borderTopColor: "#55584f",
-  },
+  section: { marginTop: "64px" },
   headingRow: {
     display: "flex",
-    alignItems: "flex-end",
+    alignItems: "center",
     justifyContent: "space-between",
-    gap: "32px",
-  },
-  eyebrow: {
-    margin: "0 0 12px",
-    color: "#85887e",
-    fontSize: "7px",
-    letterSpacing: "0.14em",
-    textTransform: "uppercase",
+    flexWrap: "wrap",
+    gap: "16px 32px",
   },
   title: {
     margin: 0,
     color: "#f4f1e8",
-    fontSize: {
-      default: "34px",
-      "@media (max-width: 820px)": "29px",
-    },
-    fontWeight: 400,
-    letterSpacing: "-0.035em",
-    lineHeight: 1,
+    fontSize: "24px",
+    fontWeight: 500,
+    letterSpacing: "-.02em",
+    lineHeight: 1.3,
   },
-  count: {
-    margin: 0,
-    color: "#85887e",
-    fontSize: "7px",
-    letterSpacing: "0.1em",
-    textTransform: "uppercase",
-  },
+  description: { margin: "8px 0 0", color: "#989b92", fontSize: "13px", lineHeight: 1.6 },
+  count: { margin: 0, color: "#989b92", fontSize: "12px", fontVariantNumeric: "tabular-nums" },
   grid: {
-    margin: "28px 0 0",
+    margin: "26px 0 0",
     padding: 0,
     display: "grid",
-    gridTemplateColumns: {
-      default: "repeat(auto-fill, minmax(154px, 1fr))",
-      "@media (max-width: 820px)": "repeat(auto-fill, minmax(142px, 1fr))",
-    },
-    gap: "30px 16px",
+    gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 180px), 1fr))",
+    gap: "30px 22px",
     listStyle: "none",
   },
-  item: {
-    minWidth: 0,
-  },
+  item: { minWidth: 0 },
   link: {
     minWidth: 0,
     display: "block",
     color: "inherit",
     textDecoration: "none",
+    borderRadius: "6px",
     transition: "transform 160ms cubic-bezier(0.23, 1, 0.32, 1)",
-    ":focus-visible": {
-      outlineWidth: "2px",
-      outlineStyle: "solid",
-      outlineColor: colors.accent,
-      outlineOffset: "5px",
-    },
+    ":focus-visible": { outline: `2px solid ${colors.accent}`, outlineOffset: "5px" },
     "@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)": {
-      ":hover": {
-        transform: "translateY(-3px)",
-      },
+      ":hover": { transform: "translateY(-3px)" },
     },
   },
-  linkSelected: {
-    color: "#f4f1e8",
-  },
+  linkSelected: { color: "#f4f1e8" },
   currentLabel: {
-    minHeight: "24px",
-    paddingInline: "8px",
-    position: "absolute",
-    zIndex: 2,
-    right: "8px",
-    bottom: "8px",
-    display: "inline-flex",
-    alignItems: "center",
-    borderRadius: "2px",
-    color: "#1b1d19",
-    backgroundColor: colors.accent,
-    fontSize: "7px",
-    letterSpacing: "0.09em",
-    textTransform: "uppercase",
-  },
-  identity: {
-    padding: "13px 3px 0",
-  },
-  setLine: {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) auto",
-    alignItems: "start",
-    gap: "9px",
-  },
-  setName: {
-    overflow: "hidden",
-    color: "#e1ded5",
-    fontSize: "11px",
-    fontWeight: 400,
-    lineHeight: 1.25,
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  },
-  setCode: {
+    padding: "3px 6px",
+    alignSelf: "start",
+    borderRadius: "4px",
     color: colors.accent,
-    fontSize: "7px",
-    letterSpacing: "0.08em",
+    backgroundColor: "#13271c",
+    fontSize: "10px",
+    lineHeight: 1.4,
+  },
+  identity: { padding: "13px 2px 0" },
+  setLine: { display: "flex", alignItems: "start", flexWrap: "wrap", gap: "8px" },
+  setName: {
+    color: "#dedfd5",
+    fontSize: "14px",
+    fontWeight: 400,
+    lineHeight: 1.4,
+    overflowWrap: "anywhere",
   },
   printingMeta: {
-    margin: "7px 0 0",
-    color: "#85887e",
-    fontSize: "7px",
-    letterSpacing: "0.055em",
-    lineHeight: 1.45,
-    textTransform: "uppercase",
+    margin: "6px 0 0",
+    color: "#989b92",
+    fontSize: "12px",
+    lineHeight: 1.5,
+    overflowWrap: "anywhere",
   },
-  labels: {
-    marginTop: "8px",
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "4px",
-  },
+  labels: { marginTop: "8px", display: "flex", flexWrap: "wrap", gap: "6px" },
   label: {
-    minHeight: "19px",
-    paddingInline: "6px",
+    padding: "3px 7px",
     display: "inline-flex",
     alignItems: "center",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#55584f",
-    borderRadius: "999px",
+    borderRadius: "4px",
     color: "#a6a89d",
-    fontSize: "6px",
-    letterSpacing: "0.08em",
-    textTransform: "uppercase",
+    backgroundColor: "#1b1c1b",
+    fontSize: "11px",
+    lineHeight: 1.4,
   },
   moreButton: {
-    width: "100%",
-    minHeight: "58px",
-    marginTop: "34px",
-    paddingInline: "14px",
     display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderWidth: "1px 0",
-    borderStyle: "solid",
-    borderColor: "#55584f",
-    borderRadius: 0,
-    color: "#f4f1e8",
-    backgroundColor: "transparent",
-    fontSize: "8px",
-    letterSpacing: "0.12em",
-    textTransform: "uppercase",
-    cursor: "pointer",
-    transition: "color 150ms ease, background-color 150ms ease",
-    ":hover": {
-      color: "#1b1d19",
-      backgroundColor: colors.accent,
-    },
-    ":focus-visible": {
-      outlineWidth: "2px",
-      outlineStyle: "solid",
-      outlineColor: colors.accent,
-      outlineOffset: "3px",
-    },
+    gap: "20px",
+    margin: "28px auto 0",
+    height: "40px",
+    paddingInline: "18px",
+    borderWidth: 0,
+    fontSize: "13px",
   },
-  moreCount: {
-    opacity: 0.7,
-  },
+  moreCount: { color: "#989b92", fontVariantNumeric: "tabular-nums" },
 });

@@ -35,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select";
+import { colors } from "../../styles/tokens.stylex.js";
 import { useCollectionMutations } from "./use-collection-mutations";
 
 export type CollectionFormValue = {
@@ -46,11 +47,13 @@ export type CollectionFormValue = {
 
 type CollectionFormDialogProps = {
   availableFinishes: readonly Finish[];
+  cardName: string;
   finishLocked?: boolean;
   initial: Partial<CollectionFormValue>;
   mergeNotice?: boolean;
   open: boolean;
   printingLabel: string;
+  submitLabel: string;
   title: string;
   onOpenChange: (open: boolean) => void;
   onSubmit: (value: CollectionFormValue) => Promise<CollectionMutationResult>;
@@ -61,7 +64,7 @@ export function CollectionFormDialog(props: CollectionFormDialogProps) {
 
   return (
     <Dialog open onOpenChange={props.onOpenChange}>
-      <DialogContent>
+      <DialogContent style={styles.dialog}>
         <CollectionForm {...props} />
       </DialogContent>
     </Dialog>
@@ -70,10 +73,12 @@ export function CollectionFormDialog(props: CollectionFormDialogProps) {
 
 function CollectionForm({
   availableFinishes,
+  cardName,
   finishLocked = false,
   initial,
   mergeNotice = false,
   printingLabel,
+  submitLabel,
   title,
   onOpenChange,
   onSubmit,
@@ -105,15 +110,17 @@ function CollectionForm({
 
   return (
     <Form onFormSubmit={() => void submit()}>
-      <div {...stylex.props(styles.topline)}>
-        <span>Collection / Physical copy</span>
+      <DialogTitle style={styles.title}>{title}</DialogTitle>
+      <div {...stylex.props(styles.identity)}>
+        <DialogDescription style={styles.description}>
+          <span {...stylex.props(styles.cardName)}>{cardName}</span>
+          <span {...stylex.props(styles.printingLabel)}>{printingLabel}</span>
+        </DialogDescription>
       </div>
-      <DialogTitle>{title}</DialogTitle>
-      <DialogDescription>{printingLabel}</DialogDescription>
 
       <div {...stylex.props(styles.fields)}>
-        <Field disabled={pending} name="quantity">
-          <FieldLabel>Quantity</FieldLabel>
+        <Field disabled={pending} name="quantity" style={styles.field}>
+          <FieldLabel style={styles.label}>Quantity</FieldLabel>
           <NumberField
             disabled={pending}
             max={Number.MAX_SAFE_INTEGER}
@@ -123,10 +130,14 @@ function CollectionForm({
             value={quantity}
             onValueChange={setQuantity}
           >
-            <NumberFieldGroup>
-              <NumberFieldDecrement aria-label="Decrease quantity">−</NumberFieldDecrement>
-              <NumberFieldInput autoFocus inputMode="numeric" />
-              <NumberFieldIncrement aria-label="Increase quantity">+</NumberFieldIncrement>
+            <NumberFieldGroup style={styles.quantityGroup}>
+              <NumberFieldDecrement aria-label="Decrease quantity" style={styles.quantityButton}>
+                −
+              </NumberFieldDecrement>
+              <NumberFieldInput autoFocus inputMode="numeric" style={styles.quantityInput} />
+              <NumberFieldIncrement aria-label="Increase quantity" style={styles.quantityButton}>
+                +
+              </NumberFieldIncrement>
             </NumberFieldGroup>
           </NumberField>
         </Field>
@@ -161,7 +172,7 @@ function CollectionForm({
 
       {mergeNotice ? (
         <p {...stylex.props(styles.notice)}>
-          If these properties match another Holding, Mooligan will merge the quantities.
+          Copies with the same finish, language and condition will be combined into one holding.
         </p>
       ) : null}
       {error ? (
@@ -172,13 +183,20 @@ function CollectionForm({
 
       <div {...stylex.props(styles.actions)}>
         <Button
+          disabled={pending}
+          render={<DialogClose />}
+          style={styles.cancel}
+          type="button"
+          variant="ghost"
+        >
+          Cancel
+        </Button>
+        <Button
           disabled={pending || !quantityIsValid || !finish || !language || !condition}
+          style={styles.submit}
           type="submit"
         >
-          {pending ? "Saving…" : "Save to collection"}
-        </Button>
-        <Button disabled={pending} render={<DialogClose />} type="button" variant="ghost">
-          Cancel
+          {pending ? "Saving…" : submitLabel}
         </Button>
       </div>
     </Form>
@@ -205,8 +223,8 @@ function CollectionSelect<Value extends string>({
   onValueChange,
 }: CollectionSelectProps<Value>) {
   return (
-    <Field disabled={disabled} name={name}>
-      <FieldLabel>{label}</FieldLabel>
+    <Field disabled={disabled} name={name} style={styles.field}>
+      <FieldLabel style={styles.label}>{label}</FieldLabel>
       <Select<Value>
         disabled={disabled}
         items={options}
@@ -215,7 +233,7 @@ function CollectionSelect<Value extends string>({
         value={value || null}
         onValueChange={(nextValue) => onValueChange(nextValue ?? "")}
       >
-        <SelectTrigger>
+        <SelectTrigger style={styles.selectTrigger}>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent align="start" alignItemWithTrigger={false}>
@@ -231,11 +249,13 @@ function CollectionSelect<Value extends string>({
 }
 
 type AddToCollectionButtonProps = {
+  compact?: boolean;
   detail?: CatalogCardDetail;
   printingId?: string;
 };
 
 export function AddToCollectionButton({
+  compact = false,
   detail: suppliedDetail,
   printingId = suppliedDetail?.selectedPrinting.id,
 }: AddToCollectionButtonProps) {
@@ -277,8 +297,23 @@ export function AddToCollectionButton({
   return (
     <>
       <div {...stylex.props(styles.addControl)}>
-        <Button size="sm" type="button" onClick={() => void prepare()}>
-          {loading ? "Reading…" : "Add to collection"}
+        <Button
+          size={compact ? "icon-sm" : suppliedDetail ? "default" : "sm"}
+          variant={compact ? "secondary" : "default"}
+          style={compact && styles.compactAdd}
+          aria-label={compact ? "Add to collection" : undefined}
+          title={compact ? "Add to collection" : undefined}
+          disabled={loading}
+          type="button"
+          onClick={() => void prepare()}
+        >
+          {compact ? (
+            <span aria-hidden="true">{loading ? "…" : "+"}</span>
+          ) : loading ? (
+            "Reading…"
+          ) : (
+            "Add to collection"
+          )}
         </Button>
         {message ? (
           <span {...stylex.props(styles.feedback)} role="status">
@@ -289,14 +324,16 @@ export function AddToCollectionButton({
       {selected ? (
         <CollectionFormDialog
           availableFinishes={selected.selectedPrinting.finishes ?? []}
+          cardName={selected.card.name}
           initial={{
             condition: "near-mint",
             language: knownLanguage(selected.selectedPrinting.language),
             quantity: 1,
           }}
           open={open}
-          printingLabel={`${selected.card.name} · ${selected.selectedPrinting.setName} #${selected.selectedPrinting.collectorNumber}`}
-          title="Add copies."
+          printingLabel={`${selected.selectedPrinting.setName} · #${selected.selectedPrinting.collectorNumber}`}
+          submitLabel="Add to collection"
+          title="Add copies"
           onOpenChange={setOpen}
           onSubmit={async (value) => {
             const result = await collection.add({
@@ -327,49 +364,116 @@ export function cleanCollectionError(cause: unknown) {
 }
 
 const styles = stylex.create({
-  topline: {
-    minHeight: "46px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
-    color: "#85887e",
-    fontSize: "7px",
-    letterSpacing: "0.13em",
-    textTransform: "uppercase",
+  compactAdd: {
+    backgroundColor: "#20231f",
+    color: "#f4f1e8",
+    borderWidth: 0,
+    boxShadow: "0 2px 8px #0006",
+    fontSize: "20px",
+    ":hover": { backgroundColor: "#324d3a" },
+  },
+  dialog: {
+    maxWidth: "min(460px, calc(100% - 32px))",
+    maxHeight: "calc(100dvh - 32px)",
+    overflowY: "auto",
+    padding: "28px",
+    borderRadius: "16px",
+    backgroundColor: "#171817",
+    boxShadow: "0 24px 80px #0008",
+  },
+  title: {
+    paddingRight: "20px",
+    color: "#f4f1e8",
+    fontSize: "26px",
+    fontWeight: 500,
+    letterSpacing: "-0.03em",
+    lineHeight: 1.2,
+  },
+  identity: { marginTop: "20px" },
+  description: { display: "grid", gap: "4px" },
+  cardName: { color: "#f4f1e8", fontSize: "16px", lineHeight: 1.4 },
+  printingLabel: { color: "#989b92", fontSize: "13px", lineHeight: 1.5, overflowWrap: "anywhere" },
+  field: { minWidth: 0 },
+  label: { color: "#b7bab2", fontSize: "12px", fontWeight: 400 },
+  selectTrigger: {
+    width: "100%",
+    height: "44px",
+    paddingInline: "14px",
+    borderWidth: 0,
+    borderRadius: "8px",
+    backgroundColor: "#242624",
+    color: "#f4f1e8",
+    ":hover": { backgroundColor: "#2d302d" },
+    ":focus-visible": {
+      outline: `2px solid ${colors.accent}`,
+      outlineOffset: "2px",
+      boxShadow: "none",
+    },
+  },
+  quantityGroup: {
+    height: "44px",
+    gridTemplateColumns: "44px minmax(0, 1fr) 44px",
+    borderWidth: 0,
+    borderRadius: "8px",
+    backgroundColor: "#242624",
+    ":focus-within": {
+      outline: `2px solid ${colors.accent}`,
+      outlineOffset: "2px",
+      boxShadow: "none",
+    },
+  },
+  quantityInput: { color: "#f4f1e8", fontSize: "16px" },
+  quantityButton: {
+    width: "44px",
+    color: "#b7bab2",
+    fontSize: "18px",
+    ":hover": { backgroundColor: "#2d302d" },
   },
   fields: {
     marginTop: "28px",
     display: "grid",
     gridTemplateColumns: {
       default: "repeat(2, minmax(0, 1fr))",
-      "@media (max-width: 560px)": "1fr",
+      "@media (max-width: 400px)": "1fr",
     },
-    gap: "14px",
+    gap: "20px 16px",
   },
   notice: {
-    margin: "18px 0 0",
-    color: "#a6a89d",
-    fontSize: "10px",
+    margin: "20px 0 0",
+    color: "#989b92",
+    fontSize: "12px",
     lineHeight: 1.55,
   },
   error: {
     margin: "16px 0 0",
     padding: "10px 12px",
-    borderLeftWidth: "3px",
-    borderLeftStyle: "solid",
-    borderLeftColor: "#d98c83",
+    borderRadius: "8px",
     color: "#f1c7c3",
     backgroundColor: "#2d1e1e",
-    fontSize: "10px",
+    fontSize: "13px",
   },
   actions: {
-    marginTop: "24px",
+    marginTop: "28px",
     display: "flex",
     alignItems: "center",
+    justifyContent: "flex-end",
+    flexWrap: "wrap",
     gap: "8px",
+  },
+  cancel: { height: "40px", paddingInline: "16px", color: "#b7bab2" },
+  submit: {
+    height: "40px",
+    paddingInline: "18px",
+    borderWidth: 0,
+    borderRadius: "8px",
+    backgroundColor: colors.accent,
+    color: "#071a0e",
+    ":hover": { backgroundColor: "#2cdb7d" },
+    ":focus-visible": {
+      outline: `2px solid ${colors.accent}`,
+      outlineOffset: "3px",
+      boxShadow: "none",
+    },
   },
   addControl: {
     display: "flex",

@@ -1,8 +1,6 @@
 import type { CatalogSelectedPrinting } from "@mooligan/domain/catalog-detail";
 import * as stylex from "@stylexjs/stylex";
 
-import { PrintingPrices } from "./printing-prices";
-
 type PrintingDetailsProps = {
   printing: CatalogSelectedPrinting;
 };
@@ -12,7 +10,7 @@ export function PrintingDetails({ printing }: PrintingDetailsProps) {
 
   return (
     <section {...stylex.props(styles.section)} aria-label="Selected printing">
-      <PrintingPrices variant="detail" />
+      <p {...stylex.props(styles.intro)}>Details for this exact edition of the card.</p>
       <dl {...stylex.props(styles.details)}>
         {rows.map((row) => (
           <div {...stylex.props(styles.detail)} key={row.label}>
@@ -85,43 +83,22 @@ function titleCase(value: string) {
 }
 
 const styles = stylex.create({
-  section: {
-    marginTop: "46px",
-    borderTopWidth: "1px",
-    borderTopStyle: "solid",
-    borderTopColor: "#55584f",
-  },
+  section: { minWidth: 0 },
+  intro: { margin: "0 0 24px", color: "#989b92", fontSize: "14px", lineHeight: 1.6 },
   details: {
-    margin: "1px 0 0",
+    margin: 0,
     display: "grid",
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "1px",
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
-    backgroundColor: "#34362f",
+    gap: "24px 32px",
+    "@media (max-width: 480px)": { gridTemplateColumns: "minmax(0, 1fr)" },
   },
-  detail: {
-    minHeight: "72px",
-    padding: "14px 16px",
-    display: "grid",
-    alignContent: "center",
-    gap: "7px",
-    backgroundColor: "#11120f",
-  },
-  term: {
-    margin: 0,
-    color: "#85887e",
-    fontSize: "7px",
-    letterSpacing: "0.1em",
-    lineHeight: 1.3,
-    textTransform: "uppercase",
-  },
+  detail: { display: "grid", alignContent: "start", gap: "7px" },
+  term: { margin: 0, color: "#989b92", fontSize: "12px", lineHeight: 1.5 },
   value: {
     margin: 0,
-    color: "#d7d5cc",
-    fontSize: "10px",
-    lineHeight: 1.45,
+    color: "#dedfd5",
+    fontSize: "14px",
+    lineHeight: 1.5,
     overflowWrap: "anywhere",
   },
 });

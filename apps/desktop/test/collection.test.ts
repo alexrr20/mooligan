@@ -12,6 +12,7 @@ import { collectionLotsQuery, workspaceSchema } from "@mooligan/workspace/schema
 
 import { createCollectionProjection } from "../electron/catalog/collection-projection.ts";
 import { createCollectionQuery } from "../electron/catalog/collection-query.ts";
+import { validateCollectionPrintingRequest } from "../shared/desktop-api.ts";
 import { createCollectionMutations } from "../src/features/collection/collection-mutations.ts";
 
 const visibility: SpoilerVisibilitySnapshot = {
@@ -31,7 +32,8 @@ void test("collection mutations merge Holding collisions and preserve the target
   });
   const validatedPrintingIds: string[] = [];
   const collection = createCollectionMutations(store, (request) => {
-    validatedPrintingIds.push(request.printingId);
+    const validated = validateCollectionPrintingRequest(request);
+    validatedPrintingIds.push(validated.printingId);
     return Promise.resolve();
   });
   try {
@@ -42,6 +44,13 @@ void test("collection mutations merge Holding collisions and preserve the target
       printingId: "printing-1",
       quantity: 2,
     });
+    const [saved] = store.query(collectionLotsQuery);
+    assert.ok(saved);
+    assert.equal(saved.condition, "near-mint");
+    assert.equal(saved.finish, "foil");
+    assert.equal(saved.language, "en");
+    assert.equal(saved.printingId, "printing-1");
+    assert.equal(saved.quantity, 2);
     const repeated = await collection.add({
       condition: "near-mint",
       finish: "foil",

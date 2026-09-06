@@ -1,10 +1,18 @@
+import { Progress } from "@base-ui/react/progress";
 import * as stylex from "@stylexjs/stylex";
-import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 
 import { colors } from "../styles/tokens.stylex.js";
 import { Button } from "./ui/button";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
+import { uiColors } from "./ui/theme.stylex";
 
 type SetupState =
   | { kind: "checking" }
@@ -70,8 +78,15 @@ export function CatalogSetup() {
     ((state.kind === "downloading" || state.kind === "error") && state.updating);
   const progress = downloading ? state.progress : undefined;
   const indexing = Boolean(progress?.totalBytes && progress.completedBytes >= progress.totalBytes);
-  const progressRatio =
-    progress && progress.totalBytes > 0 ? progress.completedBytes / progress.totalBytes : 0;
+  const progressPercent =
+    progress && progress.totalBytes > 0 && !indexing
+      ? Math.min(99, Math.floor((progress.completedBytes / progress.totalBytes) * 100))
+      : null;
+  const progressLabel = indexing
+    ? "Finishing up…"
+    : progress?.totalBytes
+      ? "Downloading…"
+      : "Connecting…";
 
   async function download() {
     const catalog = window.catalog;
@@ -105,123 +120,71 @@ export function CatalogSetup() {
         }
       }}
     >
-      <DialogContent showCloseButton={false}>
-        <motion.div
-          {...stylex.props(styles.panel)}
-          initial={{ opacity: 0, scale: 0.985, y: 12 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <div {...stylex.props(styles.topline)}>
-            <span>{updating ? "Catalog refresh / Card index" : "First run / Card index"}</span>
-            <span>
-              {downloading
-                ? indexing
-                  ? "Indexing locally"
-                  : "Receiving catalog"
-                : updating
-                  ? "Update available"
-                  : "Local setup"}
-            </span>
-          </div>
-
-          <div {...stylex.props(styles.layout)}>
-            <div {...stylex.props(styles.mark)} aria-hidden="true">
-              <span {...stylex.props(styles.markNumber)}>∞</span>
-              <span {...stylex.props(styles.markLabel)}>Cards</span>
-            </div>
-
-            <div {...stylex.props(styles.copy)}>
-              <p {...stylex.props(styles.eyebrow)}>
-                {updating ? "A fresh catalog is ready" : "One quiet download"}
-              </p>
-              <DialogTitle>
-                {updating ? (
-                  <>
-                    Bring the whole index
-                    <br />
-                    up to date.
-                  </>
-                ) : (
-                  <>
-                    Keep the whole index
-                    <br />
-                    close at hand.
-                  </>
-                )}
-              </DialogTitle>
-              <DialogDescription>
-                {updating
-                  ? "A newer card library is ready with the latest cards, sets, and corrections. Your current library stays available until the update is complete."
-                  : "Download the card library to this device for instant search and offline browsing. Prices will still be fetched when you ask for them."}
-              </DialogDescription>
-
-              {state.kind === "error" ? (
-                <p {...stylex.props(styles.error)} role="alert">
-                  {cleanError(state.message)}
-                </p>
-              ) : null}
-
-              {downloading ? (
-                <div {...stylex.props(styles.progressBlock)} aria-live="polite">
-                  <div {...stylex.props(styles.progressMeta)}>
-                    <span>
-                      {indexing
-                        ? "Indexing local catalog"
-                        : updating
-                          ? "Downloading catalog update"
-                          : "Downloading card catalog"}
-                    </span>
-                    <span>
-                      {progress?.totalBytes
-                        ? `${formatBytes(progress.completedBytes)} / ${formatBytes(progress.totalBytes)} · ${progress.completedCards.toLocaleString()} cards`
-                        : "Connecting…"}
-                    </span>
-                  </div>
-                  <div
-                    {...stylex.props(styles.progressTrack)}
-                    role="progressbar"
-                    aria-label={updating ? "Updating card library" : "Downloading card library"}
-                    aria-valuemax={progress?.totalBytes || undefined}
-                    aria-valuenow={progress?.totalBytes ? progress.completedBytes : undefined}
-                  >
-                    <motion.div
-                      {...stylex.props(styles.progressFill)}
-                      animate={{ scaleX: progressRatio }}
-                      transition={{ duration: 0.24, ease: "easeOut" }}
-                    />
-                  </div>
-                </div>
-              ) : null}
-
-              <div {...stylex.props(styles.actions)}>
-                <Button disabled={downloading} onClick={() => void download()} size="lg">
-                  {downloading
-                    ? indexing
-                      ? "Indexing…"
-                      : "Downloading…"
-                    : state.kind === "error"
-                      ? updating
-                        ? "Try update again"
-                        : "Try again"
-                      : updating
-                        ? "Update library"
-                        : "Download library"}
-                  <span aria-hidden="true">↓</span>
-                </Button>
-                <Button disabled={downloading} render={<DialogClose />} size="lg" variant="ghost">
-                  Not now
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          <p {...stylex.props(styles.footnote)}>
+      <DialogContent showCloseButton={false} style={styles.content}>
+        <DialogHeader>
+          <DialogTitle style={styles.title}>
+            {downloading
+              ? updating
+                ? "Updating card catalog"
+                : "Downloading card catalog"
+              : updating
+                ? "Update card catalog"
+                : "Download card catalog"}
+          </DialogTitle>
+          <DialogDescription style={styles.description}>
             {updating
-              ? "The current library remains in place until its replacement is verified."
-              : "Stored in Mooligan’s private application data. No folder selection needed."}
+              ? downloading
+                ? "Your current catalog stays available until the update is complete."
+                : "Get the latest cards and corrections for offline browsing."
+              : "Download the catalog to search cards and browse offline."}
+          </DialogDescription>
+        </DialogHeader>
+
+        {state.kind === "error" ? (
+          <p {...stylex.props(styles.error)} role="alert">
+            {cleanError(state.message)}
           </p>
-        </motion.div>
+        ) : null}
+
+        {downloading ? (
+          <Progress.Root
+            {...stylex.props(styles.progress)}
+            value={progressPercent}
+            aria-valuetext={
+              progressPercent === null ? progressLabel : `${progressPercent}% downloaded`
+            }
+          >
+            <div {...stylex.props(styles.progressMeta)}>
+              <Progress.Label aria-live="polite">{progressLabel}</Progress.Label>
+              <Progress.Value {...stylex.props(styles.progressValue)}>
+                {(_, value) => (value === null ? null : `${value}%`)}
+              </Progress.Value>
+            </div>
+            <Progress.Track {...stylex.props(styles.progressTrack)}>
+              <Progress.Indicator {...stylex.props(styles.progressFill)} />
+            </Progress.Track>
+            {progress?.totalBytes ? (
+              <p {...stylex.props(styles.progressDetail)}>
+                {indexing
+                  ? `${progress.completedCards.toLocaleString()} cards processed`
+                  : `${formatBytes(progress.completedBytes)} of ${formatBytes(progress.totalBytes)}`}
+              </p>
+            ) : null}
+          </Progress.Root>
+        ) : (
+          <div {...stylex.props(styles.actions)}>
+            <DialogClose render={<Button size="lg" variant="ghost" style={styles.action} />}>
+              Not now
+            </DialogClose>
+            <Button onClick={() => void download()} size="lg" style={styles.action}>
+              {state.kind === "error"
+                ? "Try again"
+                : updating
+                  ? "Update catalog"
+                  : "Download catalog"}
+            </Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -236,122 +199,82 @@ function formatBytes(value: number) {
 }
 
 const styles = stylex.create({
-  panel: {
-    padding: "0 30px 24px",
-    backgroundImage:
-      "radial-gradient(circle at 84% 12%, rgba(255, 255, 255, 0.05), transparent 30%)",
+  content: {
+    maxWidth: "min(28rem, calc(100vw - 2rem))",
+    maxHeight: "calc(100dvh - 2rem)",
+    overflowY: "auto",
+    padding: {
+      default: "1.5rem",
+      "@media (max-width: 400px)": "1.25rem",
+    },
+    gap: "1.5rem",
   },
-  topline: {
-    minHeight: "45px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "24px",
-    borderBottomWidth: "1px",
-    borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
-    color: "#8f9287",
-    fontSize: "8px",
-    letterSpacing: "0.13em",
-    textTransform: "uppercase",
+  title: {
+    fontSize: "1.375rem",
+    fontWeight: 600,
+    lineHeight: 1.25,
+    letterSpacing: "-0.02em",
   },
-  layout: {
-    paddingBlock: "34px 32px",
-    display: "grid",
-    gridTemplateColumns: "138px minmax(0, 1fr)",
-    gap: "42px",
-    alignItems: "start",
-  },
-  mark: {
-    width: "118px",
-    height: "164px",
-    padding: "14px",
-    position: "relative",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#1b1d19",
-    borderRadius: "5px",
-    backgroundColor: colors.accent,
-    color: "#1b1d19",
-    boxShadow: "11px 11px 0 #242620, 12px 12px 0 #55584f",
-    transform: "rotate(-2.5deg)",
-  },
-  markNumber: {
-    fontSize: "42px",
-    lineHeight: 0.8,
-  },
-  markLabel: {
-    fontSize: "8px",
-    letterSpacing: "0.14em",
-    textTransform: "uppercase",
-  },
-  copy: {
-    minWidth: 0,
-  },
-  eyebrow: {
-    margin: "0 0 15px",
-    color: "#a6a89d",
-    fontSize: "8px",
-    letterSpacing: "0.15em",
-    textTransform: "uppercase",
-  },
-  error: {
-    margin: "18px 0 0",
-    padding: "10px 12px",
-    borderLeftWidth: "3px",
-    borderLeftStyle: "solid",
-    borderLeftColor: "#d98c83",
-    color: "#f1c7c3",
-    backgroundColor: "#2d1e1e",
-    fontSize: "11px",
+  description: {
     lineHeight: 1.5,
   },
-  progressBlock: {
-    marginTop: "22px",
+  error: {
+    margin: 0,
+    padding: "0.75rem",
+    borderRadius: "0.5rem",
+    color: uiColors.destructive,
+    backgroundColor: uiColors.destructive20,
+    fontSize: "0.8125rem",
+    lineHeight: 1.5,
+    overflowWrap: "anywhere",
+  },
+  progress: {
+    display: "grid",
+    gap: "0.625rem",
+    minWidth: 0,
   },
   progressMeta: {
-    marginBottom: "9px",
     display: "flex",
+    alignItems: "baseline",
     justifyContent: "space-between",
-    gap: "20px",
-    color: "#a6a89d",
-    fontSize: "8px",
-    letterSpacing: "0.08em",
-    textTransform: "uppercase",
+    gap: "1rem",
+    fontSize: "0.8125rem",
+    lineHeight: 1.5,
+  },
+  progressValue: {
+    color: colors.accent,
+    fontVariantNumeric: "tabular-nums",
   },
   progressTrack: {
-    height: "7px",
+    height: "0.375rem",
     overflow: "hidden",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#55584f",
-    backgroundColor: "#22241f",
+    borderRadius: "999px",
+    backgroundColor: uiColors.muted,
   },
   progressFill: {
-    width: "100%",
     height: "100%",
+    borderRadius: "inherit",
     backgroundColor: colors.accent,
-    transform: "scaleX(0)",
-    transformOrigin: "left center",
+    "[data-indeterminate]": {
+      width: "100%",
+      opacity: 0.35,
+    },
+  },
+  progressDetail: {
+    margin: 0,
+    color: uiColors.mutedForeground,
+    fontSize: "0.75rem",
+    lineHeight: 1.5,
+    fontVariantNumeric: "tabular-nums",
   },
   actions: {
-    marginTop: "25px",
     display: "flex",
+    flexWrap: "wrap",
     alignItems: "center",
-    gap: "11px",
+    justifyContent: "flex-end",
+    gap: "0.5rem",
   },
-  footnote: {
-    margin: 0,
-    paddingTop: "15px",
-    borderTopWidth: "1px",
-    borderTopStyle: "solid",
-    borderTopColor: "#34362f",
-    color: "#85887e",
-    fontSize: "7px",
-    letterSpacing: "0.08em",
-    textTransform: "uppercase",
+  action: {
+    paddingInline: "0.875rem",
   },
 });
