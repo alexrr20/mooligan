@@ -2,6 +2,8 @@ import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 
 import { useAuth } from "../features/auth/use-auth";
+import { canAccessProfile } from "../features/profile/profile-access";
+import { useWorkspaceRuntime } from "../features/workspace/workspace-runtime-context";
 import { colors } from "../styles/tokens.stylex.js";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 
@@ -45,8 +47,10 @@ function SettingsButton() {
 
 function ProfileButton() {
   const { snapshot } = useAuth();
+  const { runtime } = useWorkspaceRuntime();
   const user = snapshot.user;
-  const label = user ? `Profile settings for ${user.name}` : "Profile settings";
+  if (!user || !canAccessProfile(snapshot, runtime)) return null;
+  const label = `Profile for ${user.name}`;
 
   return (
     <TooltipProvider delay={450} closeDelay={0} timeout={350}>
@@ -54,20 +58,16 @@ function ProfileButton() {
         <TooltipTrigger
           render={
             <Link
-              {...stylex.props(styles.button, user && styles.buttonSignedIn)}
+              {...stylex.props(styles.button, styles.buttonSignedIn)}
               aria-label={label}
               data-window-no-drag
-              to="/settings"
+              to="/profile"
             />
           }
         >
-          {user ? (
-            <span {...stylex.props(styles.initials)} aria-hidden="true">
-              {initials(user.name)}
-            </span>
-          ) : (
-            <ProfileIcon />
-          )}
+          <span {...stylex.props(styles.initials)} aria-hidden="true">
+            {initials(user.name)}
+          </span>
         </TooltipTrigger>
         <TooltipContent align="end" side="bottom" sideOffset={9}>
           {label}
@@ -84,15 +84,6 @@ function SettingsIcon() {
       <circle cx="11" cy="6" r="2" />
       <circle cx="15" cy="12" r="2" />
       <circle cx="9" cy="18" r="2" />
-    </svg>
-  );
-}
-
-function ProfileIcon() {
-  return (
-    <svg {...stylex.props(styles.icon)} aria-hidden="true" fill="none" viewBox="0 0 24 24">
-      <circle cx="12" cy="8" r="3.25" />
-      <path d="M5.75 20c.45-3.45 2.53-5.25 6.25-5.25s5.8 1.8 6.25 5.25" />
     </svg>
   );
 }

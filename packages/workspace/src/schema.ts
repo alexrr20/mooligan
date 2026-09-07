@@ -1,10 +1,13 @@
 import { Events, makeSchema, queryDb, Schema, State } from "@livestore/livestore";
 
 import { deckEvents, deckMaterializers, deckTables } from "./decks.ts";
+import { profileEvents, profileMaterializers, profileTables } from "./profile.ts";
+export { emptyProfile, type ProfileSettings } from "./profile-contract.ts";
+export { profileQuery, readProfile } from "./profile.ts";
 export { decksQuery, deckEntriesQuery } from "./decks.ts";
 
 export const initialSpoilerResetId = "initial";
-export const workspaceEventSchemaVersion = 2;
+export const workspaceEventSchemaVersion = 3;
 
 const TargetId = Schema.String.pipe(Schema.minLength(1), Schema.maxLength(128));
 const DecisionId = Schema.String.pipe(Schema.minLength(1), Schema.maxLength(128));
@@ -101,6 +104,7 @@ const CollectionLot = Schema.Struct({
 });
 
 export const tables = {
+  ...profileTables,
   ...deckTables,
   collectionLots: State.SQLite.table({
     indexes: [
@@ -117,6 +121,7 @@ export const tables = {
 };
 
 export const events = {
+  ...profileEvents,
   ...deckEvents,
   collectionCopiesAdded: Events.synced({
     name: "v1.CollectionCopiesAdded",
@@ -166,6 +171,10 @@ export const events = {
 } as const;
 
 export const workspaceSyncedEventSchema = Schema.Union(
+  Schema.Struct({
+    args: events.profileChanged.schema,
+    name: Schema.Literal(events.profileChanged.name),
+  }),
   Schema.Struct({ args: events.deckCreated.schema, name: Schema.Literal(events.deckCreated.name) }),
   Schema.Struct({ args: events.deckChanged.schema, name: Schema.Literal(events.deckChanged.name) }),
   Schema.Struct({ args: events.deckDeleted.schema, name: Schema.Literal(events.deckDeleted.name) }),
@@ -234,6 +243,7 @@ const matchingCollectionLotSql = (alias: string) => `
 `;
 
 const materializers = State.SQLite.materializers(events, {
+  ...profileMaterializers,
   ...deckMaterializers,
   "v1.CollectionCopiesAdded": ({ lot }) => {
     const row = toCollectionLotRow(lot);

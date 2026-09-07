@@ -7,8 +7,11 @@ import {
   type WorkspaceRuntime,
   type WorkspaceSyncIssue,
   type WorkspaceSyncSession,
-} from "../../shared/desktop-api.ts";
-import type { AccountWorkspaceApiPath } from "../auth/service.ts";
+} from "./runtime.ts";
+export type AccountWorkspaceApiPath =
+  | "/api/workspace"
+  | "/api/workspace/bind"
+  | "/api/workspace/sync-credential";
 import type { WorkspaceRegistry } from "./registry.ts";
 
 const PersonalWorkspaceSchema = z.strictObject({

@@ -10,7 +10,7 @@ import { workspaceEventSchemaVersion } from "@mooligan/workspace";
 
 import type { AuthSnapshot } from "../shared/desktop-api.ts";
 import type { AccountWorkspaceApiPath } from "../electron/auth/service.ts";
-import { AccountWorkspace, type AccountWorkspaceAuth } from "../electron/workspace/account.ts";
+import { AccountWorkspace, type AccountWorkspaceAuth } from "@mooligan/account/workspace";
 import { WorkspaceRegistry } from "../electron/workspace/registry.ts";
 
 const now = 1_000_000;

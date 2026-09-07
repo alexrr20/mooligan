@@ -31,6 +31,7 @@ const backup: WorkspaceBackup = {
   ],
   decks: [],
   format: "mooligan-workspace",
+  profile: { bannerPrintingId: null, featuredPrintingIds: [null, null, null, null] },
   spoilers: {
     decisions: [
       { scope: "printing", state: "reveal", targetId: "preview-printing" },
@@ -39,10 +40,10 @@ const backup: WorkspaceBackup = {
     policy: "show",
     resetGeneration: 3,
   },
-  version: 4,
+  version: 5,
 };
 
-void test("version 3 backups round trip without device or account metadata", () => {
+void test("version 5 backups round trip without device or account metadata", () => {
   const parsed = parseWorkspaceBackup(serializeWorkspaceBackup(backup));
 
   assert.deepEqual(parsed, backup);

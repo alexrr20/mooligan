@@ -13,7 +13,7 @@ import {
   serializeWorkspaceBackup,
   validateWorkspaceBackup,
 } from "./backup";
-import type { AccountWorkspace } from "./account";
+import type { AccountWorkspace } from "@mooligan/account/workspace";
 import type { WorkspaceRegistry } from "./registry";
 
 export function registerWorkspaceIpc(

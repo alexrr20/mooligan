@@ -11,6 +11,8 @@ import {
   deckEntriesQuery,
   events,
   initialSpoilerResetId,
+  profileQuery,
+  readProfile,
   spoilerDecisionsQuery,
   spoilerSettingsQuery,
   workspaceSchema,
@@ -20,6 +22,7 @@ import { materializeDecks } from "../decks/deck-state.ts";
 
 type WorkspaceLiveStore = Store<typeof workspaceSchema>;
 type RestoreEvent =
+  | ReturnType<typeof events.profileChanged>
   | ReturnType<typeof events.deckCreated>
   | ReturnType<typeof events.deckEntryAdded>
   | ReturnType<typeof events.collectionCopiesAdded>
@@ -35,6 +38,7 @@ export function createWorkspaceBackup(store: WorkspaceLiveStore): WorkspaceBacku
     collectionLots: readBackupCollectionLots(store),
     decks: readBackupDecks(store),
     format: workspaceBackupFormat,
+    profile: readProfile(store.query(profileQuery)),
     spoilers: {
       decisions: readBackupDecisions(store),
       policy: settings.policy,
@@ -48,6 +52,8 @@ export async function restoreWorkspaceBackup(store: WorkspaceLiveStore, backup: 
   const restoreResetId =
     backup.spoilers.resetGeneration === 0 ? initialSpoilerResetId : crypto.randomUUID();
   let batch: RestoreEvent[] = [];
+
+  batch.push(events.profileChanged(backup.profile));
 
   batch.push(events.spoilerPolicyChanged({ policy: backup.spoilers.policy }));
   if (backup.spoilers.resetGeneration > 0) {
@@ -119,6 +125,7 @@ export async function restoreWorkspaceBackup(store: WorkspaceLiveStore, backup: 
 
   const settings = store.query(spoilerSettingsQuery);
   if (
+    JSON.stringify(readProfile(store.query(profileQuery))) !== JSON.stringify(backup.profile) ||
     JSON.stringify(readBackupDecks(store)) !== JSON.stringify(sortedDecks(backup.decks)) ||
     settings.policy !== backup.spoilers.policy ||
     settings.resetGeneration !== backup.spoilers.resetGeneration ||

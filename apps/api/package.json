@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@better-auth/electron": "catalog:",
+    "@better-auth/expo": "catalog:",
     "@livestore/sync-cf": "catalog:",
     "@mooligan/domain": "workspace:*",
     "@mooligan/workspace": "workspace:*",

@@ -1,9 +1,10 @@
 import { Schema } from "effect";
 
 import { deckEntrySchema, deckMetadataSchema } from "./deck-contract.ts";
+import { profileSettingsSchema } from "./profile-contract.ts";
 
 export const workspaceBackupFormat = "mooligan-workspace";
-export const workspaceBackupVersion = 4;
+export const workspaceBackupVersion = 5;
 export const workspaceBackupMaxBytes = 50 * 1024 * 1024;
 export const workspaceBackupMaxCollectionLots = 100_000;
 export const workspaceBackupMaxSpoilerDecisions = 100_000;
@@ -113,6 +114,7 @@ const Deck = Schema.Struct({
 });
 
 export const workspaceBackupSchema = Schema.Struct({
+  profile: profileSettingsSchema,
   decks: Schema.Array(Deck).pipe(
     Schema.maxItems(10_000),
     Schema.filter(
