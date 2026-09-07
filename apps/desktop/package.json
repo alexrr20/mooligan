@@ -23,6 +23,7 @@
     "@livestore/react": "catalog:",
     "@livestore/sync-cf": "catalog:",
     "@livestore/wa-sqlite": "catalog:",
+    "@mooligan/account": "workspace:*",
     "@mooligan/domain": "workspace:*",
     "@mooligan/workspace": "workspace:*",
     "@stylexjs/stylex": "catalog:",

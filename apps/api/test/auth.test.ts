@@ -144,3 +144,41 @@ test("an authenticated session resolves the Better Auth user", async () => {
   assert.equal(sessionBody.user.id, user.id);
   assert.equal(sessionBody.user.email, "test@example.com");
 });
+
+test("Expo starts Google sign-in with the mobile origin and callback", async () => {
+  const response = await exports.default.fetch(
+    new Request("http://127.0.0.1:3000/api/auth/sign-in/social", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "expo-origin": "com.mooligan.app://",
+        "x-skip-oauth-proxy": "true",
+      },
+      body: JSON.stringify({ provider: "google", callbackURL: "com.mooligan.app://settings" }),
+    }),
+  );
+  assert.equal(response.status, 200);
+  const result = await response.json<{ url: string; redirect: boolean }>();
+  assert.equal(new URL(result.url).origin, "https://accounts.google.com");
+  assert.equal(result.redirect, true);
+});
+
+test("the Expo authorization proxy is mounted and rejects unsafe URLs", async () => {
+  const response = await exports.default.fetch(
+    new Request(
+      "http://127.0.0.1:3000/api/auth/expo-authorization-proxy?authorizationURL=http://evil.example.com",
+    ),
+  );
+  assert.equal(response.status, 400);
+});
+
+test("Expo rejects an unrelated app origin", async () => {
+  const response = await exports.default.fetch(
+    new Request("http://127.0.0.1:3000/api/auth/sign-in/social", {
+      method: "POST",
+      headers: { "content-type": "application/json", "expo-origin": "other.app://" },
+      body: JSON.stringify({ provider: "google", callbackURL: "other.app://settings" }),
+    }),
+  );
+  assert.equal(response.status, 403);
+});

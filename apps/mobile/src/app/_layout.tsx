@@ -3,6 +3,8 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { Pressable, StyleSheet, Text } from "react-native";
 
+import { AccountStartup } from "@/account/account-provider";
+
 import { MooliganThemeProvider, useMooliganTheme } from "@/theme/theme-provider";
 
 void SplashScreen.preventAutoHideAsync();
@@ -10,7 +12,9 @@ void SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   return (
     <MooliganThemeProvider>
-      <AppNavigator />
+      <AccountStartup>
+        <AppNavigator />
+      </AccountStartup>
     </MooliganThemeProvider>
   );
 }

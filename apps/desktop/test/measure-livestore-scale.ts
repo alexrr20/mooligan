@@ -140,6 +140,7 @@ function largeBackup(): WorkspaceBackup {
     })),
     decks: [],
     format: "mooligan-workspace",
+    profile: { bannerPrintingId: null, featuredPrintingIds: [null, null, null, null] },
     spoilers: {
       decisions: Array.from({ length: spoilerDecisionCount }, (_, index) => ({
         scope: "printing" as const,
@@ -149,7 +150,7 @@ function largeBackup(): WorkspaceBackup {
       policy: "protect",
       resetGeneration: 1,
     },
-    version: 4,
+    version: 5,
   };
 }
 

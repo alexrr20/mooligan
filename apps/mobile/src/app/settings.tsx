@@ -1,6 +1,8 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AccountSettings } from "@/account/account-settings";
+
 import { themePreferences, type ThemePreference } from "@/theme/theme";
 import { useMooliganTheme } from "@/theme/theme-provider";
 
@@ -30,6 +32,7 @@ export default function SettingsScreen() {
     >
       <SafeAreaView edges={["bottom", "left", "right"]} style={styles.safeArea}>
         <View style={styles.content}>
+          <AccountSettings />
           <Text style={[styles.sectionTitle, { color: palette.textSecondary }]}>APPEARANCE</Text>
           <View
             accessibilityRole="radiogroup"
@@ -89,8 +92,8 @@ export default function SettingsScreen() {
           >
             <Text style={[styles.aboutName, { color: palette.text }]}>Mooligan mobile</Text>
             <Text style={[styles.aboutBody, { color: palette.textSecondary }]}>
-              This foundation stores only the appearance choice on this Device. It does not create a
-              Workspace or connect an Account.
+              Your Workspace is saved on this Device. Sign in to sync with desktop. Appearance is a
+              Device setting.
             </Text>
           </View>
         </View>

@@ -30,7 +30,7 @@ import { registerDesktopSchemes } from "./protocols";
 import { registerSpoilerProjectionIpc } from "./spoilers/projection-ipc";
 import { SpoilerProjection } from "./spoilers/projection";
 import { focusFirstWindow, publishRendererEvent } from "./windows";
-import { AccountWorkspace } from "./workspace/account";
+import { AccountWorkspace } from "@mooligan/account/workspace";
 import { registerWorkspaceIpc } from "./workspace/ipc";
 import { WorkspaceRegistry } from "./workspace/registry";
 

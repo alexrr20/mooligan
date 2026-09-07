@@ -3,7 +3,7 @@
     "name": "Mooligan",
     "slug": "mooligan-mobile",
     "version": "0.0.0",
-    "scheme": "mooligan",
+    "scheme": "com.mooligan.app",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "automatic",
@@ -32,7 +32,10 @@
             "image": "./assets/images/splash-icon.png"
           }
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-sqlite",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

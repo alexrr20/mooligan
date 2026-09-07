@@ -1,3 +1,4 @@
+import { expo } from "@better-auth/expo";
 import { electron } from "@better-auth/electron";
 import { betterAuth } from "better-auth";
 import { v7 as uuidv7 } from "uuid";
@@ -37,7 +38,7 @@ export function createAuth(environment: Env) {
         ipAddressHeaders: ["cf-connecting-ip", "x-forwarded-for"],
       },
     },
-    plugins: [electron()],
+    plugins: [electron(), expo()],
   });
 }
 

@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from "./routes/index";
 import { Route as CollectionRouteImport } from "./routes/collection";
 import { Route as DecksRouteImport } from "./routes/decks";
 import { Route as ListsRouteImport } from "./routes/lists";
+import { Route as ProfileRouteImport } from "./routes/profile";
 import { Route as SearchRouteImport } from "./routes/search";
 import { Route as SetsRouteImport } from "./routes/sets";
 import { Route as SettingsRouteImport } from "./routes/settings";
@@ -36,6 +37,11 @@ const DecksRoute = DecksRouteImport.update({
 const ListsRoute = ListsRouteImport.update({
   id: "/lists",
   path: "/lists",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ProfileRoute = ProfileRouteImport.update({
+  id: "/profile",
+  path: "/profile",
   getParentRoute: () => rootRouteImport,
 } as any);
 const SearchRoute = SearchRouteImport.update({
@@ -64,6 +70,7 @@ export interface FileRoutesByFullPath {
   "/collection": typeof CollectionRoute;
   "/decks": typeof DecksRoute;
   "/lists": typeof ListsRoute;
+  "/profile": typeof ProfileRoute;
   "/search": typeof SearchRoute;
   "/sets": typeof SetsRoute;
   "/settings": typeof SettingsRoute;
@@ -74,6 +81,7 @@ export interface FileRoutesByTo {
   "/collection": typeof CollectionRoute;
   "/decks": typeof DecksRoute;
   "/lists": typeof ListsRoute;
+  "/profile": typeof ProfileRoute;
   "/search": typeof SearchRoute;
   "/sets": typeof SetsRoute;
   "/settings": typeof SettingsRoute;
@@ -85,6 +93,7 @@ export interface FileRoutesById {
   "/collection": typeof CollectionRoute;
   "/decks": typeof DecksRoute;
   "/lists": typeof ListsRoute;
+  "/profile": typeof ProfileRoute;
   "/search": typeof SearchRoute;
   "/sets": typeof SetsRoute;
   "/settings": typeof SettingsRoute;
@@ -97,6 +106,7 @@ export interface FileRouteTypes {
     | "/collection"
     | "/decks"
     | "/lists"
+    | "/profile"
     | "/search"
     | "/sets"
     | "/settings"
@@ -107,6 +117,7 @@ export interface FileRouteTypes {
     | "/collection"
     | "/decks"
     | "/lists"
+    | "/profile"
     | "/search"
     | "/sets"
     | "/settings"
@@ -117,6 +128,7 @@ export interface FileRouteTypes {
     | "/collection"
     | "/decks"
     | "/lists"
+    | "/profile"
     | "/search"
     | "/sets"
     | "/settings"
@@ -128,6 +140,7 @@ export interface RootRouteChildren {
   CollectionRoute: typeof CollectionRoute;
   DecksRoute: typeof DecksRoute;
   ListsRoute: typeof ListsRoute;
+  ProfileRoute: typeof ProfileRoute;
   SearchRoute: typeof SearchRoute;
   SetsRoute: typeof SetsRoute;
   SettingsRoute: typeof SettingsRoute;
@@ -162,6 +175,13 @@ declare module "@tanstack/react-router" {
       path: "/lists";
       fullPath: "/lists";
       preLoaderRoute: typeof ListsRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/profile": {
+      id: "/profile";
+      path: "/profile";
+      fullPath: "/profile";
+      preLoaderRoute: typeof ProfileRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/search": {
@@ -200,6 +220,7 @@ const rootRouteChildren: RootRouteChildren = {
   CollectionRoute: CollectionRoute,
   DecksRoute: DecksRoute,
   ListsRoute: ListsRoute,
+  ProfileRoute: ProfileRoute,
   SearchRoute: SearchRoute,
   SetsRoute: SetsRoute,
   SettingsRoute: SettingsRoute,

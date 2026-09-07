@@ -28,8 +28,8 @@ would disappear after a restart.
 
 The user-owned workspace is separate from the replaceable Scryfall catalog
 database. Motion and view preferences stay in renderer local storage on the
-current device. Workspace backup version 4 contains only materialized
-collection lots, decks with their card entries, and spoiler state, and every restore creates a new unbound
+current device. Workspace backup version 5 contains only materialized
+collection lots, decks with their card entries, profile choices, and spoiler state, and every restore creates a new unbound
 workspace before activation.
 
 ## Decks
@@ -60,10 +60,23 @@ the same field resolve in the synchronized event order. Merged card IDs remain
 addressable by later offline edits. Removed cards cannot be revived by stale
 edits, and deleted decks reject later card additions and metadata changes.
 
-The workspace event schema is now version 2. Deploy the updated API alongside
-the desktop client to enable deck sync. Older clients must update before syncing;
-their local workspace remains available. Backup version 4 replaces version 3,
+The workspace event schema is now version 3. Deploy the updated API alongside
+the desktop client to enable profile sync. Older clients must update before syncing;
+their local workspace remains available. Backup version 5 replaces version 4,
 with no backward compatibility for old backup files.
+
+## Profile
+
+Signed-in users can open their profile from the header when their account workspace
+is active. Unbound workspaces have no profile entry, and direct profile navigation
+returns them to Home. Sign-out also closes access to the profile.
+
+The profile displays collection counts, card previews, and active decks. Users can
+pin four distinct printings they own, replace or unpin them, and choose banner
+artwork from the catalog. Protected previews remain concealed. Printings no longer
+owned leave an empty featured slot. Profile choices persist in the workspace event
+log, sync between devices, and are included in backups. Profiles are not published
+as public pages.
 
 ## Development
 
@@ -93,8 +106,10 @@ vp run mobile#dev
 ```
 
 Expo generates `apps/mobile/ios` and `apps/mobile/android` locally from
-`apps/mobile/app.json`. Neither directory is committed. The mobile foundation
-does not create or synchronize a Workspace yet.
+`apps/mobile/app.json`. Neither directory is committed. Mobile creates a persistent local Workspace
+and uses Better Auth’s Expo client to sign in and sync its Account Workspace. See
+[mobile setup](apps/mobile/README.md) for the public service origin, native
+rebuild requirements, and verification steps.
 
 The baseline migration creates the catalog release, Better Auth, and
 workspace-sync tables in Wrangler's local D1 database. It targets a fresh
@@ -188,7 +203,7 @@ supported maximum. The desktop pauses sync and keeps local editing available.
 
 ### Reset development data
 
-Workspace backup version 4 is the only supported backup format. Export a backup
+Workspace backup version 5 is the only supported backup format. Export a backup
 from Settings before resetting any data you care about.
 
 For an unbound development Workspace, quit Mooligan, clear the renderer origin's

@@ -1,6 +1,8 @@
 import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { WorkspaceSummary } from "@/account/workspace-summary";
+
 import { useMooliganTheme } from "@/theme/theme-provider";
 
 export default function HomeScreen() {
@@ -20,14 +22,13 @@ export default function HomeScreen() {
             style={styles.mark}
           />
           <Text style={[styles.eyebrow, { color: palette.accentText }]}>MOOLIGAN MOBILE</Text>
-          <Text style={[styles.title, { color: palette.text }]}>
-            Your Workspace will live here.
-          </Text>
+          <Text style={[styles.title, { color: palette.text }]}>Your Workspace, with you.</Text>
           <Text style={[styles.body, { color: palette.textSecondary }]}>
-            Mooligan mobile is set up, but it does not create or sync a Workspace yet. Cards, your
-            Collection, and Decks come next.
+            Your Collection and Decks sync with desktop and stay saved on this Device. Mobile card
+            browsing and editing come next.
           </Text>
 
+          <WorkspaceSummary />
           <View
             style={[styles.note, { backgroundColor: palette.surface, borderColor: palette.border }]}
           >
@@ -37,7 +38,7 @@ export default function HomeScreen() {
                 An Account stays optional
               </Text>
               <Text style={[styles.noteBody, { color: palette.textSecondary }]}>
-                Core card, Collection, and Deck work will remain available locally on this Device.
+                Your Workspace stays on this Device when you sign out or lose your connection.
               </Text>
             </View>
           </View>
