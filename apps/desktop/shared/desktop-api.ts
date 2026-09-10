@@ -121,9 +121,10 @@ export type DesktopApi = {
     signOut: () => Promise<AuthSnapshot>;
   };
   catalog: {
+    cancelQuery: (requestId: string) => Promise<void>;
     detail: (printingId: string) => Promise<CatalogPrintingResult | null>;
     download: () => Promise<CatalogStatus>;
-    list: (request?: CatalogListRequest) => Promise<CatalogListPage>;
+    list: (request?: CatalogListRequest, requestId?: string) => Promise<CatalogListPage>;
     onProgress: (callback: (progress: CatalogProgress) => void) => () => void;
     resolveRootSetId: (targetId: string) => Promise<string | null>;
     spoilerRevealSummaries: () => Promise<SpoilerRevealSummaries>;
@@ -135,7 +136,7 @@ export type DesktopApi = {
     validateCollectionPrinting: (request: CollectionPrintingValidationRequest) => Promise<void>;
   };
   collection: {
-    list: (request?: CollectionListRequest) => Promise<CollectionListResult>;
+    list: (request?: CollectionListRequest, requestId?: string) => Promise<CollectionListResult>;
   };
   workspaceProjection: {
     applyCollectionDelta: (delta: CollectionProjectionDelta) => Promise<CollectionProjectionResult>;

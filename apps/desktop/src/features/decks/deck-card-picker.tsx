@@ -8,6 +8,7 @@ import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../components/ui/dialog";
 import { Form } from "../../components/ui/form";
 import { Input } from "../../components/ui/input";
+import { listCatalog } from "../catalog/catalog-request";
 import { useCatalogCardDetail } from "../cards/use-card-detail";
 import {
   DeckMessage,
@@ -24,7 +25,7 @@ export function DeckCardPicker({ deckId }: { deckId: string }) {
   const [selected, setSelected] = useState<string>();
   const results = useQuery({
     queryKey: ["catalog", "deck-search", search],
-    queryFn: () => window.catalog.list({ ...search, limit: 30, includeDigital: true }),
+    queryFn: ({ signal }) => listCatalog({ ...search, limit: 30, includeDigital: true }, signal),
     enabled: !!search.query,
   });
   return (

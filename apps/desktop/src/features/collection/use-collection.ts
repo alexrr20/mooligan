@@ -2,6 +2,7 @@ import { infiniteQueryOptions, type InfiniteData, useInfiniteQuery } from "@tans
 
 import type { CollectionListPage, CollectionListRequest } from "@mooligan/domain/collection";
 
+import { listCollection } from "../catalog/catalog-request";
 import { spoilerCatalogCacheKey, useSpoilerState } from "../spoilers/use-spoilers";
 import type { CollectionSearchState } from "./collection-state";
 
@@ -10,7 +11,7 @@ export function useCollection(search: CollectionSearchState) {
   const visibilityKey = spoilerCatalogCacheKey(spoilers.state);
   const request = toCollectionRequest(search);
   const result = useInfiniteQuery(
-    collectionQueryOptions(window.collection.list, request, visibilityKey, !spoilers.loading),
+    collectionQueryOptions(listCollection, request, visibilityKey, !spoilers.loading),
   );
 
   const pages = result.data?.pages ?? [];
@@ -37,7 +38,7 @@ export function useCollection(search: CollectionSearchState) {
 }
 
 function collectionQueryOptions(
-  list: Window["collection"]["list"],
+  list: typeof listCollection,
   request: CollectionListRequest,
   visibilityKey: string,
   enabled: boolean,
@@ -53,8 +54,8 @@ function collectionQueryOptions(
     getNextPageParam: (lastPage, pages) =>
       lastPage.hasMore ? pages.reduce((count, page) => count + page.holdings.length, 0) : undefined,
     initialPageParam: 0,
-    queryFn: async ({ pageParam }) => {
-      const result = await list({ ...request, limit: 100, offset: pageParam });
+    queryFn: async ({ pageParam, signal }) => {
+      const result = await list({ ...request, limit: 100, offset: pageParam }, signal);
       if (result.status === "not-ready") throw new CollectionProjectionNotReadyError();
       return result.page;
     },

@@ -1,5 +1,6 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 
+import { listCatalog } from "../catalog/catalog-request";
 import { spoilerCatalogCacheKey, useSpoilerState } from "../spoilers/use-spoilers.ts";
 import { catalogSearchQueryOptions } from "./catalog-search-query-options";
 import type { UniverseFilter } from "./search-state";
@@ -20,7 +21,7 @@ export function useCatalogSearch(
   const visibilityKey = spoilerCatalogCacheKey(spoilers.state);
   const result = useInfiniteQuery(
     catalogSearchQueryOptions(
-      window.catalog.list,
+      listCatalog,
       query,
       uniqueCards,
       includeAdCards,
