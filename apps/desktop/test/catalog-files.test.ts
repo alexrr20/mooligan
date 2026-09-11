@@ -411,6 +411,10 @@ void test("catalog filters tokens and ad cards independently", () => {
         content = 'cards',
         content_rowid = 'rowid'
       );
+      CREATE INDEX cards_recent_order ON cards (
+        effective_released_at DESC, name COLLATE NOCASE,
+        set_code COLLATE NOCASE, collector_number COLLATE NOCASE, id
+      );
     `);
     const insert = database.prepare(
       `INSERT INTO cards
@@ -979,6 +983,23 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
       assert.deepEqual(
         queryCatalog({ query: "alternate", uniqueCards: true }).cards.map((card) => card.id),
         ["printing-3"],
+      );
+      assert.deepEqual(
+        queryCatalog({ query: "s:moo", uniqueCards: true, includeArtSeries: false }).cards.map(
+          (card) => card.id,
+        ),
+        ["printing-1", "printing-2"],
+      );
+      assert.deepEqual(
+        queryCatalog({
+          query: "test",
+          uniqueCards: true,
+          includeDigital: false,
+          includeArtSeries: false,
+          limit: 1,
+          offset: 1,
+        }).cards.map((card) => card.id),
+        ["printing-2"],
       );
       assert.deepEqual(queryCatalog({ limit: 1, query: "second" }), {
         cards: [

@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import { SpoilerTargetIdSchema } from "@mooligan/domain/spoilers";
+import { CatalogListPageSchema } from "@mooligan/domain/catalog-search";
 import * as z from "zod";
 
 import {
@@ -20,6 +21,7 @@ import {
   type DesktopApi,
 } from "../shared/desktop-api";
 import { validateWorkspaceBackup } from "./workspace/backup";
+import { unwrapCatalogRequest } from "../shared/catalog-request";
 
 function subscribe<Value>(channel: string, callback: (value: Value) => void) {
   const listener = (_event: IpcRendererEvent, value: Value) => callback(value);
@@ -31,14 +33,21 @@ function subscribe<Value>(channel: string, callback: (value: Value) => void) {
 
 export const desktopApi = {
   collection: {
-    list: async (request) =>
-      validateCollectionListResult(await ipcRenderer.invoke("collection:list", request)),
+    list: async (request, requestId) =>
+      validateCollectionListResult(
+        unwrapCatalogRequest(await ipcRenderer.invoke("collection:list", request, requestId)),
+      ),
   },
 
   catalog: {
+    cancelQuery: (requestId) =>
+      ipcRenderer.invoke("catalog:cancel-query", z.uuid().parse(requestId)),
     detail: (printingId) => ipcRenderer.invoke("catalog:detail", printingId),
     download: () => ipcRenderer.invoke("catalog:download"),
-    list: (request) => ipcRenderer.invoke("catalog:list", request),
+    list: async (request, requestId) =>
+      CatalogListPageSchema.parse(
+        unwrapCatalogRequest(await ipcRenderer.invoke("catalog:list", request, requestId)),
+      ),
     onProgress: (callback: (progress: CatalogProgress) => void) =>
       subscribe("catalog:progress", callback),
     resolveRootSetId: (targetId) =>

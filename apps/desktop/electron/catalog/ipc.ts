@@ -30,7 +30,9 @@ import * as z from "zod";
 import type { JSONType } from "zod";
 
 import type { CatalogProgress, CatalogStatus } from "../../shared/desktop-api.ts";
+import { settleCatalogRequest } from "../../shared/catalog-request.ts";
 import { isFileNotFound, recoverInterruptedReplacement } from "./files";
+import { CatalogQueryQueue } from "./query-queue";
 import { validateCatalogPrintingId } from "./detail";
 import { catalogSchemaVersion } from "./import";
 import { parseCatalogQueryWorkerResponse, validateCatalogListRequest } from "./query";
@@ -82,6 +84,8 @@ type CatalogQueryResult =
   | SpoilerRevealSummaries
   | string
   | null;
+const catalogQueryQueue = new CatalogQueryQueue();
+const catalogRequestControllers = new Map<string, AbortController>();
 const catalogQueries = new Map<
   number,
   {
@@ -115,13 +119,20 @@ export function registerCatalogIpc(options: CatalogIpcOptions) {
     assertTrustedSender(event);
     return getCatalogStatus();
   });
-  ipcMain.handle("catalog:list", async (event, request) => {
+  ipcMain.handle("catalog:cancel-query", (event, requestId) => {
     assertTrustedSender(event);
-    await catalogQueriesAvailable;
+    const key = `${event.sender.id}:${z.uuid().parse(requestId)}`;
+    catalogRequestControllers.get(key)?.abort();
+  });
+  ipcMain.handle("catalog:list", (event, request, requestId) => {
+    assertTrustedSender(event);
     const validRequest = validateCatalogListRequest(request);
-    return queryCatalogWithStableVisibility((visibility) =>
-      queryCatalog({ request: validRequest, type: "list", visibility }),
-    );
+    return withCatalogRequest(event, requestId, async (signal) => {
+      await catalogQueriesAvailable;
+      return queryCatalogWithStableVisibility((visibility) =>
+        queryCatalog({ request: validRequest, type: "list", visibility }, signal),
+      );
+    });
   });
   ipcMain.handle("catalog:detail", async (event, printingId) => {
     assertTrustedSender(event);
@@ -137,25 +148,27 @@ export function registerCatalogIpc(options: CatalogIpcOptions) {
     assertTrustedSender(event);
     return resolveCatalogRootSetId(targetId);
   });
-  ipcMain.handle("collection:list", async (event, request) => {
+  ipcMain.handle("collection:list", (event, request, requestId) => {
     assertTrustedSender(event);
-    if (!readCollectionProjectionReady()) {
-      return { status: "not-ready" } as const;
-    }
     const validRequest = validateCollectionListRequest(request);
-    await catalogQueriesAvailable;
-    if (!readCollectionProjectionReady()) {
-      return { status: "not-ready" } as const;
-    }
-    const result = await queryCatalogWithStableVisibility((visibility) =>
-      queryCatalog({ request: validRequest, type: "collection-list", visibility }),
-    );
+    return withCatalogRequest(event, requestId, async (signal) => {
+      if (!readCollectionProjectionReady()) {
+        return { status: "not-ready" } as const;
+      }
+      await catalogQueriesAvailable;
+      if (!readCollectionProjectionReady()) {
+        return { status: "not-ready" } as const;
+      }
+      const result = await queryCatalogWithStableVisibility((visibility) =>
+        queryCatalog({ request: validRequest, type: "collection-list", visibility }, signal),
+      );
 
-    if (!readCollectionProjectionReady()) {
-      return { status: "not-ready" } as const;
-    }
+      if (!readCollectionProjectionReady()) {
+        return { status: "not-ready" } as const;
+      }
 
-    return { page: result, status: "ready" } as const;
+      return { page: result, status: "ready" } as const;
+    });
   });
   ipcMain.handle("catalog:upcoming", async (event) => {
     assertTrustedSender(event);
@@ -191,6 +204,23 @@ export function registerCatalogIpc(options: CatalogIpcOptions) {
 
     return activeDownload;
   });
+}
+
+async function withCatalogRequest<Result>(
+  event: IpcMainInvokeEvent,
+  requestId: JSONType | undefined,
+  read: (signal?: AbortSignal) => Promise<Result>,
+) {
+  if (requestId === undefined) return settleCatalogRequest(() => read());
+  const key = `${event.sender.id}:${z.uuid().parse(requestId)}`;
+  if (catalogRequestControllers.has(key)) throw new Error("Duplicate catalog request.");
+  const controller = new AbortController();
+  catalogRequestControllers.set(key, controller);
+  try {
+    return await settleCatalogRequest(() => read(controller.signal), controller.signal);
+  } finally {
+    catalogRequestControllers.delete(key);
+  }
 }
 
 export function replaceCatalogCollectionProjection(lots: CollectionLot[]) {
@@ -550,9 +580,11 @@ function queryCatalog(
 ): Promise<string | null>;
 function queryCatalog(
   operation: Extract<CatalogQueryOperation, { type: "list" }>,
+  signal?: AbortSignal,
 ): Promise<CatalogListPage>;
 function queryCatalog(
   operation: Extract<CatalogQueryOperation, { type: "collection-list" }>,
+  signal?: AbortSignal,
 ): Promise<CollectionListPage>;
 function queryCatalog(
   operation: Extract<CatalogQueryOperation, { type: "root-set" }>,
@@ -569,7 +601,14 @@ function queryCatalog(
 function queryCatalog(
   operation: Extract<CatalogQueryOperation, { type: "upcoming-printings" }>,
 ): Promise<CatalogUpcomingPrintingPage>;
-function queryCatalog(operation: CatalogQueryOperation): Promise<CatalogQueryResult> {
+function queryCatalog(
+  operation: CatalogQueryOperation,
+  signal?: AbortSignal,
+): Promise<CatalogQueryResult> {
+  return catalogQueryQueue.run(() => sendCatalogQuery(operation), signal);
+}
+
+function sendCatalogQuery(operation: CatalogQueryOperation): Promise<CatalogQueryResult> {
   const id = ++catalogQueryId;
   let worker: Worker;
 
@@ -688,6 +727,7 @@ function failCatalogQueryWorker(worker: Worker, terminate = true) {
 
   catalogQueryWorker = undefined;
   catalogQueryWorkerIdentity = undefined;
+  catalogQueryQueue.clear(catalogReadError());
 
   for (const pending of catalogQueries.values()) {
     pending.reject(catalogReadError());

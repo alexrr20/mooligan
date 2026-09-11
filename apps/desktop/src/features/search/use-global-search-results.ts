@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
+import { listCatalog, listCollection } from "../catalog/catalog-request";
+import { globalSearchCatalogQueryOptions } from "./global-search-query";
 import { useDecks } from "../decks/use-decks";
 import { spoilerCatalogCacheKey, useSpoilerState } from "../spoilers/use-spoilers";
 import {
@@ -13,25 +15,17 @@ import {
   type GlobalSearchGroup,
 } from "./global-search-results";
 
-export function useGlobalSearchResults(query: string, open: boolean, workspaceId: string) {
+export function useGlobalSearchResults(input: string, open: boolean, workspaceId: string) {
+  const query = open ? input : "";
   const decks = useDecks();
   const spoilers = useSpoilerState();
   const visibilityKey = spoilerCatalogCacheKey(spoilers.state);
   const enabled = open && Boolean(query) && !spoilers.loading;
-  const catalog = useQuery({
-    queryKey: ["catalog", "global-search", workspaceId, visibilityKey, query],
-    queryFn: () => window.catalog.list({ query, uniqueCards: true, limit: 6 }),
-    enabled,
-    retry: false,
-  });
+  const catalog = useQuery(
+    globalSearchCatalogQueryOptions(listCatalog, query, workspaceId, visibilityKey, enabled),
+  );
   const collection = useQuery(
-    globalSearchCollectionQueryOptions(
-      window.collection.list,
-      query,
-      workspaceId,
-      visibilityKey,
-      enabled,
-    ),
+    globalSearchCollectionQueryOptions(listCollection, query, workspaceId, visibilityKey, enabled),
   );
   const groups: GlobalSearchGroup[] = [
     { label: "Cards", items: cardSearchResults(catalog.data?.cards ?? []) },

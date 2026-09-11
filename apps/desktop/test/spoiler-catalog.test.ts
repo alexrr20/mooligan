@@ -152,6 +152,10 @@ void test("catalog reads enforce spoiler visibility before any card data crosses
         list({ uniqueCards: true }, PROTECTED).cards.map(({ id }) => id),
         ["old-reprint"],
       );
+      assert.deepEqual(
+        list({ query: "returning", uniqueCards: true }, PROTECTED).cards.map(({ id }) => id),
+        ["old-reprint"],
+      );
 
       const protectedUpcoming = upcomingPrintings(undefined, PROTECTED);
       assert.deepEqual(protectedUpcoming, {

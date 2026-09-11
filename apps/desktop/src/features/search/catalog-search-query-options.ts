@@ -1,6 +1,7 @@
 import type { CatalogListPage } from "@mooligan/domain/catalog-search";
 import { infiniteQueryOptions, type InfiniteData } from "@tanstack/react-query";
 
+import type { listCatalog } from "../catalog/catalog-request.ts";
 import type { UniverseFilter } from "./search-state.ts";
 
 type CatalogSearchQueryKey = readonly [
@@ -19,7 +20,7 @@ type CatalogSearchQueryKey = readonly [
 ];
 
 export function catalogSearchQueryOptions(
-  list: Window["catalog"]["list"],
+  list: typeof listCatalog,
   query: string,
   uniqueCards: boolean,
   includeAdCards: boolean,
@@ -56,18 +57,21 @@ export function catalogSearchQueryOptions(
       previousData: InfiniteData<CatalogListPage, number> | undefined,
       previousQuery,
     ) => (previousQuery?.queryKey[2] === visibilityKey ? previousData : undefined),
-    queryFn: ({ pageParam }) =>
-      list({
-        includeAdCards,
-        includeArtSeries,
-        includeDigital,
-        includeTokens,
-        limit: 100,
-        offset: pageParam,
-        query,
-        uniqueCards,
-        universe,
-      }),
+    queryFn: ({ pageParam, signal }) =>
+      list(
+        {
+          includeAdCards,
+          includeArtSeries,
+          includeDigital,
+          includeTokens,
+          limit: 100,
+          offset: pageParam,
+          query,
+          uniqueCards,
+          universe,
+        },
+        signal,
+      ),
     getNextPageParam: (lastPage, pages) =>
       lastPage.hasMore ? pages.reduce((count, page) => count + page.cards.length, 0) : undefined,
     initialPageParam: 0,

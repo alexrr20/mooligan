@@ -177,8 +177,6 @@ const cardColumns = `cards.id,
                      cards.type_line AS typeLine,
                      cards.rarity,
                      ${effectiveReleaseDateSql} AS releasedOn`;
-const summaryColumns =
-  "id, name, hasImage, hasGridImage, isDigital, setCode, setName, collectorNumber, typeLine, rarity, releasedOn";
 const artSeriesFilter = "? OR COALESCE(json_extract(cards.json, '$.layout'), '') <> 'art_series'";
 const digitalFilter = "? OR COALESCE(json_extract(cards.json, '$.digital'), 0) = 0";
 const tokenCard =
@@ -316,38 +314,31 @@ export function createCatalogQuery(database: DatabaseSync) {
       return { cards: [], hasMore: false, queryError: compiledQuery.error, total: 0 };
     }
 
+    // Walk the existing result-order index so LIMIT can stop before reading every match.
     const statement = compiledQuery
       ? database.prepare(
           uniqueCards
-            ? `WITH matches AS (
-                 SELECT ${cardColumns},
-                        cards.oracle_id AS oracleId
-                 FROM cards
-                 WHERE (${compiledQuery.sql})
-                   AND (${cardFilter})
-                   AND ${catalogVisibilitySql}
-               ), ranked AS (
-                 SELECT *,
-                        ROW_NUMBER() OVER (
-                          PARTITION BY COALESCE(oracleId, id)
-                          ORDER BY releasedOn DESC,
-                                   setCode COLLATE NOCASE,
-                                   collectorNumber COLLATE NOCASE,
-                                   id
-                        ) AS printingRank
-                 FROM matches
-               )
-               SELECT ${summaryColumns}
-               FROM ranked
-               WHERE printingRank = 1
-               ORDER BY releasedOn DESC,
-                        name COLLATE NOCASE,
-                        setCode COLLATE NOCASE,
-                        collectorNumber COLLATE NOCASE,
-                        id
+            ? `SELECT ${cardColumns}
+               FROM cards INDEXED BY cards_recent_order
+               WHERE (${compiledQuery.sql})
+                 AND (${cardFilter})
+                 AND ${catalogVisibilitySql}
+                 AND NOT EXISTS (
+                   SELECT 1 FROM cards AS newer
+                   WHERE newer.identity_id = cards.identity_id
+                     AND (${compiledQuery.sql.replaceAll("cards.", "newer.")})
+                     AND (${newerCardFilter})
+                     AND ${catalogVisibilitySqlFor("newer")}
+                     AND ${newerCardPrecedes}
+                 )
+               ORDER BY ${effectiveReleaseDateSql} DESC,
+                        cards.name COLLATE NOCASE,
+                        cards.set_code COLLATE NOCASE,
+                        cards.collector_number COLLATE NOCASE,
+                        cards.id
                LIMIT ? OFFSET ?`
             : `SELECT ${cardColumns}
-               FROM cards
+               FROM cards INDEXED BY cards_recent_order
                WHERE (${compiledQuery.sql})
                  AND (${cardFilter})
                  AND ${catalogVisibilitySql}
@@ -369,6 +360,9 @@ export function createCatalogQuery(database: DatabaseSync) {
               ...compiledQuery.parameters,
               ...filterArguments,
               ...visibilityArguments,
+              ...(uniqueCards
+                ? [...compiledQuery.parameters, ...filterArguments, ...visibilityArguments]
+                : []),
               limit + 1,
               offset,
             )

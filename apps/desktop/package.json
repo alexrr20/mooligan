@@ -12,6 +12,7 @@
     "package": "vp run build && electron-builder --dir",
     "dist": "vp run build && electron-builder",
     "measure:livestore": "node test/measure-livestore-scale.ts",
+    "measure:catalog": "node test/measure-catalog-search.ts",
     "start": "electron .",
     "test": "node --test test/*.test.ts"
   },

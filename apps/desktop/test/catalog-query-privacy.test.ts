@@ -5,6 +5,7 @@ import type { CatalogListPage } from "@mooligan/domain/catalog-search";
 import type { SpoilerState } from "@mooligan/domain/spoilers";
 import { InfiniteQueryObserver, QueryClient } from "@tanstack/react-query";
 
+import type { listCatalog } from "../src/features/catalog/catalog-request.ts";
 import { catalogSearchQueryOptions } from "../src/features/search/catalog-search-query-options.ts";
 import { spoilerCatalogCacheKey } from "../src/features/spoilers/spoiler-cache-key.ts";
 
@@ -43,7 +44,7 @@ const protectedSpoilers: SpoilerState = {
 void test("search placeholders never cross spoiler visibility contexts", async () => {
   const sameContextRequest = deferred<CatalogListPage>();
   const nextContextRequest = deferred<CatalogListPage>();
-  const list: Window["catalog"]["list"] = (request) => {
+  const list: typeof listCatalog = (request) => {
     if (request?.query === "same-context") return sameContextRequest.promise;
     if (request?.query === "next-context") return nextContextRequest.promise;
     return Promise.resolve(visibleSearch);
