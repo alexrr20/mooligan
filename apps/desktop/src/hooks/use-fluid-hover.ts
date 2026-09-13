@@ -370,6 +370,8 @@ export function useFluidHover<T extends HTMLElement>(
   const registerItem = useCallback(
     (index: number, element: HTMLElement | null) => {
       if (element) {
+        const previous = itemsRef.current.get(index);
+        if (previous) getItemRo().unobserve(previous);
         itemsRef.current.set(index, element);
         getItemRo()?.observe(element);
         if (index === activeIndexRef.current) element.setAttribute(ACTIVE_ATTR, "");

@@ -29,7 +29,7 @@ const identifiers = {
 };
 const cardPrices = {
   paper: {
-    cardmarket: { currency: "EUR", retail: { normal: { [date]: 1.15 }, foil: { [date]: 2.25 } } },
+    cardmarket: { currency: "EUR", retail: { normal: { [date]: 1.15 }, foil: { [date]: 2.3 } } },
     cardkingdom: {
       currency: "USD",
       buylist: { normal: { [date]: 0 } },
@@ -189,6 +189,9 @@ void test("conflicting face mappings are omitted and search uses saved MTGJSON p
         ["usd<10", 1],
         ["eur<10", 0],
         ["eur_foil<3", 1],
+        ["eur_foil=2.30", 1],
+        ["eur_foil>2.30", 0],
+        ["eur_foil=2.295", 1],
       ] as const) {
         const compiled = compileScryfallQuery(query, visibility);
         assert.ok(compiled.success);

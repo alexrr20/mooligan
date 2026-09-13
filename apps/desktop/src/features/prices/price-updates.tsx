@@ -72,7 +72,8 @@ export function PriceUpdateControl() {
       </div>
       {error ? (
         <p {...stylex.props(styles.error)} role="alert">
-          {error} Cached prices remain available.
+          {error}
+          {data?.snapshot ? " Cached prices remain available." : null}
         </p>
       ) : null}
     </div>

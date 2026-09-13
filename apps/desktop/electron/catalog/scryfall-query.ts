@@ -756,7 +756,7 @@ function compilePrice(field: string, value: string, comparison: Comparison): Sql
         ? "etched"
         : "nonfoil";
     return {
-      parameters: [market, currency, finish, price * 100],
+      parameters: [market, currency, finish, Math.round((price + Number.EPSILON) * 100)],
       sql: `EXISTS (SELECT 1 FROM market_prices.prices AS price
         WHERE price.printing_id = cards.id AND price.market = ? AND price.currency = ?
           AND price.finish = ? AND price.kind = 'retail'

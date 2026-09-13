@@ -37,7 +37,14 @@ export function AppSidebar() {
   return (
     <Sidebar variant="inset" side="left" data-window-no-drag>
       <SidebarHeader>
-        <Link to="/" {...stylex.props(styles.wordmark)}>
+        <Link
+          to="/"
+          {...stylex.props(styles.wordmark)}
+          onClick={() => {
+            setOpenMobile(false);
+            setIsPeeking(false);
+          }}
+        >
           Mooligan
           <span {...stylex.props(styles.dot)} aria-hidden="true" />
         </Link>
