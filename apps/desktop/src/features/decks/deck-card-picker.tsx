@@ -1,3 +1,4 @@
+import { PrintingPrice } from "../prices/printing-price";
 import type { CatalogCardDetail } from "@mooligan/domain/catalog-detail";
 import type { DeckSection } from "@mooligan/domain/decks";
 import * as stylex from "@stylexjs/stylex";
@@ -208,6 +209,7 @@ function AddDeckCardForm({
         {detail.card.name} · {detail.selectedPrinting.setCode.toUpperCase()}{" "}
         {detail.selectedPrinting.collectorNumber}
       </p>
+      <PrintingPrice printingId={detail.selectedPrinting.id} finish={finish} />
       {!deckId ? (
         <DeckSelect
           label="Deck"

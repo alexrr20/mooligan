@@ -13,7 +13,7 @@ const decodeBackup = Schema.decodeUnknownSync(workspaceBackupSchema, {
   onExcessProperty: "error",
 });
 
-void test("backup v5 validation is strict and rejects old versions", () => {
+void test("backup v7 validation is strict and rejects old versions", () => {
   const backup = fixture();
 
   assert.deepEqual(decodeBackup(backup), backup);
@@ -27,7 +27,7 @@ void test("backup v5 validation is strict and rejects old versions", () => {
   );
 });
 
-void test("backup v5 rejects duplicate state and invalid collection values", () => {
+void test("backup v7 rejects duplicate state and invalid collection values", () => {
   const backup = fixture();
 
   assert.throws(() =>
@@ -54,7 +54,7 @@ void test("backup v5 rejects duplicate state and invalid collection values", () 
 });
 
 void test(
-  "backup v5 round trips 100,000 lots and 100,000 spoiler decisions within 50 MiB",
+  "backup v7 round trips 100,000 lots and 100,000 spoiler decisions within 50 MiB",
   { timeout: 60_000 },
   () => {
     const largeBackup = {
@@ -68,6 +68,8 @@ void test(
       })),
       decks: [],
       format: "mooligan-workspace" as const,
+      priceCurrency: "EUR",
+      priceProviders: ["cardmarket", "tcgplayer", "cardkingdom", "cardsphere", "manapool"],
       profile: { bannerPrintingId: null, featuredPrintingIds: [null, null, null, null] },
       spoilers: {
         decisions: Array.from({ length: 100_000 }, (_, index) => ({
@@ -78,7 +80,7 @@ void test(
         policy: "protect" as const,
         resetGeneration: 12,
       },
-      version: 5 as const,
+      version: 7 as const,
     } satisfies WorkspaceBackup;
     const serialized = JSON.stringify(largeBackup);
 
@@ -105,12 +107,14 @@ function fixture(): WorkspaceBackup {
     ],
     decks: [],
     format: "mooligan-workspace",
+    priceCurrency: "EUR",
+    priceProviders: ["cardmarket", "tcgplayer", "cardkingdom", "cardsphere", "manapool"],
     profile: { bannerPrintingId: null, featuredPrintingIds: [null, null, null, null] },
     spoilers: {
       decisions: [{ scope: "printing", state: "reveal", targetId: "printing-one" }],
       policy: "protect",
       resetGeneration: 0,
     },
-    version: 5,
+    version: 7,
   };
 }

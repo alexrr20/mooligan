@@ -28,6 +28,7 @@ const port = parentPort;
 const startup = z
   .strictObject({
     catalogPath: z.string().min(1),
+    pricePath: z.string().min(1),
     collectionLots: z.array(CollectionLotSchema.strict()).max(100_000),
   })
   .safeParse(workerData);
@@ -37,6 +38,7 @@ if (!port || !startup.success) {
 }
 
 const database = new DatabaseSync(startup.data.catalogPath, { readOnly: true });
+database.prepare("ATTACH DATABASE ? AS market_prices").run(startup.data.pricePath);
 const collectionProjection = createCollectionProjection(database);
 collectionProjection.replace(startup.data.collectionLots);
 const listCatalog = createCatalogQuery(database);

@@ -1,3 +1,4 @@
+import { PrintingPrice } from "../prices/printing-price";
 import type { CatalogImageDescriptor } from "@mooligan/domain/catalog-detail";
 import type { ProfileSettings } from "@mooligan/workspace/schema";
 import * as stylex from "@stylexjs/stylex";
@@ -141,6 +142,7 @@ function CollectionChoices({
       setCode: holding.setCode,
       collectorNumber: holding.collectorNumber,
       image: holding.gridImage ?? holding.image,
+      isDigital: false,
     }),
   );
   return (
@@ -181,6 +183,7 @@ function BannerChoices({ query, busy, onChoose }: ChoicesProps) {
 }
 
 type Choice = {
+  isDigital: boolean;
   id: string;
   name: string;
   setCode: string;
@@ -211,6 +214,7 @@ function Choices({
             aria-label={`Choose ${card.name}, ${card.setCode} ${card.collectorNumber}${excluded.includes(card.id) ? ", already featured" : ""}`}
           >
             <PrintingImage image={card.image} />
+            {!card.isDigital ? <PrintingPrice printingId={card.id} /> : null}
             <span {...stylex.props(styles.cardName)}>{card.name}</span>
             <span {...stylex.props(styles.muted)}>
               {excluded.includes(card.id)

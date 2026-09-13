@@ -67,6 +67,7 @@ const CatalogImportWorkerMessageSchema = z.discriminatedUnion("type", [
 ]);
 let activeDownload: Promise<CatalogStatus> | undefined;
 let catalogEpoch = 0;
+let pricePath: string;
 let catalogQueriesAvailable = Promise.resolve();
 let catalogQueryId = 0;
 let catalogQueryWorker: Worker | undefined;
@@ -104,6 +105,7 @@ const collectionProjectionRequests = new Map<
 >();
 
 export type CatalogIpcOptions = {
+  pricePath: string;
   getCollectionProjectionLots: () => CollectionLot[];
   getVisibilitySnapshot: () => SpoilerVisibilitySnapshot;
   isCollectionProjectionReady: () => boolean;
@@ -111,6 +113,7 @@ export type CatalogIpcOptions = {
 };
 
 export function registerCatalogIpc(options: CatalogIpcOptions) {
+  pricePath = options.pricePath;
   getCatalogVisibilitySnapshot = options.getVisibilitySnapshot;
   getCollectionProjectionLots = options.getCollectionProjectionLots;
   isCollectionProjectionReady = options.isCollectionProjectionReady;
@@ -653,6 +656,7 @@ function getCatalogQueryWorker() {
     throw new Error("The Collection projection has not been initialized.");
   }
   const startup = {
+    pricePath,
     catalogPath: catalogPath(),
     collectionLots: getCollectionProjectionLots(),
   };

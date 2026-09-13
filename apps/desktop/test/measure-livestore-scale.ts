@@ -140,6 +140,8 @@ function largeBackup(): WorkspaceBackup {
     })),
     decks: [],
     format: "mooligan-workspace",
+    priceCurrency: "EUR",
+    priceProviders: ["cardmarket", "tcgplayer", "cardkingdom", "cardsphere", "manapool"],
     profile: { bannerPrintingId: null, featuredPrintingIds: [null, null, null, null] },
     spoilers: {
       decisions: Array.from({ length: spoilerDecisionCount }, (_, index) => ({
@@ -150,7 +152,7 @@ function largeBackup(): WorkspaceBackup {
       policy: "protect",
       resetGeneration: 1,
     },
-    version: 5,
+    version: 7,
   };
 }
 

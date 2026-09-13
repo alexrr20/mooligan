@@ -1,0 +1,24 @@
+import type { SVGProps } from "react";
+
+/** Rounded solid cards with a transparent art window on the front card. */
+export function DeckIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      focusable="false"
+      {...props}
+    >
+      <path d="M7.5 8.5C7.5 5.55 9.3 4 12 4h3l-.12-.46c-.36-1.36-1.44-1.98-2.8-1.62L3.56 4.2c-1.39.37-2.02 1.46-1.64 2.87l3.1 11.55c.32 1.2 1.18 1.91 2.48 1.85V8.5Z" />
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M12 5.5c-2 0-3 .99-3 3V19c0 2 1 3 3 3h6.5c2 0 3-1 3-3V8.5c0-2.01-1-3-3-3H12ZM12 8a1 1 0 0 0-1 1v4.25a1 1 0 0 0 1 1h6.5a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H12Z"
+      />
+    </svg>
+  );
+}

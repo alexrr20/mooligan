@@ -18,6 +18,8 @@
   },
   "devDependencies": {
     "@base-ui/react": "catalog:",
+    "@hugeicons/core-free-icons": "catalog:",
+    "@hugeicons/react": "catalog:",
     "@livestore/adapter-web": "catalog:",
     "@livestore/common": "catalog:",
     "@livestore/livestore": "catalog:",
@@ -27,6 +29,7 @@
     "@mooligan/account": "workspace:*",
     "@mooligan/domain": "workspace:*",
     "@mooligan/workspace": "workspace:*",
+    "@streamparser/json-node": "catalog:",
     "@stylexjs/stylex": "catalog:",
     "@stylexjs/unplugin": "catalog:",
     "@tanstack/react-query": "catalog:",

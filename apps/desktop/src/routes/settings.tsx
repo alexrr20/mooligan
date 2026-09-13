@@ -13,6 +13,7 @@ import { SpoilerSettings } from "../features/spoilers/spoiler-settings";
 import { WorkspaceSetting } from "../features/workspace/workspace-setting";
 import { colors } from "../styles/tokens.stylex.js";
 import { typography } from "../styles/typography";
+import { PriceSettings } from "../features/prices/price-updates";
 
 export const Route = createFileRoute("/settings")({
   component: SettingsPage,
@@ -78,6 +79,7 @@ function SettingsPage() {
         </section>
 
         <SpoilerSettings />
+        <PriceSettings />
 
         <BackupSetting backup={backup} />
       </div>

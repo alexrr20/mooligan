@@ -23,7 +23,7 @@ This describes the product direction rather than a committed feature roadmap.
 
 **Workspace**:
 The personal data boundary containing one Collection, its Decks and card lists,
-and durable user decisions such as spoiler reveals. A Workspace exists without
+and durable user decisions such as spoiler reveals and price provider preferences. A Workspace exists without
 an Account, may later bind to one Account, and may be available on several
 Devices.
 _Avoid_: Account
@@ -141,6 +141,23 @@ _Avoid_: Locale
 **Deck**:
 A planned arrangement of cards for play. A deck does not consume, reserve, or
 move copies from the collection.
+
+### Pricing
+
+**Market price**:
+A dated reference value for one exact Printing and finish at a named market,
+in a stated currency. It does not describe the acquisition cost of a Collection
+lot or automatically account for a Holding's condition and language.
+
+**Retail price**:
+A market's reference value for buying a card.
+
+**Buylist price**:
+A market's reference value for selling a card to that market.
+
+**Price supplier**:
+The source that delivers market prices to Mooligan. A supplier can aggregate
+prices from several markets; the supplier and market remain distinct.
 
 ## Product principles
 

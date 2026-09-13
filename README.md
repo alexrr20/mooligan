@@ -28,9 +28,59 @@ would disappear after a restart.
 
 The user-owned workspace is separate from the replaceable Scryfall catalog
 database. Motion and view preferences stay in renderer local storage on the
-current device. Workspace backup version 5 contains only materialized
-collection lots, decks with their card entries, profile choices, and spoiler state, and every restore creates a new unbound
+current device. Workspace backup version 7 contains only materialized
+collection lots, decks with their card entries, profile choices, price provider preferences, and spoiler state, and every restore creates a new unbound
 workspace before activation.
+
+## Card prices
+
+Desktop card details include a Prices tab for paper Printings, showing each
+market's retail and buylist prices by finish and currency. MTGJSON supplies the
+daily data, including Cardmarket, TCGplayer, Card Kingdom, and Mana Pool when
+present in the feed. Missing prices remain unavailable. Price dates are shown
+beside each amount; older observations are marked stale. These are reference
+estimates, without adjustments for a Holding's condition or language.
+
+Settings → Card prices lets users enable or disable individual price providers
+for printing price labels and the Prices tab. The selection belongs to the active Workspace and may be
+empty. It works offline and syncs across Devices when the Workspace is bound to
+an Account. Each provider toggle is a separate synced event, so edits to different
+providers merge; conflicting edits to the same provider follow synced event order.
+All providers start enabled in a new Workspace. The previous Device-local
+selection is no longer read and must be selected again. This display preference does not change bulk
+downloads or the explicit market used by currency-based search filters.
+
+Printing labels show the lowest saved retail price from enabled providers,
+converted to the default currency selected in Settings. EUR is the initial default;
+USD, GBP, CAD, AUD, JPY, and CHF are also available. The selection syncs with the
+Workspace. ECB reference rates from Frankfurter are cached daily on the Device;
+converted estimates show ≈, and missing rates are reported instead of comparing
+unconverted amounts. Collection holdings and deck entries match their
+finish; other printings show a “From” price across finishes. Values are per copy,
+with the source market shown and the finish and date available on hover. Protected
+previews stay concealed, and disabling every provider hides these labels.
+
+The desktop checks for updates on launch and hourly while running, downloading
+`AllPricesToday.json.gz` when its last successful import is at least 24 hours old.
+Settings and the Prices tab also offer a manual update. The first import downloads
+`AllIdentifiers.json.gz`, currently about 218 MB compressed, to map MTGJSON UUIDs
+to Scryfall Printing IDs. The saved mapping refreshes weekly. New unmapped records
+remain unpriced until a mapping refresh. Duplicate face records with equal prices
+collapse into one observation; conflicting observations are omitted.
+
+A worker streams the gzip JSON files into a staging database. It validates the
+release and installs prices and metadata in one SQLite transaction. Readers keep
+using the previous snapshot during downloads or failures. Prices and identifier
+mappings live in the Device's `prices.sqlite`, separate from the catalog and
+Workspace. They survive catalog replacement and sign-out, and are excluded from
+Workspace events, synchronization, and backups.
+
+Paper price searches now use this same MTGJSON snapshot: `usd`, `usd_foil`, and
+`usd_etched` use TCGplayer retail; `eur`, `eur_foil`, and `eur_etched` use Cardmarket
+retail. This changes results from the previous Scryfall catalog prices. Before
+the first price import, these filters have no matches. Digital `tix` searches
+continue to use the Scryfall catalog. Historical charts and Collection/Deck
+valuation summaries are not part of this layer.
 
 ## Decks
 
@@ -60,9 +110,9 @@ the same field resolve in the synchronized event order. Merged card IDs remain
 addressable by later offline edits. Removed cards cannot be revived by stale
 edits, and deleted decks reject later card additions and metadata changes.
 
-The workspace event schema is now version 3. Deploy the updated API alongside
-the desktop client to enable profile sync. Older clients must update before syncing;
-their local workspace remains available. Backup version 5 replaces version 4,
+The workspace event schema is now version 5. Deploy the updated API alongside
+the clients to enable price provider preference sync. Older clients must update before syncing;
+their local workspace remains available. Backup version 7 replaces version 6,
 with no backward compatibility for old backup files.
 
 ## Profile
@@ -203,7 +253,7 @@ supported maximum. The desktop pauses sync and keeps local editing available.
 
 ### Reset development data
 
-Workspace backup version 5 is the only supported backup format. Export a backup
+Workspace backup version 7 is the only supported backup format. Export a backup
 from Settings before resetting any data you care about.
 
 For an unbound development Workspace, quit Mooligan, clear the renderer origin's

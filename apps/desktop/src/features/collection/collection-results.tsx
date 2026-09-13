@@ -1,3 +1,4 @@
+import { PrintingPrice } from "../prices/printing-price";
 import { cardConditions, cardLanguages, type CollectionHolding } from "@mooligan/domain/collection";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
@@ -235,6 +236,7 @@ function HoldingIdentity({
         <span {...stylex.props(styles.printing)}>
           {holding.setName} · {holding.setCode.toUpperCase()} #{holding.collectorNumber}
         </span>
+        <PrintingPrice printingId={holding.printingId} finish={holding.finish} />
       </div>
     );
   }

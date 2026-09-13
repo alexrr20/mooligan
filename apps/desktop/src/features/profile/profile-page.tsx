@@ -1,3 +1,4 @@
+import { PrintingPrice } from "../prices/printing-price";
 import { collectionLotsQuery, profileQuery, readProfile } from "@mooligan/workspace/schema";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
@@ -159,6 +160,7 @@ export function ProfilePage({ user }: { user: AuthUser }) {
                     <p {...stylex.props(styles.muted)}>
                       {holding.setCode.toUpperCase()} · {holding.collectorNumber}
                     </p>
+                    <PrintingPrice printingId={holding.printingId} finish={holding.finish} />
                   </Link>
                 </li>
               ))}
@@ -255,6 +257,7 @@ function FeaturedCard({ printingId, onEdit }: { printingId: string; onEdit: () =
           {...stylex.props(styles.link)}
         >
           <PrintingImage image={image} />
+          {!detail.selectedPrinting.isDigital ? <PrintingPrice printingId={printingId} /> : null}
         </Link>
       ) : (
         <PrintingImage

@@ -1,3 +1,4 @@
+import { PrintingPrice } from "../prices/printing-price";
 import type { CatalogSiblingPrinting } from "@mooligan/domain/catalog-detail";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
@@ -102,6 +103,7 @@ export function PrintingGallery({
                     {` · ${titleCase(printing.rarity)}`}
                     {printing.language ? ` · ${printing.language.toUpperCase()}` : ""}
                   </p>
+                  {!printing.isDigital ? <PrintingPrice printingId={printing.id} /> : null}
                   {printing.isPromo || printing.isDigital ? (
                     <div {...stylex.props(styles.labels)}>
                       {printing.isPromo ? <span {...stylex.props(styles.label)}>Promo</span> : null}

@@ -11,6 +11,10 @@ import {
   deckEntriesQuery,
   events,
   initialSpoilerResetId,
+  priceProviderPreferencesQuery,
+  priceCurrencyQuery,
+  readPriceCurrency,
+  readEnabledPriceProviders,
   spoilerDecisionsQuery,
   workspaceSchema,
 } from "@mooligan/workspace/schema";
@@ -18,6 +22,53 @@ import { Effect, Option, Queue, Scope, Stream, SubscriptionRef } from "effect";
 
 type WorkspaceStore = Store<typeof workspaceSchema>;
 type SyncEvent = Parameters<SyncBackend.SyncBackend["push"]>[0][number];
+
+void test("offline provider toggles sync independently and same-provider conflicts converge", async () => {
+  await Effect.gen(function* () {
+    const server = yield* makeBroadcastSyncServer();
+    const first = yield* Effect.promise(() => openStore("prices-first", server));
+    const second = yield* Effect.promise(() => openStore("prices-second", server));
+    const enabled = (store: WorkspaceStore) =>
+      readEnabledPriceProviders(store.query(priceProviderPreferencesQuery));
+    try {
+      yield* server.disconnect;
+      first.commit(events.priceProviderChanged({ provider: "tcgplayer", enabled: false }));
+      second.commit(events.priceProviderChanged({ provider: "cardkingdom", enabled: false }));
+      assert.ok(enabled(first).includes("cardkingdom"));
+      assert.ok(enabled(second).includes("tcgplayer"));
+      yield* server.connect;
+      yield* Effect.promise(() =>
+        waitFor(
+          () => !enabled(first).includes("cardkingdom") && !enabled(second).includes("tcgplayer"),
+        ),
+      );
+      assert.deepEqual(enabled(first), enabled(second));
+      yield* server.disconnect;
+      first.commit(events.priceProviderChanged({ provider: "cardmarket", enabled: false }));
+      second.commit(events.priceProviderChanged({ provider: "cardmarket", enabled: true }));
+      yield* server.connect;
+      yield* Effect.promise(() =>
+        waitFor(
+          () =>
+            server.eventCount() === 4 &&
+            JSON.stringify(enabled(first)) === JSON.stringify(enabled(second)),
+        ),
+      );
+      assert.deepEqual(enabled(first), enabled(second));
+      assert.ok(!enabled(first).includes("tcgplayer"));
+      assert.ok(!enabled(first).includes("cardkingdom"));
+      yield* server.disconnect;
+      first.commit(events.priceCurrencyChanged({ currency: "GBP" }));
+      assert.equal(readPriceCurrency(second.query(priceCurrencyQuery)), "EUR");
+      yield* server.connect;
+      yield* Effect.promise(() =>
+        waitFor(() => readPriceCurrency(second.query(priceCurrencyQuery)) === "GBP"),
+      );
+    } finally {
+      yield* Effect.promise(() => Promise.all([first.shutdownPromise(), second.shutdownPromise()]));
+    }
+  }).pipe(Effect.scoped, Effect.runPromise);
+});
 
 void test("two offline clients converge additive Holdings and protective spoiler decisions", async () => {
   await Effect.gen(function* () {

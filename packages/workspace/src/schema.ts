@@ -2,12 +2,23 @@ import { Events, makeSchema, queryDb, Schema, State } from "@livestore/livestore
 
 import { deckEvents, deckMaterializers, deckTables } from "./decks.ts";
 import { profileEvents, profileMaterializers, profileTables } from "./profile.ts";
+import {
+  pricePreferenceEvents,
+  pricePreferenceMaterializers,
+  pricePreferenceTables,
+} from "./price-preferences.ts";
+export {
+  priceProviders,
+  priceProviderPreferencesQuery,
+  readEnabledPriceProviders,
+  type PriceProvider,
+} from "./price-preferences.ts";
 export { emptyProfile, type ProfileSettings } from "./profile-contract.ts";
 export { profileQuery, readProfile } from "./profile.ts";
 export { decksQuery, deckEntriesQuery } from "./decks.ts";
 
 export const initialSpoilerResetId = "initial";
-export const workspaceEventSchemaVersion = 3;
+export const workspaceEventSchemaVersion = 5;
 
 const TargetId = Schema.String.pipe(Schema.minLength(1), Schema.maxLength(128));
 const DecisionId = Schema.String.pipe(Schema.minLength(1), Schema.maxLength(128));
@@ -104,6 +115,7 @@ const CollectionLot = Schema.Struct({
 });
 
 export const tables = {
+  ...pricePreferenceTables,
   ...profileTables,
   ...deckTables,
   collectionLots: State.SQLite.table({
@@ -121,6 +133,7 @@ export const tables = {
 };
 
 export const events = {
+  ...pricePreferenceEvents,
   ...profileEvents,
   ...deckEvents,
   collectionCopiesAdded: Events.synced({
@@ -171,6 +184,14 @@ export const events = {
 } as const;
 
 export const workspaceSyncedEventSchema = Schema.Union(
+  Schema.Struct({
+    args: events.priceCurrencyChanged.schema,
+    name: Schema.Literal(events.priceCurrencyChanged.name),
+  }),
+  Schema.Struct({
+    args: events.priceProviderChanged.schema,
+    name: Schema.Literal(events.priceProviderChanged.name),
+  }),
   Schema.Struct({
     args: events.profileChanged.schema,
     name: Schema.Literal(events.profileChanged.name),
@@ -243,6 +264,7 @@ const matchingCollectionLotSql = (alias: string) => `
 `;
 
 const materializers = State.SQLite.materializers(events, {
+  ...pricePreferenceMaterializers,
   ...profileMaterializers,
   ...deckMaterializers,
   "v1.CollectionCopiesAdded": ({ lot }) => {
@@ -535,3 +557,6 @@ function isUnattributedLot(lot: CollectionLotRow) {
     lot.unitCostCurrency === null
   );
 }
+
+export { priceCurrencyQuery, readPriceCurrency } from "./price-preferences.ts";
+export { priceCurrencies, type PriceCurrency } from "./price-preference-contract.ts";
