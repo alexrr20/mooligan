@@ -1,3 +1,4 @@
+import { PrintingPrice } from "../prices/printing-price";
 import type { CatalogImageDescriptor } from "@mooligan/domain/catalog-detail";
 import type { ProfileSettings } from "@mooligan/workspace/schema";
 import * as stylex from "@stylexjs/stylex";
@@ -211,6 +212,7 @@ function Choices({
             aria-label={`Choose ${card.name}, ${card.setCode} ${card.collectorNumber}${excluded.includes(card.id) ? ", already featured" : ""}`}
           >
             <PrintingImage image={card.image} />
+            <PrintingPrice printingId={card.id} />
             <span {...stylex.props(styles.cardName)}>{card.name}</span>
             <span {...stylex.props(styles.muted)}>
               {excluded.includes(card.id)

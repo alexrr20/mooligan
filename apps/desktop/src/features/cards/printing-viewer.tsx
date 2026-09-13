@@ -1,3 +1,4 @@
+import { PrintingPrice } from "../prices/printing-price";
 import type {
   CatalogCardFace,
   CatalogImageDescriptor,
@@ -99,6 +100,11 @@ export function PrintingViewer({ faces, printing }: PrintingViewerProps) {
           </div>
         ) : null}
       </PrintingImage>
+      {!printing.isDigital ? (
+        <figcaption>
+          <PrintingPrice printingId={printing.id} />
+        </figcaption>
+      ) : null}
 
       {images.length > 1 ? (
         <ToggleGroup

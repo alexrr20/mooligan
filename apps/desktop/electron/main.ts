@@ -33,9 +33,16 @@ import { focusFirstWindow, publishRendererEvent } from "./windows";
 import { AccountWorkspace } from "@mooligan/account/workspace";
 import { registerWorkspaceIpc } from "./workspace/ipc";
 import { WorkspaceRegistry } from "./workspace/registry";
+import { PriceService } from "./prices/service";
+import { registerPriceIpc } from "./prices/ipc";
 
 app.enableSandbox();
 registerDesktopSchemes(protocol);
+
+// Do not keep a development window alive after its Vite launcher exits.
+if (developmentRendererUrl() && process.connected) {
+  process.once("disconnect", () => app.quit());
+}
 
 const authStartup = registerAuthColdStart({
   onOpenUrl(listener) {
@@ -104,6 +111,11 @@ if (!authStartup.isPrimary) {
     .whenReady()
     .then(async () => {
       const workspaceRegistry = new WorkspaceRegistry(app.getPath("userData"));
+      const pricePath = join(app.getPath("userData"), "prices.sqlite");
+      const prices = new PriceService(pricePath, () =>
+        publishRendererEvent("prices:updated", undefined),
+      );
+      registerPriceIpc(prices);
       const activeWorkspaceId = () => workspaceRegistry.bootstrap().workspaceId;
       const spoilers = new SpoilerProjection(activeWorkspaceId, {
         onChanged: () => publishRendererEvent("workspace-projection:spoilers-changed", undefined),
@@ -116,6 +128,7 @@ if (!authStartup.isPrimary) {
       });
 
       registerCatalogIpc({
+        pricePath,
         getCollectionProjectionLots: () => collection.lots(),
         getVisibilitySnapshot: () => spoilers.visibilitySnapshot(),
         isCollectionProjectionReady: () => collection.isReady(),
@@ -169,7 +182,13 @@ if (!authStartup.isPrimary) {
         accountWorkspace.authChanged(snapshot),
       );
 
+      const priceRefreshTimer = setInterval(() => {
+        void prices.refresh();
+      }, 3_600_000);
+      priceRefreshTimer.unref();
       app.once("will-quit", () => {
+        clearInterval(priceRefreshTimer);
+        void prices.close();
         spoilers.close();
         workspaceRegistry.close();
       });
@@ -180,6 +199,7 @@ if (!authStartup.isPrimary) {
       });
 
       await createWindow(collection, spoilers);
+      void prices.refresh();
       publishAuthStateAndRefresh();
 
       app.on("activate", () => {

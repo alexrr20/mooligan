@@ -12,6 +12,11 @@ import {
   events,
   initialSpoilerResetId,
   profileQuery,
+  priceProviders,
+  priceCurrencyQuery,
+  readPriceCurrency,
+  priceProviderPreferencesQuery,
+  readEnabledPriceProviders,
   readProfile,
   spoilerDecisionsQuery,
   spoilerSettingsQuery,
@@ -22,6 +27,8 @@ import { materializeDecks } from "../decks/deck-state.ts";
 
 type WorkspaceLiveStore = Store<typeof workspaceSchema>;
 type RestoreEvent =
+  | ReturnType<typeof events.priceCurrencyChanged>
+  | ReturnType<typeof events.priceProviderChanged>
   | ReturnType<typeof events.profileChanged>
   | ReturnType<typeof events.deckCreated>
   | ReturnType<typeof events.deckEntryAdded>
@@ -39,6 +46,8 @@ export function createWorkspaceBackup(store: WorkspaceLiveStore): WorkspaceBacku
     decks: readBackupDecks(store),
     format: workspaceBackupFormat,
     profile: readProfile(store.query(profileQuery)),
+    priceCurrency: readPriceCurrency(store.query(priceCurrencyQuery)),
+    priceProviders: readEnabledPriceProviders(store.query(priceProviderPreferencesQuery)),
     spoilers: {
       decisions: readBackupDecisions(store),
       policy: settings.policy,
@@ -54,6 +63,12 @@ export async function restoreWorkspaceBackup(store: WorkspaceLiveStore, backup: 
   let batch: RestoreEvent[] = [];
 
   batch.push(events.profileChanged(backup.profile));
+  batch.push(events.priceCurrencyChanged({ currency: backup.priceCurrency }));
+  for (const { id: provider } of priceProviders) {
+    batch.push(
+      events.priceProviderChanged({ provider, enabled: backup.priceProviders.includes(provider) }),
+    );
+  }
 
   batch.push(events.spoilerPolicyChanged({ policy: backup.spoilers.policy }));
   if (backup.spoilers.resetGeneration > 0) {
@@ -125,6 +140,11 @@ export async function restoreWorkspaceBackup(store: WorkspaceLiveStore, backup: 
 
   const settings = store.query(spoilerSettingsQuery);
   if (
+    readPriceCurrency(store.query(priceCurrencyQuery)) !== backup.priceCurrency ||
+    JSON.stringify(readEnabledPriceProviders(store.query(priceProviderPreferencesQuery))) !==
+      JSON.stringify(
+        priceProviders.filter(({ id }) => backup.priceProviders.includes(id)).map(({ id }) => id),
+      ) ||
     JSON.stringify(readProfile(store.query(profileQuery))) !== JSON.stringify(backup.profile) ||
     JSON.stringify(readBackupDecks(store)) !== JSON.stringify(sortedDecks(backup.decks)) ||
     settings.policy !== backup.spoilers.policy ||

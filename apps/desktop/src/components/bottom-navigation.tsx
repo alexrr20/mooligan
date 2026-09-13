@@ -4,15 +4,23 @@ import { motion, useReducedMotionConfig } from "motion/react";
 import { useState } from "react";
 
 import { colors } from "../styles/tokens.stylex.js";
+import {
+  HomeIcon,
+  CollectionIcon,
+  DecksIcon,
+  SetsIcon,
+  ListsIcon,
+  SearchIcon,
+} from "./navigation-icons";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 
 const navigation = [
-  { to: "/", label: "Home", icon: "home" },
-  { to: "/collection", label: "Collection", icon: "collection" },
-  { to: "/decks", label: "Decks", icon: "decks" },
-  { to: "/sets", label: "Sets", icon: "sets" },
-  { to: "/lists", label: "Lists", icon: "lists" },
-  { to: "/search", label: "Search", icon: "search" },
+  { to: "/", label: "Home", icon: HomeIcon },
+  { to: "/collection", label: "Collection", icon: CollectionIcon },
+  { to: "/decks", label: "Decks", icon: DecksIcon },
+  { to: "/sets", label: "Sets", icon: SetsIcon },
+  { to: "/lists", label: "Lists", icon: ListsIcon },
+  { to: "/search", label: "Search", icon: SearchIcon },
 ] as const;
 
 export function BottomNavigation() {
@@ -87,7 +95,7 @@ export function BottomNavigation() {
                     />
                   }
                 >
-                  <NavigationIcon name={item.icon} />
+                  <item.icon size={20} />
                 </TooltipTrigger>
                 <TooltipContent sideOffset={10}>{item.label}</TooltipContent>
               </Tooltip>
@@ -96,54 +104,6 @@ export function BottomNavigation() {
         </div>
       </nav>
     </TooltipProvider>
-  );
-}
-
-type NavigationIconName = (typeof navigation)[number]["icon"];
-
-function NavigationIcon({ name }: { name: NavigationIconName }) {
-  return (
-    <svg {...stylex.props(styles.navIcon)} aria-hidden="true" fill="none" viewBox="0 0 24 24">
-      {name === "home" ? (
-        <>
-          <path d="m3 10.75 9-7.5 9 7.5" />
-          <path d="M5.5 9.25V21h13V9.25M9 21v-6.5h6V21" />
-        </>
-      ) : null}
-      {name === "collection" ? (
-        <>
-          <path d="M6 5V3.5h12V5" />
-          <rect width="18" height="16" x="3" y="5" rx="2" />
-          <path d="M9 10h6" />
-        </>
-      ) : null}
-      {name === "decks" ? (
-        <>
-          <path d="m12 3 9 4.75-9 4.75-9-4.75L12 3Z" />
-          <path d="m3 12 9 4.75L21 12M3 16.25 12 21l9-4.75" />
-        </>
-      ) : null}
-      {name === "sets" ? (
-        <>
-          <rect width="7" height="7" x="3" y="3" rx="1.5" />
-          <rect width="7" height="7" x="14" y="3" rx="1.5" />
-          <rect width="7" height="7" x="3" y="14" rx="1.5" />
-          <rect width="7" height="7" x="14" y="14" rx="1.5" />
-        </>
-      ) : null}
-      {name === "lists" ? (
-        <>
-          <path d="M9 6h12M9 12h12M9 18h12" />
-          <path d="M4 6h.01M4 12h.01M4 18h.01" strokeWidth="2.5" />
-        </>
-      ) : null}
-      {name === "search" ? (
-        <>
-          <circle cx="11" cy="11" r="7" />
-          <path d="m20 20-4-4" />
-        </>
-      ) : null}
-    </svg>
   );
 }
 
@@ -233,13 +193,5 @@ const styles = stylex.create({
     ":active": {
       transform: "none",
     },
-  },
-  navIcon: {
-    width: "20px",
-    height: "20px",
-    stroke: "currentColor",
-    strokeWidth: "1.7",
-    strokeLinecap: "round",
-    strokeLinejoin: "round",
   },
 });

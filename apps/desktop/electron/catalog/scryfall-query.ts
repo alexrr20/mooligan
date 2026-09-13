@@ -465,6 +465,7 @@ function compileTerm(raw: string, visibility: SpoilerVisibilitySnapshot): SqlFra
     case "usd_foil":
     case "usd_etched":
     case "eur_foil":
+    case "eur_etched":
       return compilePrice(field, value, comparison);
     case "prints":
     case "sets":
@@ -746,6 +747,22 @@ function compileYear(value: string, comparison: Comparison): SqlFragment {
 
 function compilePrice(field: string, value: string, comparison: Comparison): SqlFragment {
   const price = parseNumber(value, field);
+  if (field !== "tix") {
+    const currency = field.startsWith("eur") ? "EUR" : "USD";
+    const market = currency === "EUR" ? "cardmarket" : "tcgplayer";
+    const finish = field.endsWith("_foil")
+      ? "foil"
+      : field.endsWith("_etched")
+        ? "etched"
+        : "nonfoil";
+    return {
+      parameters: [market, currency, finish, price * 100],
+      sql: `EXISTS (SELECT 1 FROM market_prices.prices AS price
+        WHERE price.printing_id = cards.id AND price.market = ? AND price.currency = ?
+          AND price.finish = ? AND price.kind = 'retail'
+          AND price.amount_minor ${sqlComparison(comparison)} ?)`,
+    };
+  }
   return {
     parameters: [price],
     sql: `CAST(json_extract(cards.json, '$.prices.${field}') AS REAL) ${sqlComparison(comparison)} ?`,

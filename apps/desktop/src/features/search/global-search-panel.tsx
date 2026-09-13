@@ -1,3 +1,4 @@
+import { PrintingPrice } from "../prices/printing-price";
 import { Autocomplete } from "@base-ui/react/autocomplete";
 import * as stylex from "@stylexjs/stylex";
 import { useState } from "react";
@@ -84,6 +85,9 @@ export function GlobalSearchPanel({
                     <span {...stylex.props(styles.copy)}>
                       <span {...stylex.props(styles.label)}>{item.label}</span>
                       <span {...stylex.props(styles.description)}>{item.description}</span>
+                      {item.printingId ? (
+                        <PrintingPrice printingId={item.printingId} finish={item.finish} />
+                      ) : null}
                     </span>
                   </Autocomplete.Item>
                 )}

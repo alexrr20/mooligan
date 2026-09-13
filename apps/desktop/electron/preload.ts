@@ -1,6 +1,11 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import { SpoilerTargetIdSchema } from "@mooligan/domain/spoilers";
 import { CatalogListPageSchema } from "@mooligan/domain/catalog-search";
+import {
+  ExchangeRatesSchema,
+  PriceStatusSchema,
+  PrintingPricesSchema,
+} from "@mooligan/domain/market";
 import * as z from "zod";
 
 import {
@@ -32,6 +37,17 @@ function subscribe<Value>(channel: string, callback: (value: Value) => void) {
 }
 
 export const desktopApi = {
+  prices: {
+    exchangeRates: async () =>
+      ExchangeRatesSchema.nullable().parse(await ipcRenderer.invoke("prices:exchange-rates")),
+    status: async () => PriceStatusSchema.parse(await ipcRenderer.invoke("prices:status")),
+    refresh: async () => PriceStatusSchema.parse(await ipcRenderer.invoke("prices:refresh")),
+    printing: async (printingId) =>
+      PrintingPricesSchema.parse(
+        await ipcRenderer.invoke("prices:printing", z.uuid().parse(printingId)),
+      ),
+    onUpdated: (callback) => subscribe("prices:updated", callback),
+  },
   collection: {
     list: async (request, requestId) =>
       validateCollectionListResult(
@@ -144,6 +160,7 @@ export const desktopApi = {
 } satisfies DesktopApi;
 
 contextBridge.exposeInMainWorld("catalog", desktopApi.catalog);
+contextBridge.exposeInMainWorld("prices", desktopApi.prices);
 contextBridge.exposeInMainWorld("collection", desktopApi.collection);
 contextBridge.exposeInMainWorld("workspaceProjection", desktopApi.workspaceProjection);
 contextBridge.exposeInMainWorld("workspace", desktopApi.workspace);

@@ -1,3 +1,4 @@
+import { PrintingPrice } from "../prices/printing-price";
 import type { Deck, DeckEntry } from "@mooligan/domain/decks";
 import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
 import * as stylex from "@stylexjs/stylex";
@@ -155,6 +156,9 @@ export function DeckCards({
                           ? ` · ${legality.status.replaceAll("_", " ")}`
                           : ""}
                       </p>
+                      {detail && !detail.selectedPrinting.isDigital ? (
+                        <PrintingPrice printingId={entry.printingId} finish={entry.finish} />
+                      ) : null}
                     </div>
                     <div {...stylex.props(styles.actions)}>
                       <Button

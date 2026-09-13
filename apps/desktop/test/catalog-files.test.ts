@@ -1,3 +1,4 @@
+import { openPriceDatabase } from "../electron/prices/database.ts";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -1150,8 +1151,10 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
           }),
       );
 
+      const pricePath = join(directory, "prices.sqlite");
+      openPriceDatabase(pricePath).close();
       const worker = new Worker(new URL("../electron/catalog/query-worker.ts", import.meta.url), {
-        workerData: { catalogPath: destination, collectionLots: [] },
+        workerData: { catalogPath: destination, collectionLots: [], pricePath },
       });
 
       try {

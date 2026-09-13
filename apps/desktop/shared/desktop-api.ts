@@ -1,4 +1,5 @@
 import type { CatalogSnapshot } from "@mooligan/domain/catalog";
+import type { ExchangeRates, PriceStatus, PrintingPrices } from "@mooligan/domain/market";
 import type {
   CatalogListPage,
   CatalogListRequest,
@@ -112,6 +113,13 @@ export type CatalogStatus =
   | (CatalogSnapshot & { installed: true; updateAvailable: boolean });
 
 export type DesktopApi = {
+  prices: {
+    exchangeRates: () => Promise<ExchangeRates | null>;
+    status: () => Promise<PriceStatus>;
+    refresh: () => Promise<PriceStatus>;
+    printing: (printingId: string) => Promise<PrintingPrices>;
+    onUpdated: (callback: () => void) => () => void;
+  };
   auth: {
     onChanged: (callback: (snapshot: AuthSnapshot) => void) => () => void;
     onError: (callback: (message: string) => void) => () => void;

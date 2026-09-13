@@ -57,6 +57,9 @@ catalog:
   expo-application: ~57.0.2
   "@better-auth/expo": 1.6.25
   expo-network: ~57.0.1
+  "@streamparser/json-node": ^0.0.26
+  "@hugeicons/react": ^1.1.10
+  "@hugeicons/core-free-icons": ^4.3.2
 overrides:
   vite: "catalog:"
 peerDependencyRules:

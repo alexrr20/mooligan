@@ -31,6 +31,8 @@ const backup: WorkspaceBackup = {
   ],
   decks: [],
   format: "mooligan-workspace",
+  priceCurrency: "EUR",
+  priceProviders: ["cardmarket", "tcgplayer", "cardkingdom", "cardsphere", "manapool"],
   profile: { bannerPrintingId: null, featuredPrintingIds: [null, null, null, null] },
   spoilers: {
     decisions: [
@@ -40,7 +42,7 @@ const backup: WorkspaceBackup = {
     policy: "show",
     resetGeneration: 3,
   },
-  version: 5,
+  version: 7,
 };
 
 void test("version 5 backups round trip without device or account metadata", () => {

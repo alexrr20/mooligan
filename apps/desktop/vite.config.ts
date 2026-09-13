@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import stylex from "@stylexjs/unplugin/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
@@ -16,7 +17,13 @@ export default defineConfig(({ command }) => {
 
   return {
     base: "./",
+    resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
     define: desktopRendererDefinitions(syncUrl),
+    optimizeDeps: {
+      // Worker imports are discovered too late by the renderer dependency scan.
+      include: ["@livestore/adapter-web/worker", "@livestore/sync-cf/client"],
+      exclude: ["@livestore/wa-sqlite"],
+    },
     server: {
       host: "127.0.0.1",
       port: 5173,
@@ -36,6 +43,7 @@ export default defineConfig(({ command }) => {
         main: {
           entry: {
             "catalog-import-worker": "electron/catalog/import-worker.ts",
+            "prices-import-worker": "electron/prices/import-worker.ts",
             "catalog-query-worker": "electron/catalog/query-worker.ts",
             main: "electron/main.ts",
           },

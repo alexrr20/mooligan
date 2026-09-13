@@ -1,3 +1,4 @@
+import { PrintingPrice } from "../prices/printing-price";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 import { useMemo, useRef } from "react";
@@ -221,6 +222,7 @@ function CatalogResults({
                       ? `#${item.card.collectorNumber}`
                       : item.release.code}
                   </span>
+                  {card && !card.isDigital ? <PrintingPrice printingId={card.id} /> : null}
                   {item.releasedOn ? (
                     <time
                       {...stylex.props(styles.printingCopy, styles.releaseDate)}

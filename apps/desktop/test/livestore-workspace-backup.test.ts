@@ -17,7 +17,7 @@ import {
   restoreWorkspaceBackup,
 } from "../src/features/workspace/workspace-backup.ts";
 
-void test("backup v5 reads collection, deck, and spoiler state from LiveStore", async () => {
+void test("backup v7 reads collection, deck, and spoiler state from LiveStore", async () => {
   const store = await openStore("backup-source");
   try {
     store.commit(events.spoilerPolicyChanged({ policy: "show" }));
@@ -69,13 +69,15 @@ void test("backup v5 reads collection, deck, and spoiler state from LiveStore", 
       ],
       decks: [],
       format: "mooligan-workspace",
+      priceCurrency: "EUR",
+      priceProviders: ["cardmarket", "tcgplayer", "cardkingdom", "cardsphere", "manapool"],
       profile: { bannerPrintingId: null, featuredPrintingIds: [null, null, null, null] },
       spoilers: {
         decisions: [{ scope: "printing", state: "reveal", targetId: "printing-one" }],
         policy: "show",
         resetGeneration: 4,
       },
-      version: 5,
+      version: 7,
     });
     assert.equal(Object.hasOwn(backup, "clientId"), false);
     assert.equal(Object.hasOwn(backup, "motion"), false);
@@ -84,7 +86,7 @@ void test("backup v5 reads collection, deck, and spoiler state from LiveStore", 
   }
 });
 
-void test("backup v5 restore commits and verifies normal LiveStore events", async () => {
+void test("backup v7 restore commits and verifies normal LiveStore events", async () => {
   const store = await openStore("backup-target");
   try {
     await restoreWorkspaceBackup(store, backupFixture);
@@ -158,6 +160,8 @@ const backupFixture: WorkspaceBackup = {
   ],
   decks: [],
   format: "mooligan-workspace",
+  priceCurrency: "EUR",
+  priceProviders: ["cardmarket", "tcgplayer", "cardkingdom", "cardsphere", "manapool"],
   profile: { bannerPrintingId: null, featuredPrintingIds: [null, null, null, null] },
   spoilers: {
     decisions: [
@@ -167,7 +171,7 @@ const backupFixture: WorkspaceBackup = {
     policy: "protect",
     resetGeneration: 7,
   },
-  version: 5,
+  version: 7,
 };
 
 function openStore(storeId: string) {

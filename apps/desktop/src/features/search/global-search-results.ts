@@ -6,6 +6,8 @@ import type { Deck } from "@mooligan/domain/decks";
 export type GlobalSearchResult = {
   id: string;
   kind: "card" | "deck" | "collection" | "recent";
+  printingId?: string;
+  finish?: "nonfoil" | "foil" | "etched" | "glossy";
   label: string;
   description: string;
   image: CatalogImageDescriptor | null;
@@ -20,6 +22,7 @@ export function cardSearchResults(cards: readonly CatalogCardSummary[]): GlobalS
   return cards.map((card) => ({
     id: card.id,
     kind: "card",
+    printingId: card.isDigital ? undefined : card.id,
     label: card.name,
     description: `${card.setName} · ${card.typeLine}`,
     image: card.image,
@@ -59,6 +62,8 @@ export function collectionSearchResults(
           {
             id: [holding.printingId, holding.finish, holding.language, holding.condition].join(":"),
             kind: "collection" as const,
+            printingId: holding.printingId,
+            finish: holding.finish,
             label: holding.name,
             description: `${holding.quantity} ${holding.quantity === 1 ? "copy" : "copies"} · ${holding.setCode.toUpperCase()} · ${holding.finish} · ${holding.language.toUpperCase()} · ${holding.condition.replaceAll("-", " ")}`,
             image: holding.image,

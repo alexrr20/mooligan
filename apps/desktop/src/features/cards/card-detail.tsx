@@ -18,6 +18,7 @@ import { PrintingViewer } from "./printing-viewer";
 import { PrintingSpoilerControl } from "../spoilers/printing-spoiler-control";
 import { AddToCollectionButton } from "../collection/collection-editor";
 import { AddToDeckButton } from "../decks/deck-card-picker";
+import { PrintingPrices } from "../prices/printing-prices";
 
 type CardDetailProps = {
   detail: CatalogCardDetailModel;
@@ -99,6 +100,11 @@ export function CardDetail({ detail, headingRef, origin, visibility }: CardDetai
               <Tabs.Tab {...stylex.props(styles.tab)} value="formats">
                 Format legality
               </Tabs.Tab>
+              {!detail.selectedPrinting.isDigital ? (
+                <Tabs.Tab {...stylex.props(styles.tab)} value="prices">
+                  Prices
+                </Tabs.Tab>
+              ) : null}
             </Tabs.List>
             <Tabs.Panel value="rules" {...stylex.props(styles.tabPanel)}>
               <CardRules card={detail.card} />
@@ -109,6 +115,11 @@ export function CardDetail({ detail, headingRef, origin, visibility }: CardDetai
             <Tabs.Panel value="formats" {...stylex.props(styles.tabPanel)}>
               <CardLegalities legalities={detail.legalities} />
             </Tabs.Panel>
+            {!detail.selectedPrinting.isDigital ? (
+              <Tabs.Panel value="prices" {...stylex.props(styles.tabPanel)}>
+                <PrintingPrices printingId={detail.selectedPrinting.id} />
+              </Tabs.Panel>
+            ) : null}
           </Tabs.Root>
           <PrintingSpoilerControl printingId={detail.selectedPrinting.id} visibility={visibility} />
         </div>
