@@ -175,6 +175,7 @@ function HoldingArtwork({
       alt={holding.status === "visible" ? `${holding.name}, ${holding.setName} printing` : ""}
       compact={!grid}
       concealed={holding.status === "protected"}
+      finish={holding.status === "visible" ? holding.finish : undefined}
       image={image}
       placeholder={
         holding.status === "protected" ? (
@@ -314,10 +315,10 @@ const styles = stylex.create({
     },
   },
   grid: {
-    paddingBlock: "4px 32px",
+    paddingBlock: "4px 16px",
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 190px), 1fr))",
-    gap: "32px 24px",
+    gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 150px), 1fr))",
+    gap: "16px 12px",
   },
   tile: {
     minHeight: 0,
@@ -338,10 +339,10 @@ const styles = stylex.create({
   },
   protectedMark: { color: colors.accent, fontSize: "24px" },
   identity: { minWidth: 0, display: "grid", gap: "6px" },
-  tileIdentity: { padding: "13px 2px 0" },
+  tileIdentity: { padding: "8px 1px 0" },
   name: {
     color: "#f4f1e8",
-    fontSize: "15px",
+    fontSize: "13px",
     fontWeight: 400,
     lineHeight: 1.35,
     textDecoration: "none",
@@ -361,7 +362,7 @@ const styles = stylex.create({
     "@media (max-width: 980px)": { gridColumn: "2 / -1" },
   },
   tileProperties: {
-    marginTop: "8px",
+    marginTop: "4px",
     gridColumn: "auto",
     "@media (max-width: 980px)": { gridColumn: "auto" },
   },
@@ -376,7 +377,7 @@ const styles = stylex.create({
     "@media (max-width: 980px)": { gridColumn: "3", gridRow: "1" },
   },
   tileQuantity: {
-    marginTop: "12px",
+    marginTop: "6px",
     color: "#f4f1e8",
     "@media (max-width: 980px)": { gridColumn: "auto", gridRow: "auto" },
   },

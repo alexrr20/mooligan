@@ -33,15 +33,18 @@ import type { CatalogProgress, CatalogStatus } from "../../shared/desktop-api.ts
 import { settleCatalogRequest } from "../../shared/catalog-request.ts";
 import { isFileNotFound, recoverInterruptedReplacement } from "./files";
 import { CatalogQueryQueue } from "./query-queue";
-import { validateCatalogPrintingId } from "./detail";
-import { catalogSchemaVersion } from "./import";
-import { parseCatalogQueryWorkerResponse, validateCatalogListRequest } from "./query";
-import { validateCollectionListRequest } from "./collection-query";
+import { validateCatalogPrintingId } from "@mooligan/catalog/detail";
+import { catalogSchemaVersion } from "@mooligan/catalog/import";
+import {
+  parseCatalogQueryWorkerResponse,
+  validateCatalogListRequest,
+} from "@mooligan/catalog/query";
+import { validateCollectionListRequest } from "@mooligan/catalog/collection-query";
 import {
   validateCatalogUpcomingPrintingRequest,
   type CatalogQueryOperation,
   type CatalogQueryWorkerRequest,
-} from "./query";
+} from "@mooligan/catalog/query";
 import {
   CatalogVisibilityChangedError,
   catalogVisibilitySnapshotsEqual,
@@ -52,7 +55,7 @@ import {
   parseCollectionProjectionWorkerResponse,
   type CollectionProjectionWorkerOperation,
   type CollectionProjectionWorkerRequest,
-} from "./collection-projection";
+} from "@mooligan/catalog/collection-projection";
 
 const apiBaseUrl = process.env.MOOLIGAN_API_URL ?? "http://127.0.0.1:3000";
 const scryfallSetsUrl = "https://api.scryfall.com/sets";

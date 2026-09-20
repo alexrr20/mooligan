@@ -3,7 +3,7 @@ import { spoilerDecisionsQuery, spoilerSettingsQuery } from "@mooligan/workspace
 import { useMutation } from "@tanstack/react-query";
 
 import { useWorkspaceLiveStore } from "../workspace/workspace-store-context.tsx";
-import { runSpoilerAction, type SpoilerAction } from "./spoiler-actions.ts";
+import { runSpoilerAction, type SpoilerAction } from "@mooligan/workspace/client/spoiler-actions";
 export { spoilerCatalogCacheKey } from "./spoiler-cache-key.ts";
 
 export function useSpoilers() {

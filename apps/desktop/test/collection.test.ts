@@ -10,10 +10,10 @@ import { createStorePromise } from "@livestore/livestore";
 import type { SpoilerVisibilitySnapshot } from "@mooligan/domain/spoilers";
 import { collectionLotsQuery, workspaceSchema } from "@mooligan/workspace/schema";
 
-import { createCollectionProjection } from "../electron/catalog/collection-projection.ts";
-import { createCollectionQuery } from "../electron/catalog/collection-query.ts";
+import { createCollectionProjection } from "@mooligan/catalog/collection-projection";
+import { createCollectionQuery } from "@mooligan/catalog/collection-query";
 import { validateCollectionPrintingRequest } from "../shared/desktop-api.ts";
-import { createCollectionMutations } from "../src/features/collection/collection-mutations.ts";
+import { createCollectionMutations } from "@mooligan/workspace/client/collection-mutations";
 
 const visibility: SpoilerVisibilitySnapshot = {
   currentDate: "2026-08-21",

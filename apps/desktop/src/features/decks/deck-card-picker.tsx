@@ -21,39 +21,65 @@ import {
 import { useDeckMutations, useDecks } from "./use-decks";
 
 export function DeckCardPicker({ deckId }: { deckId: string }) {
+  const [selected, setSelected] = useState<string>();
+  return (
+    <>
+      <DeckCardSearch onSelect={setSelected} />
+      {selected ? (
+        <SelectedCardDialog
+          printingId={selected}
+          deckId={deckId}
+          onClose={() => setSelected(undefined)}
+        />
+      ) : null}
+    </>
+  );
+}
+
+export function DeckCardSearch({
+  onSelect,
+  actionLabel = "Add",
+  disabled = false,
+}: {
+  onSelect: (printingId: string) => void;
+  actionLabel?: string;
+  disabled?: boolean;
+}) {
   const [input, setInput] = useState("");
   const [search, setSearch] = useState({ query: "", offset: 0 });
-  const [selected, setSelected] = useState<string>();
   const results = useQuery({
     queryKey: ["catalog", "deck-search", search],
     queryFn: ({ signal }) => listCatalog({ ...search, limit: 30, includeDigital: true }, signal),
     enabled: !!search.query,
   });
   return (
-    <section {...stylex.props(deckStyles.panel)} aria-labelledby="deck-card-search">
-      <h2 id="deck-card-search" {...stylex.props(deckStyles.sectionTitle)}>
-        Add cards
-      </h2>
-      <Form
-        style={deckStyles.toolbar}
-        onSubmit={(event) => {
-          event.preventDefault();
-          setSearch({ query: input.trim(), offset: 0 });
-        }}
-      >
+    <section {...stylex.props(deckStyles.section)} aria-label="Add cards">
+      <div {...stylex.props(deckStyles.toolbar)}>
         <label {...stylex.props(deckStyles.field, deckStyles.grow)}>
-          Search the local catalog
           <Input
+            aria-label="Search cards"
             value={input}
             maxLength={500}
+            disabled={disabled}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                event.stopPropagation();
+                setSearch({ query: input.trim(), offset: 0 });
+              }
+            }}
             onValueChange={setInput}
             placeholder="Name or query, such as t:creature c:green"
           />
         </label>
-        <Button type="submit" disabled={!input.trim()}>
+        <Button
+          type="button"
+          disabled={disabled || !input.trim()}
+          onClick={() => setSearch({ query: input.trim(), offset: 0 })}
+        >
           Search
         </Button>
-      </Form>
+      </div>
       {results.isFetching ? <DeckMessage>Searching…</DeckMessage> : null}
       {results.error || results.data?.queryError ? (
         <DeckMessage error>{results.error?.message ?? results.data?.queryError}</DeckMessage>
@@ -73,10 +99,12 @@ export function DeckCardPicker({ deckId }: { deckId: string }) {
             </div>
             <Button
               variant="secondary"
-              onClick={() => setSelected(card.id)}
-              aria-label={`Add ${card.name} from ${card.setCode} ${card.collectorNumber}`}
+              type="button"
+              disabled={disabled}
+              onClick={() => onSelect(card.id)}
+              aria-label={`${actionLabel} ${card.name} from ${card.setCode} ${card.collectorNumber}`}
             >
-              Add
+              {actionLabel}
             </Button>
           </li>
         ))}
@@ -84,27 +112,22 @@ export function DeckCardPicker({ deckId }: { deckId: string }) {
       {search.offset > 0 || results.data?.hasMore ? (
         <div {...stylex.props(deckStyles.toolbar)}>
           <Button
-            disabled={search.offset === 0 || results.isFetching}
+            type="button"
+            disabled={disabled || search.offset === 0 || results.isFetching}
             variant="secondary"
             onClick={() => setSearch({ ...search, offset: Math.max(0, search.offset - 30) })}
           >
             Previous
           </Button>
           <Button
-            disabled={!results.data?.hasMore || results.isFetching}
+            type="button"
+            disabled={disabled || !results.data?.hasMore || results.isFetching}
             variant="secondary"
             onClick={() => setSearch({ ...search, offset: search.offset + 30 })}
           >
             Next
           </Button>
         </div>
-      ) : null}
-      {selected ? (
-        <SelectedCardDialog
-          printingId={selected}
-          deckId={deckId}
-          onClose={() => setSelected(undefined)}
-        />
       ) : null}
     </section>
   );

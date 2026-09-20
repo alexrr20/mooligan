@@ -46,7 +46,7 @@ export function DeckSelect<T extends string>({
         }}
         disabled={disabled}
       >
-        <SelectTrigger aria-label={label}>
+        <SelectTrigger aria-label={label} size="sm" style={deckStyles.control}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent alignItemWithTrigger={false}>
@@ -111,9 +111,9 @@ export function DeckMessage({ children, error = false }: { children: ReactNode; 
 export const deckStyles = stylex.create({
   page: {
     display: "grid",
-    gap: "24px",
-    paddingBlock: "30px 70px",
-    fontSize: "14px",
+    gap: "16px",
+    minWidth: 0,
+    fontSize: "13px",
     lineHeight: 1.5,
     color: "#f4f1e8",
   },
@@ -122,13 +122,16 @@ export const deckStyles = stylex.create({
     alignItems: "center",
     justifyContent: "space-between",
     flexWrap: "wrap",
-    gap: "16px",
+    gap: "12px",
   },
-  title: { margin: 0, fontSize: "30px", fontWeight: 500, overflowWrap: "anywhere" },
-  sectionTitle: { margin: 0, fontSize: "20px", fontWeight: 500 },
-  toolbar: { display: "flex", alignItems: "end", flexWrap: "wrap", gap: "12px" },
-  field: { display: "grid", gap: "6px", minWidth: "130px", fontSize: "13px" },
+  title: { margin: 0, fontSize: "24px", fontWeight: 500, overflowWrap: "anywhere" },
+  sectionTitle: { margin: 0, fontSize: "18px", fontWeight: 500 },
+  toolbar: { display: "flex", alignItems: "end", flexWrap: "wrap", gap: "8px" },
+  field: { display: "grid", gap: "4px", minWidth: 0, fontSize: "12px" },
+  searchField: { flex: "0 1 360px" },
+  control: { height: "28px", fontSize: "13px" },
   fields: { display: "grid", gap: "16px" },
+  section: { display: "grid", gap: "16px", minWidth: 0 },
   panel: {
     display: "grid",
     gap: "16px",

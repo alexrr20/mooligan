@@ -1,5 +1,5 @@
 import { useWorkspaceLiveStore } from "../workspace/workspace-store-context";
-import { createCollectionMutations } from "./collection-mutations";
+import { createCollectionMutations } from "@mooligan/workspace/client/collection-mutations";
 
 export function useCollectionMutations() {
   const store = useWorkspaceLiveStore();

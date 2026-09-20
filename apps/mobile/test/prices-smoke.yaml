@@ -1,0 +1,23 @@
+appId: com.mooligan.mobile
+---
+- launchApp
+- openLink: com.mooligan.app://settings
+- tapOn:
+    text: "Open|Abrir"
+    optional: true
+- scrollUntilVisible:
+    element:
+      text: Update market prices
+    direction: DOWN
+    timeout: 40000
+- tapOn: Update market prices
+- extendedWaitUntil:
+    notVisible: Update market prices
+    timeout: 10000
+- extendedWaitUntil:
+    visible: Update market prices
+    timeout: 600000
+- scrollUntilVisible:
+    element:
+      text: Saved prices from.*
+    direction: UP

@@ -1,12 +1,18 @@
+import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { getCatalogFormatName, type CatalogImageDescriptor } from "@mooligan/domain/catalog-detail";
 import type { Deck } from "@mooligan/domain/decks";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
+import { motion, useReducedMotionConfig } from "motion/react";
 import type { ReactNode } from "react";
 
-import { pageInsets } from "../../styles/tokens.stylex";
+import { Button } from "../../components/ui/button";
+import { fontFamilies, pageInsets } from "../../styles/tokens.stylex";
 import { catalogImageUrl } from "../catalog/catalog-image";
 import { deckStyles } from "./deck-controls";
+import { DeckColors } from "./deck-colors";
+import "./deck-header.css";
 
 export function DeckHeader({
   deck,
@@ -17,46 +23,136 @@ export function DeckHeader({
   art: readonly CatalogImageDescriptor[];
   children: ReactNode;
 }) {
+  const reduceMotion = useReducedMotionConfig() ?? false;
+
   return (
-    <header {...stylex.props(styles.header)}>
-      {art.length ? (
-        <div aria-hidden="true" {...stylex.props(styles.background)}>
-          {art.map((image) => (
-            <div key={image.printingId} {...stylex.props(styles.art(catalogImageUrl(image)))} />
-          ))}
-          <div {...stylex.props(styles.shade)} />
+    <>
+      <header {...stylex.props(styles.bar)} data-deck-bar data-reduced-motion={reduceMotion}>
+        <div aria-hidden="true" {...stylex.props(styles.plate)} data-deck-plate />
+        <Button
+          render={<Link to="/decks" search={{}} />}
+          nativeButton={false}
+          variant="ghost"
+          size="icon"
+          style={styles.back}
+          aria-label="Back to decks"
+          title="Back to decks"
+        >
+          <HugeiconsIcon icon={ArrowLeft01Icon} size={20} aria-hidden="true" />
+        </Button>
+        <div aria-hidden="true" {...stylex.props(styles.compactHeading)} data-deck-compact-title>
+          <DeckColors deck={deck} />
+          <span {...stylex.props(styles.compactTitle)}>{deck.name}</span>
         </div>
-      ) : null}
-      <Link to="/decks" search={{}} {...stylex.props(deckStyles.link)}>
-        Back to decks
-      </Link>
-      <div {...stylex.props(deckStyles.header)}>
-        <div>
-          <h1 {...stylex.props(deckStyles.title)}>{deck.name}</h1>
+        <div {...stylex.props(deckStyles.toolbar)}>{children}</div>
+      </header>
+      <div {...stylex.props(styles.hero)} data-reduced-motion={reduceMotion}>
+        {art.length ? (
+          <div aria-hidden="true" {...stylex.props(styles.background)} data-deck-art>
+            {art.map((image) => (
+              <div key={image.printingId} {...stylex.props(styles.art(catalogImageUrl(image)))} />
+            ))}
+            <div {...stylex.props(styles.shade)} />
+          </div>
+        ) : null}
+        <div {...stylex.props(styles.heading)} data-deck-heading>
+          <div {...stylex.props(styles.colors)}>
+            <DeckColors deck={deck} />
+          </div>
+          <motion.h1
+            key={deck.id}
+            {...stylex.props(deckStyles.title, styles.title)}
+            initial={{
+              opacity: 0,
+              transform: reduceMotion ? "none" : "translateY(10px) scale(0.98)",
+              filter: reduceMotion ? "none" : "blur(3px)",
+            }}
+            animate={{
+              opacity: 1,
+              transform: reduceMotion ? "none" : "translateY(0px) scale(1)",
+              filter: reduceMotion ? "none" : "blur(0px)",
+            }}
+            transition={{ duration: reduceMotion ? 0.15 : 0.28, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {deck.name}
+          </motion.h1>
           <p {...stylex.props(deckStyles.muted)}>
             {getCatalogFormatName(deck.formatId)}
             {deck.archived ? " · Archived" : ""}
             {deck.tags.length ? ` · ${deck.tags.join(", ")}` : ""}
           </p>
         </div>
-        <div {...stylex.props(deckStyles.toolbar)}>{children}</div>
       </div>
-    </header>
+    </>
   );
 }
 
 const styles = stylex.create({
-  header: {
-    position: "relative",
-    isolation: "isolate",
-    display: "grid",
-    gap: "24px",
+  colors: { display: "flex", justifyContent: "flex-start", minHeight: "16px", marginBottom: "8px" },
+  heading: { minWidth: 0, paddingBlock: "40px", textAlign: "left" },
+  title: {
+    fontFamily: fontFamilies.sans,
+    fontSize: "48px",
+    fontWeight: 600,
+    fontStyle: "italic",
+    letterSpacing: "-0.04em",
+    lineHeight: 1.1,
+    textTransform: "uppercase",
+    transformOrigin: "bottom left",
   },
+  bar: {
+    position: "sticky",
+    top: 0,
+    zIndex: 2,
+    isolation: "isolate",
+    display: "flex",
+    alignItems: "center",
+    gap: "20px",
+    minWidth: 0,
+    minHeight: "48px",
+    marginInline: `calc(-1 * (${pageInsets.inline} + ${pageInsets.shellInline}))`,
+    paddingInline: `calc(${pageInsets.inline} + ${pageInsets.shellInline})`,
+  },
+  plate: {
+    position: "absolute",
+    insetInline: 0,
+    // Cover the page inset before the bar reaches its sticky position.
+    top: `calc(-1 * ${pageInsets.top})`,
+    bottom: "-40px",
+    zIndex: -1,
+    backgroundImage:
+      "linear-gradient(180deg, #0a0a0a 36%, rgb(10 10 10 / 96%) 46%, rgb(10 10 10 / 84%) 56%, rgb(10 10 10 / 64%) 66%, rgb(10 10 10 / 40%) 76%, rgb(10 10 10 / 16%) 86%, rgb(10 10 10 / 4%) 94%, rgb(10 10 10 / 0%) 100%)",
+    pointerEvents: "none",
+    opacity: 0,
+  },
+  back: { width: "44px", height: "44px" },
+  compactHeading: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    flex: 1,
+    minWidth: 0,
+    opacity: 0,
+  },
+  compactTitle: {
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    fontFamily: fontFamilies.sans,
+    fontSize: "16px",
+    fontWeight: 600,
+    fontStyle: "italic",
+    textTransform: "uppercase",
+    letterSpacing: "-0.025em",
+  },
+  hero: { position: "relative", isolation: "isolate", minWidth: 0 },
   background: {
     position: "absolute",
-    top: `calc(-1 * (${pageInsets.top} + 30px))`,
-    insetInline: `calc(-1 * ${pageInsets.inline})`,
-    bottom: "-24px",
+    top: `calc(-1 * (${pageInsets.top} + 64px))`,
+    insetInlineStart: "40%",
+    insetInlineEnd: `calc(-1 * (${pageInsets.inline} + ${pageInsets.shellInline}))`,
+    bottom: "-16px",
     zIndex: -1,
     display: "flex",
     borderRadius: "10px 10px 0 0",
@@ -74,6 +170,6 @@ const styles = stylex.create({
     position: "absolute",
     inset: 0,
     backgroundImage:
-      "linear-gradient(180deg, rgb(13 13 13 / 20%), rgb(13 13 13 / 65%) 40%, #0d0d0d 100%), linear-gradient(90deg, rgb(13 13 13 / 50%), transparent 75%)",
+      "linear-gradient(180deg, rgb(10 10 10 / 20%), rgb(10 10 10 / 65%) 40%, #0a0a0a 100%), linear-gradient(90deg, #0a0a0a, transparent 45%)",
   },
 });

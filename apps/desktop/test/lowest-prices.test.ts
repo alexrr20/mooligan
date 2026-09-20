@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { MarketPrice, ExchangeRates } from "@mooligan/domain/market";
-import { lowestRetailPrice } from "../src/features/prices/lowest-prices.ts";
+import { lowestRetailPrice } from "@mooligan/catalog/lowest-prices";
 
 void test("cheapest market uses converted values, matching finish, and available rates", () => {
   const price = (

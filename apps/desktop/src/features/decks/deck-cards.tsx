@@ -3,7 +3,7 @@ import type { Deck, DeckEntry } from "@mooligan/domain/decks";
 import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
-import { useMemo, useRef } from "react";
+import { Fragment, useMemo, useRef } from "react";
 
 import { Button } from "../../components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "../../components/ui/toggle-group";
@@ -11,8 +11,8 @@ import { PrintingImage } from "../cards/printing-image";
 import { useCatalogImageLoading } from "../catalog/catalog-image-loading";
 import { deckStyles } from "./deck-controls";
 import { withDeckOrigin } from "./deck-origin";
-import { ownershipKey, type summarizeDeck } from "./deck-summary";
-import { useDeckViewPreference } from "./use-deck-view-preference";
+import type { summarizeDeck } from "@mooligan/workspace/client/deck-summary";
+import { useViewPreference } from "../preferences/use-view-preference";
 
 export function DeckCards({
   deck,
@@ -27,7 +27,7 @@ export function DeckCards({
   onEdit: (entry: DeckEntry) => void;
   onRemove: (entry: DeckEntry) => void;
 }) {
-  const { view, setView } = useDeckViewPreference();
+  const { view, setView } = useViewPreference("mooligan.deck.view");
   const grid = view === "grid";
   const containerRef = useRef<HTMLDivElement>(null);
   const images = useMemo(
@@ -52,8 +52,7 @@ export function DeckCards({
 
   return (
     <div ref={containerRef} {...stylex.props(styles.sections)}>
-      <div {...stylex.props(deckStyles.header)}>
-        <h2 {...stylex.props(deckStyles.sectionTitle)}>Cards</h2>
+      <div {...stylex.props(styles.viewControls)}>
         <ToggleGroup
           aria-label="Deck card view"
           value={[view]}
@@ -73,113 +72,129 @@ export function DeckCards({
         </ToggleGroup>
       </div>
       {summary.sections.map(({ value, label, quantity, entries }) => (
-        <section key={value} {...stylex.props(deckStyles.panel)} aria-label={label}>
-          <h3 {...stylex.props(deckStyles.sectionTitle)}>
+        <section key={value} {...stylex.props(deckStyles.section)} aria-label={label}>
+          <h2 {...stylex.props(deckStyles.sectionTitle)}>
             {label} · {quantity}
-          </h3>
+          </h2>
           {!quantity ? <p {...stylex.props(deckStyles.muted)}>No cards in this section.</p> : null}
-          <ul {...stylex.props(deckStyles.list, grid && styles.grid)}>
-            {entries
-              .toSorted((a, b) => {
-                const left = printings.get(a.printingId);
-                const right = printings.get(b.printingId);
-                return (
-                  Number(b.section === "commander") - Number(a.section === "commander") ||
-                  (left?.status === "visible" ? left.detail.card.name : "").localeCompare(
-                    right?.status === "visible" ? right.detail.card.name : "",
-                  ) ||
-                  a.id.localeCompare(b.id)
-                );
-              })
-              .map((entry) => {
-                const printing = printings.get(entry.printingId);
-                const detail = printing?.status === "visible" ? printing.detail : null;
-                const name =
-                  detail?.card.name ??
-                  (printing?.status === "protected" ? "Protected preview" : "Printing unavailable");
-                const legality = detail?.legalities.find(
-                  ({ formatId }) => formatId === deck.formatId,
-                );
-                const owned = summary.owned.get(ownershipKey(entry)) ?? 0;
-                const needed = summary.required.get(ownershipKey(entry)) ?? 0;
-                return (
-                  <li key={entry.id} {...stylex.props(deckStyles.row, grid && styles.tile)}>
-                    {grid ? (
-                      <Link
-                        to="/cards/$printingId"
-                        params={{ printingId: entry.printingId }}
-                        state={withDeckOrigin({ deckId: deck.id })}
-                        search={{}}
-                        aria-label={`View ${name}, ${entry.quantity} ${entry.quantity === 1 ? "copy" : "copies"}`}
-                        {...stylex.props(styles.artwork)}
-                      >
-                        <PrintingImage
-                          alt=""
-                          concealed={printing?.status === "protected"}
-                          image={images.get(entry.printingId)}
-                          imageActive={imageLoading.ids.has(entry.printingId)}
-                          failed={imageLoading.failed.has(entry.printingId)}
-                          imageKey={`${imageLoading.generation}:${entry.printingId}`}
-                          placeholder={
-                            printing?.status === "protected" ? "Protected preview" : undefined
-                          }
-                          overlay={
-                            <strong {...stylex.props(styles.quantity)}>{entry.quantity}×</strong>
-                          }
-                          onImageError={() => imageLoading.settle(entry.printingId, true)}
-                          onImageLoad={() => imageLoading.settle(entry.printingId)}
-                        />
-                      </Link>
-                    ) : (
-                      <strong>{entry.quantity}×</strong>
-                    )}
-                    <div {...stylex.props(deckStyles.grow, grid && styles.identity)}>
-                      <Link
-                        to="/cards/$printingId"
-                        params={{ printingId: entry.printingId }}
-                        state={withDeckOrigin({ deckId: deck.id })}
-                        search={{}}
-                        {...stylex.props(deckStyles.link)}
-                      >
-                        {name}
-                      </Link>
-                      {entry.section === "commander" ? (
-                        <span {...stylex.props(deckStyles.commanderLabel)}>Commander</span>
-                      ) : null}
-                      <p {...stylex.props(deckStyles.muted)}>
-                        {detail
-                          ? `${detail.selectedPrinting.setCode.toUpperCase()} ${detail.selectedPrinting.collectorNumber}`
-                          : entry.printingId}{" "}
-                        · {entry.finish} · {owned} owned
-                        {needed ? ` / ${needed} needed across this deck` : ""}
-                        {legality && legality.status !== "legal"
-                          ? ` · ${legality.status.replaceAll("_", " ")}`
-                          : ""}
-                      </p>
-                      {detail && !detail.selectedPrinting.isDigital ? (
-                        <PrintingPrice printingId={entry.printingId} finish={entry.finish} />
-                      ) : null}
-                    </div>
-                    <div {...stylex.props(styles.actions)}>
-                      <Button
-                        variant="secondary"
-                        onClick={() => onEdit(entry)}
-                        aria-label={`Edit ${name}`}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        onClick={() => onRemove(entry)}
-                        aria-label={`Remove ${name}`}
-                      >
-                        Remove
-                      </Button>
-                    </div>
-                  </li>
-                );
-              })}
-          </ul>
+          {(value === "mainboard"
+            ? summary.mainboardGroups
+            : [{ type: "", entries, quantity }]
+          ).map((group) => (
+            <Fragment key={group.type}>
+              {group.type ? (
+                <h3 {...stylex.props(styles.typeTitle)}>
+                  {group.type} <span {...stylex.props(styles.typeCount)}>{group.quantity}</span>
+                </h3>
+              ) : null}
+              <ul {...stylex.props(deckStyles.list, grid && styles.grid)}>
+                {group.entries
+                  .toSorted((a, b) => {
+                    const left = printings.get(a.printingId);
+                    const right = printings.get(b.printingId);
+                    return (
+                      (left?.status === "visible" ? left.detail.card.name : "").localeCompare(
+                        right?.status === "visible" ? right.detail.card.name : "",
+                      ) || a.id.localeCompare(b.id)
+                    );
+                  })
+                  .map((entry) => {
+                    const printing = printings.get(entry.printingId);
+                    const detail = printing?.status === "visible" ? printing.detail : null;
+                    const name =
+                      detail?.card.name ??
+                      (printing?.status === "protected"
+                        ? "Protected preview"
+                        : "Printing unavailable");
+                    const legality = detail?.legalities.find(
+                      ({ formatId }) => formatId === deck.formatId,
+                    );
+                    return (
+                      <li key={entry.id} {...stylex.props(deckStyles.row, grid && styles.tile)}>
+                        {grid ? (
+                          <Link
+                            to="/cards/$printingId"
+                            params={{ printingId: entry.printingId }}
+                            state={withDeckOrigin({ deckId: deck.id })}
+                            search={{}}
+                            aria-label={`View ${name}, ${entry.quantity} ${entry.quantity === 1 ? "copy" : "copies"}`}
+                            {...stylex.props(styles.artwork)}
+                          >
+                            <PrintingImage
+                              alt=""
+                              concealed={printing?.status === "protected"}
+                              finish={entry.finish}
+                              image={images.get(entry.printingId)}
+                              imageActive={imageLoading.ids.has(entry.printingId)}
+                              failed={imageLoading.failed.has(entry.printingId)}
+                              imageKey={`${imageLoading.generation}:${entry.printingId}`}
+                              placeholder={
+                                printing?.status === "protected" ? "Protected preview" : undefined
+                              }
+                              overlay={
+                                <strong {...stylex.props(styles.quantity)}>
+                                  {entry.quantity}×
+                                </strong>
+                              }
+                              onImageError={() => imageLoading.settle(entry.printingId, true)}
+                              onImageLoad={() => imageLoading.settle(entry.printingId)}
+                            />
+                          </Link>
+                        ) : (
+                          <strong>{entry.quantity}×</strong>
+                        )}
+                        <div {...stylex.props(deckStyles.grow, grid && styles.identity)}>
+                          {!grid ? (
+                            <>
+                              <Link
+                                to="/cards/$printingId"
+                                params={{ printingId: entry.printingId }}
+                                state={withDeckOrigin({ deckId: deck.id })}
+                                search={{}}
+                                {...stylex.props(styles.cardName)}
+                              >
+                                {name}
+                              </Link>
+                              {entry.section === "commander" ? (
+                                <span {...stylex.props(deckStyles.commanderLabel)}>Commander</span>
+                              ) : null}
+                              <p {...stylex.props(deckStyles.muted)}>
+                                {detail
+                                  ? `${detail.selectedPrinting.setCode.toUpperCase()} ${detail.selectedPrinting.collectorNumber}`
+                                  : entry.printingId}{" "}
+                                · {entry.finish}
+                                {legality && legality.status !== "legal"
+                                  ? ` · ${legality.status.replaceAll("_", " ")}`
+                                  : ""}
+                              </p>
+                            </>
+                          ) : null}
+                          {detail && !detail.selectedPrinting.isDigital ? (
+                            <PrintingPrice printingId={entry.printingId} finish={entry.finish} />
+                          ) : null}
+                        </div>
+                        <div {...stylex.props(styles.actions)}>
+                          <Button
+                            variant="secondary"
+                            onClick={() => onEdit(entry)}
+                            aria-label={`Edit ${name}`}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            onClick={() => onRemove(entry)}
+                            aria-label={`Remove ${name}`}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      </li>
+                    );
+                  })}
+              </ul>
+            </Fragment>
+          ))}
         </section>
       ))}
     </div>
@@ -187,7 +202,24 @@ export function DeckCards({
 }
 
 const styles = stylex.create({
+  cardName: {
+    color: "#f4f1e8",
+    textDecoration: "none",
+    borderRadius: "2px",
+    ":focus-visible": { outline: "2px solid #c4ef8c", outlineOffset: "4px" },
+  },
+  typeTitle: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: "8px",
+    margin: 0,
+    paddingBlockStart: "8px",
+    fontSize: "14px",
+    fontWeight: 500,
+  },
+  typeCount: { color: "#a6a89d", fontSize: "12px", fontVariantNumeric: "tabular-nums" },
   sections: { display: "grid", gap: "24px", minWidth: 0 },
+  viewControls: { display: "flex", justifyContent: "flex-end" },
   grid: {
     gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 180px), 1fr))",
     gap: "24px 20px",

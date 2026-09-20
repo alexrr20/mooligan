@@ -13,12 +13,12 @@ import {
 import { Schema } from "effect";
 import { workspaceBackupSchema } from "@mooligan/workspace/backup";
 
-import { createDeckMutations } from "../src/features/decks/deck-mutations.ts";
-import { materializeDecks } from "../src/features/decks/deck-state.ts";
+import { createDeckMutations } from "@mooligan/workspace/client/deck-mutations";
+import { materializeDecks } from "@mooligan/workspace/client/deck-state";
 import {
   createWorkspaceBackup,
   restoreWorkspaceBackup,
-} from "../src/features/workspace/workspace-backup.ts";
+} from "@mooligan/workspace/client/workspace-backup";
 
 const time = "2026-09-04T10:00:00.000Z";
 const metadata = {
@@ -29,6 +29,29 @@ const metadata = {
   archived: false,
 };
 type WorkspaceStore = Store<typeof workspaceSchema>;
+
+void test("creating a deck saves its commander and rejects invalid entries before creating it", async () => {
+  const store = await openStore("deck-create-commander");
+  try {
+    const mutations = createDeckMutations(store, async () => null);
+    const commander = {
+      printingId: "commander-printing",
+      finish: "nonfoil" as const,
+      quantity: 1,
+      section: "commander" as const,
+    };
+    const id = mutations.create(metadata, [commander]);
+    const deck = readDecks(store).find((deck) => deck.id === id)!;
+    assert.equal(deck.entries.length, 1);
+    assert.deepEqual(deck.entries[0], { ...commander, id: deck.entries[0]!.id });
+    assert.equal(store.query(tables.collectionLots).length, 0);
+    assert.throws(() => mutations.create(metadata, [{ ...commander, quantity: 0 }]));
+    assert.equal(readDecks(store).length, 1);
+  } finally {
+    await waitForPersistence(store);
+    await store.shutdownPromise();
+  }
+});
 
 void test("decks work without a catalog or account and survive backup/restore", async () => {
   const source = await openStore("deck-source");

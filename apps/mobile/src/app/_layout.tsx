@@ -1,102 +1,56 @@
-import { DarkTheme, DefaultTheme, Link, Stack, ThemeProvider } from "expo-router";
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { Pressable, StyleSheet, Text } from "react-native";
-
 import { AccountStartup } from "@/account/account-provider";
-
 import { MooliganThemeProvider, useMooliganTheme } from "@/theme/theme-provider";
+import { WorkspaceProvider } from "@/workspace/provider";
 
 void SplashScreen.preventAutoHideAsync();
-
 export default function RootLayout() {
   return (
     <MooliganThemeProvider>
       <AccountStartup>
-        <AppNavigator />
+        <WorkspaceProvider>
+          <AppNavigator />
+        </WorkspaceProvider>
       </AccountStartup>
     </MooliganThemeProvider>
   );
 }
-
 function AppNavigator() {
   const { colorScheme, palette } = useMooliganTheme();
-  const baseNavigationTheme = colorScheme === "dark" ? DarkTheme : DefaultTheme;
-  const navigationTheme = {
-    ...baseNavigationTheme,
-    colors: {
-      ...baseNavigationTheme.colors,
-      primary: palette.accent,
-      background: palette.background,
-      card: palette.background,
-      text: palette.text,
-      border: palette.border,
-      notification: palette.accent,
-    },
-  };
-
+  const base = colorScheme === "dark" ? DarkTheme : DefaultTheme;
   return (
-    <ThemeProvider value={navigationTheme}>
+    <ThemeProvider
+      value={{
+        ...base,
+        colors: {
+          ...base.colors,
+          primary: palette.accent,
+          background: palette.background,
+          card: palette.background,
+          text: palette.text,
+          border: palette.border,
+          notification: palette.accent,
+        },
+      }}
+    >
       <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
       <Stack
         screenOptions={{
           contentStyle: { backgroundColor: palette.background },
-          headerShadowVisible: false,
           headerStyle: { backgroundColor: palette.background },
           headerTintColor: palette.text,
-          headerTitleStyle: styles.headerTitle,
+          headerShadowVisible: false,
+          headerBackButtonDisplayMode: "minimal",
         }}
       >
-        <Stack.Screen
-          name="index"
-          options={{
-            title: "Mooligan",
-            headerRight: () => <SettingsHeaderButton />,
-          }}
-        />
-        <Stack.Screen
-          name="settings"
-          options={{
-            title: "Settings",
-            headerBackButtonDisplayMode: "minimal",
-          }}
-        />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="cards/[printingId]" options={{ title: "Card" }} />
+        <Stack.Screen name="decks/[deckId]" options={{ title: "Deck" }} />
+        <Stack.Screen name="sets" options={{ title: "Upcoming releases" }} />
+        <Stack.Screen name="profile" options={{ title: "Profile" }} />
       </Stack>
     </ThemeProvider>
   );
 }
-
-function SettingsHeaderButton() {
-  const { palette } = useMooliganTheme();
-
-  return (
-    <Link href="/settings" asChild>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Open Settings"
-        hitSlop={10}
-        style={({ pressed }) => [styles.headerButton, pressed && styles.headerButtonPressed]}
-      >
-        <Text style={[styles.headerButtonText, { color: palette.accentText }]}>Settings</Text>
-      </Pressable>
-    </Link>
-  );
-}
-
-const styles = StyleSheet.create({
-  headerTitle: {
-    fontWeight: "600",
-  },
-  headerButton: {
-    minHeight: 44,
-    justifyContent: "center",
-    paddingHorizontal: 4,
-  },
-  headerButtonPressed: {
-    opacity: 0.55,
-  },
-  headerButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-});

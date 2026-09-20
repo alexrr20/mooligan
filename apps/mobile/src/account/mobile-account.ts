@@ -22,6 +22,7 @@ export class MobileAccount<Workspace extends LocalWorkspace> {
   #auth: MobileAuthClient | null = null;
   readonly #createAuth: (() => MobileAuthClient) | null;
   readonly #account: AccountWorkspace;
+  readonly #registry: WorkspaceRegistry;
   readonly #open: (runtime: WorkspaceRuntime) => Promise<Workspace>;
   readonly #listeners = new Set<() => void>();
   #snapshot: MobileAccountSnapshot<Workspace>;
@@ -40,6 +41,7 @@ export class MobileAccount<Workspace extends LocalWorkspace> {
     authOrigin: string | null,
     request: typeof fetch = globalThis.fetch,
   ) {
+    this.#registry = registry;
     this.#createAuth = createAuth;
     this.#open = open;
     const signedOut: AuthSnapshot = { status: "signed-out", user: null, pendingAuth: false };
@@ -139,6 +141,32 @@ export class MobileAccount<Workspace extends LocalWorkspace> {
       this.#set({ busy: true, error: null });
       await this.#account.selectWorkspace(workspaceId);
       this.#selectedAccountId = this.#snapshot.auth.user?.id ?? null;
+    });
+  }
+
+  restoreWorkspace(restore: (workspace: Workspace) => Promise<void>) {
+    return this.#run(async () => {
+      this.#set({ busy: true, error: null });
+      const pending = this.#registry.beginRestore();
+      let temporary: Workspace | undefined;
+      try {
+        temporary = await this.#open({
+          ...pending,
+          sync: null,
+          syncIssue: null,
+          workspaces: this.#registry.workspaces(),
+        });
+        await restore(temporary);
+        await temporary.close();
+        temporary = undefined;
+        this.#registry.activateRestore(pending.workspaceId);
+        this.#selectedAccountId = this.#snapshot.auth.user?.id ?? null;
+        await this.#account.workspaceActivated();
+      } catch (error) {
+        await temporary?.close();
+        this.#registry.cancelRestore(pending.workspaceId);
+        throw error;
+      }
     });
   }
 

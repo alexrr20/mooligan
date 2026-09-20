@@ -12,9 +12,6 @@ const styles = stylex.create({
     minHeight: "100%",
     paddingTop: pageInsets.top,
     paddingInline: pageInsets.inline,
-    paddingBottom: {
-      default: "64px",
-      "@media (max-width: 820px)": "52px",
-    },
+    paddingBottom: "32px",
   },
 });

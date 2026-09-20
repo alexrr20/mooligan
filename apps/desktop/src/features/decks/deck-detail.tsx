@@ -18,7 +18,7 @@ import { DeckImportExport } from "./deck-import-export";
 import { DeckHeader } from "./deck-header";
 import { DeckMetadataEditor } from "./deck-metadata-editor";
 import { DeckStats } from "./deck-stats";
-import { summarizeDeck } from "./deck-summary";
+import { summarizeDeck } from "@mooligan/workspace/client/deck-summary";
 import { useDeckMutations } from "./use-decks";
 
 export function DeckDetail({

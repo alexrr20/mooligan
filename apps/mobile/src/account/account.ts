@@ -11,7 +11,9 @@ function createMobileAccount() {
   let configuration: ReturnType<typeof accountConfiguration> = null;
   let configurationError: string | null = null;
   try {
-    configuration = accountConfiguration(process.env.EXPO_PUBLIC_MOOLIGAN_AUTH_ORIGIN);
+    configuration = accountConfiguration(
+      process.env.EXPO_PUBLIC_MOOLIGAN_AUTH_ORIGIN ?? "https://mooligan-api.bessa.workers.dev",
+    );
   } catch {
     configurationError =
       "The Account service address in this build is invalid. Your Workspace is available locally.";

@@ -1,8 +1,8 @@
 import { deckEntriesQuery, decksQuery } from "@mooligan/workspace/schema";
 
 import { useWorkspaceLiveStore } from "../workspace/workspace-store-context";
-import { createDeckMutations } from "./deck-mutations";
-import { materializeDecks } from "./deck-state";
+import { createDeckMutations } from "@mooligan/workspace/client/deck-mutations";
+import { materializeDecks } from "@mooligan/workspace/client/deck-state";
 
 export function useDecks() {
   const store = useWorkspaceLiveStore();

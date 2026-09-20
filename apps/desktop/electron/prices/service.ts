@@ -1,10 +1,11 @@
-import { updateExchangeRates } from "./exchange-rates.ts";
+import { updateExchangeRates } from "@mooligan/catalog/exchange-rates";
 import { Worker } from "node:worker_threads";
 
 import { PriceSnapshotSchema, PricePhaseSchema, type PriceStatus } from "@mooligan/domain/market";
 import * as z from "zod";
 
-import { openPriceDatabase, readPrintingPrices, readPriceSnapshot } from "./database.ts";
+import { openPriceDatabase } from "./database.ts";
+import { readPrintingPrices, readPriceSnapshot } from "@mooligan/catalog/prices";
 
 const WorkerMessageSchema = z.union([
   z.object({ snapshot: PriceSnapshotSchema }),

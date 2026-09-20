@@ -3,13 +3,12 @@ import { createRootRoute, Outlet, useRouterState } from "@tanstack/react-router"
 import { motion, MotionConfig } from "motion/react";
 
 import { AppSidebar } from "../components/app-sidebar";
-import { SidebarProvider, SidebarInset, SidebarTrigger } from "../components/ui/sidebar";
+import { SidebarProvider, SidebarInset } from "../components/ui/sidebar";
 import { CatalogSetup } from "../components/catalog-setup";
-import { GlobalSearch } from "../components/global-search";
-import { HeaderActions } from "../components/header-actions";
 import { useSidebarPreference } from "../features/preferences/use-sidebar-preference";
 import { useMotionPreference } from "../features/preferences/use-motion-preference";
 import { usePriceUpdates } from "../features/prices/price-updates";
+import { pageInsets } from "../styles/tokens.stylex";
 
 export const Route = createRootRoute({
   component: AppShell,
@@ -33,10 +32,7 @@ function AppShell() {
   return (
     <MotionConfig reducedMotion={reducedMotion}>
       <div {...stylex.props(styles.app)}>
-        <header {...stylex.props(styles.chrome)} data-window-drag-region>
-          <GlobalSearch />
-          <HeaderActions />
-        </header>
+        <header {...stylex.props(styles.chrome)} data-window-drag-region />
 
         <SidebarProvider
           open={sidebar.open}
@@ -46,11 +42,8 @@ function AppShell() {
         >
           <AppSidebar />
           <SidebarInset>
-            <div {...stylex.props(styles.sidebarToolbar)}>
-              <SidebarTrigger />
-            </div>
             <div
-              {...stylex.props(styles.main)}
+              {...stylex.props(styles.main, !sidebar.open && styles.mainCollapsed)}
               data-scroll-restoration-id="mooligan-main"
               data-window-no-drag
             >
@@ -74,49 +67,35 @@ function AppShell() {
 
 const styles = stylex.create({
   app: {
+    position: "relative",
     height: "100vh",
     display: "grid",
     gridTemplateColumns: "minmax(0, 1fr)",
-    gridTemplateRows: "50px minmax(0, 1fr)",
+    gridTemplateRows: "minmax(0, 1fr)",
     overflow: "hidden",
     backgroundColor: "#0a0a0a",
   },
   chrome: {
-    gridColumn: "1 / -1",
-    position: "relative",
-    display: "flex",
-    alignItems: "center",
-    minWidth: 0,
-    paddingLeft: "22px",
-    paddingRight: "12px",
-    color: "#f4f1e8",
-    backgroundColor: "#0a0a0a",
-  },
-  wordmark: {
-    paddingLeft: {
-      default: "64px",
-      "@media (max-width: 820px)": "52px",
-    },
-    fontSize: "17px",
-    letterSpacing: "-0.01em",
-  },
-  sidebarToolbar: {
-    display: "flex",
-    alignItems: "center",
-    minHeight: "40px",
-    paddingInline: "8px",
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: "88px",
+    height: "50px",
+    zIndex: 1,
   },
   main: {
     flex: "1 1 0",
     minWidth: 0,
     minHeight: 0,
-    padding: "0 12px",
+    borderRadius: "inherit",
+    paddingBlock: 0,
+    paddingTop: { default: 0, "@media (width < 768px)": "50px" },
+    paddingInline: pageInsets.shellInline,
     overflowY: "auto",
-    backgroundColor: "#0d0d0d",
   },
+  mainCollapsed: { paddingTop: "50px" },
   route: {
     minHeight: "100%",
     borderRadius: "10px",
-    backgroundColor: "#0d0d0d",
   },
 });

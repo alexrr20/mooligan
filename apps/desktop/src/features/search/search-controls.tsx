@@ -59,19 +59,13 @@ export function SearchForm({
 
   return (
     <form
-      {...stylex.props(styles.searchBar)}
       role="search"
       onSubmit={(event) => {
         event.preventDefault();
         onSearch(query.trim());
       }}
     >
-      <svg {...stylex.props(styles.searchIcon)} aria-hidden="true" fill="none" viewBox="0 0 24 24">
-        <circle cx="11" cy="11" r="7" />
-        <path d="m20 20-4-4" />
-      </svg>
       <Input
-        style={styles.searchInput}
         aria-label={ariaLabel}
         autoFocus={autoFocus}
         id={id}
@@ -137,13 +131,14 @@ export function SearchUniverseFilter({ onChange, value }: SearchUniverseFilterPr
 const styles = stylex.create({
   modeTabs: {
     display: "flex",
-    gap: "4px",
-    padding: "4px",
-    borderRadius: "10px",
+    gap: "2px",
+    padding: "3px",
+    borderRadius: "8px",
     backgroundColor: "#171817",
   },
   modeTab: {
-    padding: "9px 16px",
+    height: "28px",
+    padding: "0 12px",
     borderWidth: 0,
     borderRadius: "7px",
     backgroundColor: "transparent",
@@ -154,48 +149,19 @@ const styles = stylex.create({
     ":hover": { color: "#f4f1e8" },
     ":focus-visible": { outline: `2px solid ${colors.accent}`, outlineOffset: "3px" },
   },
-  searchBar: {
-    width: "100%",
-    minHeight: "52px",
-    paddingInline: "16px",
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    borderRadius: "10px",
-    backgroundColor: "#1b1c1b",
-    ":focus-within": { outline: `2px solid ${colors.accent}`, outlineOffset: "2px" },
-  },
-  searchInput: {
-    height: "50px",
-    padding: 0,
-    borderWidth: 0,
-    backgroundColor: "transparent",
-    fontSize: "15px",
-    boxShadow: "none",
-    ":focus-visible": { boxShadow: "none" },
-  },
-  searchIcon: {
-    width: "20px",
-    height: "20px",
-    flexShrink: 0,
-    color: "#85887f",
-    stroke: "currentColor",
-    strokeWidth: "1.6",
-    strokeLinecap: "round",
-    strokeLinejoin: "round",
-  },
   filterToggle: {
-    height: "32px",
-    paddingInline: "10px",
+    height: "28px",
+    paddingInline: "8px",
     borderWidth: 0,
     color: "#a6a89d",
     fontSize: "12px",
-    gap: "6px",
+    gap: "4px",
     "[data-pressed]": { color: colors.accent, backgroundColor: "#13271c" },
   },
   toggleMark: { fontSize: "14px", width: "12px" },
   universeOption: {
-    height: "32px",
+    height: "28px",
+    paddingInline: "8px",
     borderWidth: 0,
     color: "#989b92",
     fontSize: "12px",

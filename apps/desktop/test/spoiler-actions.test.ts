@@ -10,7 +10,7 @@ import {
   workspaceSchema,
 } from "@mooligan/workspace/schema";
 
-import { runSpoilerAction } from "../src/features/spoilers/spoiler-actions.ts";
+import { runSpoilerAction } from "@mooligan/workspace/client/spoiler-actions";
 
 void test("protecting a printing observes a release reveal completed during catalog lookup", async () => {
   const store = await openStore("protect-printing-race");

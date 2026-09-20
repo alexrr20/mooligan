@@ -16,7 +16,7 @@ import { createCatalogSearchOrigin } from "../features/search/catalog-search-ori
 import { type CatalogSearchState, validateCatalogSearch } from "../features/search/search-state";
 import { useCatalogSearch } from "../features/search/use-catalog-search";
 import { useCatalogUpcomingPrintings } from "../features/search/use-catalog-upcoming-printings";
-import { useSearchViewPreference } from "../features/search/use-search-view-preference";
+import { useViewPreference } from "../features/preferences/use-view-preference";
 
 export const Route = createFileRoute("/search")({
   component: SearchPage,
@@ -31,7 +31,10 @@ function SearchPage() {
   const includeArtSeries = searchState.artSeries === true;
   const includeDigital = searchState.digital === true;
   const includeTokens = searchState.tokens === true;
-  const { setView, view } = useSearchViewPreference(searchState.grid === true);
+  const { setView, view } = useViewPreference(
+    "mooligan.search.view",
+    searchState.grid === true ? "grid" : undefined,
+  );
   const gridView = view === "grid";
   const uniqueCards = searchState.uniqueCards === true;
   const catalog = useCatalogSearch(
@@ -78,13 +81,7 @@ function SearchPage() {
           updateSearch({ mode: value === "upcoming" ? "upcoming" : undefined })
         }
       >
-        <header {...stylex.props(browseStyles.header)}>
-          <div>
-            <h1 {...stylex.props(browseStyles.title)}>Search cards</h1>
-            <p {...stylex.props(browseStyles.description)}>
-              Explore your catalog by card name, set, or Scryfall syntax.
-            </p>
-          </div>
+        <header {...stylex.props(browseStyles.header, styles.alignEnd)}>
           <SearchModeTabs />
         </header>
         <Tabs.Panel value="cards">
@@ -123,16 +120,7 @@ function SearchPage() {
               />
             </div>
           </div>
-          <div {...stylex.props(browseStyles.resultsBar)}>
-            <span {...stylex.props(browseStyles.count)} aria-live="polite">
-              {catalog.queryError
-                ? "Query error"
-                : catalog.loading && catalog.cards.length === 0
-                  ? activeQuery
-                    ? "Searching…"
-                    : "Reading index…"
-                  : `${(catalog.total ?? catalog.cards.length).toLocaleString()}${catalog.total === null && catalog.hasMore ? "+" : ""} ${activeQuery ? "matches" : uniqueCards ? (catalog.total === 1 ? "card" : "cards") : catalog.total === 1 ? "printing" : "printings"}`}
-            </span>
+          <div {...stylex.props(browseStyles.resultsBar, styles.alignEnd)}>
             <BrowseViewToggle
               label="Card view"
               grid={gridView}
@@ -196,7 +184,8 @@ function SearchPage() {
 }
 
 const styles = stylex.create({
-  filters: { marginTop: "16px" },
-  filterOptions: { display: "flex", alignItems: "center", flexWrap: "wrap", gap: "8px 12px" },
+  alignEnd: { justifyContent: "flex-end" },
+  filters: { marginTop: "8px" },
+  filterOptions: { display: "flex", alignItems: "center", flexWrap: "wrap", gap: "4px" },
   upcomingCopy: { margin: 0, color: "#989b92", fontSize: "14px", lineHeight: 1.6 },
 });

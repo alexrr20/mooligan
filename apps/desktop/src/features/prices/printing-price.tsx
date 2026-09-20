@@ -2,8 +2,15 @@ import type { Finish } from "@mooligan/domain/catalog";
 import * as stylex from "@stylexjs/stylex";
 import { useQuery } from "@tanstack/react-query";
 
-import { lowestRetailPrice } from "./lowest-prices";
+import cardkingdom from "../../assets/markets/cardkingdom.png";
+import cardmarket from "../../assets/markets/cardmarket.png";
+import cardsphere from "../../assets/markets/cardsphere.svg";
+import manapool from "../../assets/markets/manapool.svg";
+import tcgplayer from "../../assets/markets/tcgplayer.ico";
+import { lowestRetailPrice } from "@mooligan/catalog/lowest-prices";
 import { priceProviders, usePriceProviders } from "./use-price-providers";
+
+const marketLogos = { cardkingdom, cardmarket, cardsphere, manapool, tcgplayer };
 
 export function PrintingPrice({ printingId, finish }: { printingId: string; finish?: Finish }) {
   const { enabledProviders, currency } = usePriceProviders();
@@ -35,9 +42,7 @@ export function PrintingPrice({ printingId, finish }: { printingId: string; fini
     rates.data,
     finish,
   );
-  const market = lowest
-    ? (priceProviders.find(({ id }) => id === lowest.price.market)?.name ?? lowest.price.market)
-    : "";
+  const market = lowest ? priceProviders.find(({ id }) => id === lowest.price.market) : undefined;
   const converted = lowest && lowest.price.money.currency !== currency;
   const stale =
     lowest &&
@@ -57,20 +62,29 @@ export function PrintingPrice({ printingId, finish }: { printingId: string; fini
         )
       ) : (
         <span
-          title={`${market} · ${lowest.price.finish} · ${lowest.price.priceDate} · Retail reference per copy${converted ? ` · Converted from ${lowest.price.money.currency} using ECB rates dated ${lowest.rateDate}` : ""}`}
+          {...stylex.props(styles.value)}
+          title={`${market?.name} · ${lowest.price.finish} · ${lowest.price.priceDate} · Retail reference per copy${converted ? ` · Converted from ${lowest.price.money.currency} using ECB rates dated ${lowest.rateDate}` : ""}`}
         >
-          {!finish ? "From " : ""}
-          {converted ? "≈ " : ""}
-          {new Intl.NumberFormat(undefined, {
-            style: "currency",
-            currency,
-            currencyDisplay: "code",
-          }).format(lowest.amount)}
-          <span {...stylex.props(styles.source)}>
-            {" "}
-            · {market}
-            {stale ? " · Stale" : ""}
+          <span>
+            {!finish ? "From " : ""}
+            {converted ? "≈ " : ""}
+            {new Intl.NumberFormat(undefined, {
+              style: "currency",
+              currency,
+              currencyDisplay: "narrowSymbol",
+            }).format(lowest.amount)}
           </span>
+          {market ? (
+            <img
+              src={marketLogos[market.id]}
+              alt={market.name}
+              title={market.name}
+              width={16}
+              height={16}
+              {...stylex.props(styles.logo)}
+            />
+          ) : null}
+          {stale ? <span {...stylex.props(styles.source)}>Stale</span> : null}
         </span>
       )}
       {lowest && missingRates && !rates.isPending ? (
@@ -81,6 +95,8 @@ export function PrintingPrice({ printingId, finish }: { printingId: string; fini
 }
 
 const styles = stylex.create({
+  value: { display: "inline-flex", alignItems: "center", flexWrap: "wrap", gap: "6px" },
+  logo: { objectFit: "contain", flexShrink: 0 },
   prices: {
     display: "grid",
     gap: "3px",

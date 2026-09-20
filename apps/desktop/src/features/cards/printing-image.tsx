@@ -1,8 +1,10 @@
+import type { Finish } from "@mooligan/domain/catalog";
 import type { CatalogImageDescriptor } from "@mooligan/domain/catalog-detail";
 import * as stylex from "@stylexjs/stylex";
-import type { Key, ReactNode } from "react";
+import { useState, type Key, type ReactNode } from "react";
 
 import { catalogImageUrl } from "../catalog/catalog-image";
+import { FoilOverlay } from "./foil-overlay";
 
 type PrintingImageProps = {
   alt?: string;
@@ -10,6 +12,7 @@ type PrintingImageProps = {
   compact?: boolean;
   concealed?: boolean;
   failed?: boolean;
+  finish?: Finish;
   image?: CatalogImageDescriptor | null;
   imageActive?: boolean;
   imageKey?: Key;
@@ -26,6 +29,7 @@ export function PrintingImage({
   compact = false,
   concealed = false,
   failed = false,
+  finish,
   image,
   imageActive = true,
   imageKey,
@@ -35,7 +39,10 @@ export function PrintingImage({
   onImageError,
   onImageLoad,
 }: PrintingImageProps) {
+  const [loadedSource, setLoadedSource] = useState<string>();
+  const source = image ? catalogImageUrl(image) : undefined;
   const imageVisible = image && imageActive && !failed;
+  const artworkReady = children !== undefined || (imageVisible && loadedSource === source);
 
   return (
     <div
@@ -56,9 +63,15 @@ export function PrintingImage({
           alt={alt}
           decoding="async"
           loading="eager"
-          src={catalogImageUrl(image)}
-          onError={onImageError}
-          onLoad={onImageLoad}
+          src={source}
+          onError={() => {
+            setLoadedSource(undefined);
+            onImageError?.();
+          }}
+          onLoad={() => {
+            setLoadedSource(source);
+            onImageLoad?.();
+          }}
         />
       ) : (
         (placeholder ??
@@ -66,6 +79,9 @@ export function PrintingImage({
           <span {...stylex.props(styles.fallback)}>{failed ? "Art offline" : "No art"}</span>
         ) : null))
       )}
+      {artworkReady && imageActive && !failed && !concealed ? (
+        <FoilOverlay finish={finish} />
+      ) : null}
       {overlay}
     </div>
   );
@@ -76,6 +92,7 @@ const styles = stylex.create({
     width: "100%",
     aspectRatio: "5 / 7",
     position: "relative",
+    isolation: "isolate",
     overflow: "hidden",
     display: "grid",
     placeItems: "center",

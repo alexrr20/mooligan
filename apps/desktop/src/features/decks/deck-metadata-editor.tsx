@@ -1,5 +1,5 @@
-import { getCatalogFormatName } from "@mooligan/domain/catalog-detail";
-import { deckFormats, type DeckMetadata } from "@mooligan/domain/decks";
+import { type CatalogCardDetail, getCatalogFormatName } from "@mooligan/domain/catalog-detail";
+import { deckFormats, type DeckEntry, type DeckMetadata } from "@mooligan/domain/decks";
 import * as stylex from "@stylexjs/stylex";
 import { useState, type RefObject } from "react";
 
@@ -7,18 +7,12 @@ import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../components/ui/dialog";
 import { Form } from "../../components/ui/form";
 import { Input } from "../../components/ui/input";
+import { CommanderPicker } from "./commander-picker";
 import { DeckMessage, DeckSelect, deckStyles } from "./deck-controls";
-
-export const emptyDeck: DeckMetadata = {
-  name: "",
-  formatId: "casual",
-  notes: "",
-  tags: [],
-  archived: false,
-};
 
 export function DeckMetadataEditor({
   finalFocus,
+  chooseCommander = false,
   initial,
   onSave,
   onClose,
@@ -26,7 +20,12 @@ export function DeckMetadataEditor({
 }: {
   finalFocus?: RefObject<HTMLElement | null>;
   initial: DeckMetadata;
-  onSave: (metadata: DeckMetadata, changed: Partial<DeckMetadata>) => void;
+  chooseCommander?: boolean;
+  onSave: (
+    metadata: DeckMetadata,
+    changed: Partial<DeckMetadata>,
+    entries: Omit<DeckEntry, "id">[],
+  ) => void;
   onClose: () => void;
   title: string;
 }) {
@@ -35,6 +34,13 @@ export function DeckMetadataEditor({
   const [formatId, setFormatId] = useState(initial.formatId);
   const [notes, setNotes] = useState(initial.notes);
   const [tags, setTags] = useState(initial.tags.join(", "));
+  const [commander, setCommander] = useState<CatalogCardDetail>();
+  const [commanderPending, setCommanderPending] = useState(false);
+  const hasCommander =
+    chooseCommander &&
+    ["commander", "brawl", "standardbrawl", "duel", "paupercommander", "oathbreaker"].includes(
+      formatId,
+    );
   const [error, setError] = useState("");
   const formats = [...new Set([...deckFormats, initial.formatId])].map((value) => ({
     value,
@@ -54,6 +60,7 @@ export function DeckMetadataEditor({
           style={deckStyles.fields}
           onSubmit={(event) => {
             event.preventDefault();
+            if (commanderPending) return;
             const metadata = {
               name: name.trim(),
               formatId,
@@ -75,7 +82,16 @@ export function DeckMetadataEditor({
             if (JSON.stringify(metadata.tags) !== JSON.stringify(original.tags))
               changed.tags = metadata.tags;
             try {
-              onSave(metadata, changed);
+              const printing = hasCommander ? commander?.selectedPrinting : undefined;
+              const finish =
+                printing?.finishes?.find((value) => value === "nonfoil") ?? printing?.finishes?.[0];
+              onSave(
+                metadata,
+                changed,
+                printing && finish
+                  ? [{ printingId: printing.id, finish, quantity: 1, section: "commander" }]
+                  : [],
+              );
             } catch (cause) {
               setError(cause instanceof Error ? cause.message : "The deck could not be saved.");
             }
@@ -85,7 +101,24 @@ export function DeckMetadataEditor({
             Name
             <Input autoFocus required maxLength={200} value={name} onValueChange={setName} />
           </label>
-          <DeckSelect label="Format" options={formats} value={formatId} onChange={setFormatId} />
+          <DeckSelect
+            label="Format"
+            options={formats}
+            value={formatId}
+            onChange={(value) => {
+              setFormatId(value);
+              setCommander(undefined);
+              setCommanderPending(false);
+            }}
+          />
+          {hasCommander ? (
+            <CommanderPicker
+              key={formatId}
+              value={commander}
+              onChange={setCommander}
+              onPendingChange={setCommanderPending}
+            />
+          ) : null}
           <label {...stylex.props(deckStyles.field)}>
             Tags, separated by commas
             <Input value={tags} onValueChange={setTags} />
@@ -101,7 +134,7 @@ export function DeckMetadataEditor({
           </label>
           {error ? <DeckMessage error>{error}</DeckMessage> : null}
           <div {...stylex.props(deckStyles.toolbar)}>
-            <Button type="submit" disabled={!name.trim()}>
+            <Button type="submit" disabled={!name.trim() || commanderPending}>
               Save deck
             </Button>
             <Button type="button" variant="secondary" onClick={onClose}>

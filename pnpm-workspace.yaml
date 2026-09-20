@@ -60,6 +60,11 @@ catalog:
   "@streamparser/json-node": ^0.0.26
   "@hugeicons/react": ^1.1.10
   "@hugeicons/core-free-icons": ^4.3.2
+  expo-document-picker: ~57.0.2
+  expo-sharing: ~57.0.21
+  expo-image: ~57.0.5
+  fflate: ^0.8.3
+  "@streamparser/json": ^0.0.26
 overrides:
   vite: "catalog:"
 peerDependencyRules:

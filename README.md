@@ -9,6 +9,7 @@ prerequisite for using the desktop app.
 - `apps/api`: Hono 4 for Cloudflare Workers, served locally by Wrangler on
   `http://127.0.0.1:3000`
 - `packages/domain`: shared catalog, collection, deck, list, and market types
+- `packages/catalog`: shared offline catalog SQL, validation, and price import logic
 - `packages/workspace`: shared LiveStore events, state, and backup schema
 
 Node.js 22.18 or newer is required.
@@ -157,7 +158,10 @@ vp run mobile#dev
 
 Expo generates `apps/mobile/ios` and `apps/mobile/android` locally from
 `apps/mobile/app.json`. Neither directory is committed. Mobile creates a persistent local Workspace
-and uses Better Auth’s Expo client to sign in and sync its Account Workspace. See
+and uses Better Auth’s Expo client to sign in and sync its Account Workspace.
+Mobile includes offline catalog search, card details, Collection and Deck editing,
+previews, Profile choices, prices, and Workspace backups. Both clients use the
+same catalog queries and Workspace editing rules. See
 [mobile setup](apps/mobile/README.md) for the public service origin, native
 rebuild requirements, and verification steps.
 

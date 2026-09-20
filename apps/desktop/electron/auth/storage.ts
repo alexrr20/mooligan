@@ -57,11 +57,6 @@ export const ProtectedAuthStateSchema = z.strictObject({
   user: StoredAuthUserSchema.nullable(),
   version: z.literal(2),
 });
-const LegacyProtectedAuthStateSchema = z.strictObject({
-  cookies: z.record(z.string(), StoredAuthCookieSchema),
-  pendingAuth: PendingAuthSchema.nullable(),
-  version: z.literal(1),
-});
 export interface AuthStateStorage {
   load(): Promise<ProtectedAuthState>;
   save(state: ProtectedAuthState): Promise<void>;
@@ -113,9 +108,9 @@ export class EncryptedAuthStorage implements AuthStateStorage {
         throw new Error("Decrypted authentication state is too large.");
       }
 
-      const { state, upgraded } = parseProtectedAuthState(decrypted.result);
+      const state = validateProtectedAuthState(JSON.parse(decrypted.result));
 
-      if (decrypted.shouldReEncrypt || upgraded) {
+      if (decrypted.shouldReEncrypt) {
         await this.save(state);
       }
 
@@ -185,38 +180,6 @@ export class EncryptedAuthStorage implements AuthStateStorage {
 
 export function emptyAuthState(): ProtectedAuthState {
   return { cookies: {}, pendingAuth: null, user: null, version: 2 };
-}
-
-function parseProtectedAuthState(serialized: string) {
-  let value;
-
-  try {
-    value = JSON.parse(serialized);
-  } catch (error) {
-    throw new ProtectedStorageError("Protected authentication state is invalid.", {
-      cause: error,
-    });
-  }
-
-  const current = ProtectedAuthStateSchema.safeParse(value);
-  if (current.success) {
-    return { state: current.data, upgraded: false };
-  }
-
-  const legacy = LegacyProtectedAuthStateSchema.safeParse(value);
-  if (legacy.success) {
-    return {
-      state: {
-        cookies: legacy.data.cookies,
-        pendingAuth: legacy.data.pendingAuth,
-        user: null,
-        version: 2,
-      } satisfies ProtectedAuthState,
-      upgraded: true,
-    };
-  }
-
-  throw new ProtectedStorageError("Protected authentication state is invalid.");
 }
 
 function validateProtectedAuthState(value: ProtectedAuthState | JSONType): ProtectedAuthState {

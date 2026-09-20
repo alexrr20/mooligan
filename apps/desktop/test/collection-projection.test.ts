@@ -11,7 +11,7 @@ import type { CollectionLot } from "@mooligan/domain/collection";
 import {
   createCollectionProjection,
   parseCollectionProjectionWorkerRequest,
-} from "../electron/catalog/collection-projection.ts";
+} from "@mooligan/catalog/collection-projection";
 import { CollectionProjection } from "../electron/collection/projection.ts";
 import { diffCollectionLots } from "../src/features/workspace/collection-projection-diff.ts";
 

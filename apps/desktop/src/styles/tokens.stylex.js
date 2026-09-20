@@ -5,13 +5,14 @@ export const colors = stylex.defineVars({
 });
 
 export const pageInsets = stylex.defineVars({
+  shellInline: "12px",
   top: {
-    default: "52px",
-    "@media (max-width: 820px)": "42px",
+    default: "24px",
+    "@media (max-width: 820px)": "16px",
   },
   inline: {
-    default: "clamp(36px, 6vw, 88px)",
-    "@media (max-width: 820px)": "34px",
+    default: "20px",
+    "@media (max-width: 820px)": "8px",
   },
 });
 

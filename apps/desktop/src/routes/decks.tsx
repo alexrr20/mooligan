@@ -10,10 +10,12 @@ import { Input } from "../components/ui/input";
 import { DeckDetail } from "../features/decks/deck-detail";
 import { DeckSelect, deckStyles } from "../features/decks/deck-controls";
 import { DeckGrid } from "../features/decks/deck-grid";
-import { DeckMetadataEditor, emptyDeck } from "../features/decks/deck-metadata-editor";
-import { useDeckMutations, useDecks } from "../features/decks/use-decks";
+import { CreateDeckDialog } from "../features/decks/create-deck-dialog";
+import { useDecks } from "../features/decks/use-decks";
 
-const DeckSearchSchema = z.object({ deck: z.string().min(1).max(128).optional() });
+const DeckSearchSchema = z.object({
+  deck: z.string().min(1).max(128).optional(),
+});
 
 export const Route = createFileRoute("/decks")({
   component: DecksPage,
@@ -24,8 +26,7 @@ function DecksPage() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const decks = useDecks();
-  const mutations = useDeckMutations();
-  const [creating, setCreating] = useState(false);
+  const [creatingDeck, setCreatingDeck] = useState(false);
   const [filter, setFilter] = useState("");
   const [status, setStatus] = useState("active");
   const [format, setFormat] = useState("all");
@@ -84,10 +85,12 @@ function DecksPage() {
               Plan cards for play. Your decks are saved in this workspace.
             </p>
           </div>
-          <Button onClick={() => setCreating(true)}>Create deck</Button>
+          <Button size="sm" onClick={() => setCreatingDeck(true)}>
+            Create deck
+          </Button>
         </header>
         <div {...stylex.props(deckStyles.toolbar)}>
-          <label {...stylex.props(deckStyles.field, deckStyles.grow)}>
+          <label {...stylex.props(deckStyles.field, deckStyles.searchField)}>
             Search decks
             <Input value={filter} onValueChange={setFilter} placeholder="Name, tags, or notes" />
           </label>
@@ -133,18 +136,7 @@ function DecksPage() {
           </section>
         ) : null}
         <DeckGrid decks={shown} />
-        {creating ? (
-          <DeckMetadataEditor
-            title="Create deck"
-            initial={emptyDeck}
-            onClose={() => setCreating(false)}
-            onSave={(metadata) => {
-              const id = mutations.create(metadata);
-              setCreating(false);
-              openDeck(id);
-            }}
-          />
-        ) : null}
+        {creatingDeck && <CreateDeckDialog onClose={() => setCreatingDeck(false)} />}
       </div>
     </PageFrame>
   );

@@ -482,8 +482,6 @@ const styles = stylex.create({
     ':is([data-slot="sidebar-wrapper"]:has(> [data-variant="inset"]) > *)': {
       margin: "8px",
       borderRadius: uiRadii.xl,
-      backgroundColor: uiColors.card,
-      boxShadow: `0 0 0 1px ${uiColors.border}`,
     },
   },
   trigger: {

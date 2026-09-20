@@ -9,13 +9,10 @@ import { gzipSync } from "node:zlib";
 import type { SpoilerVisibilitySnapshot } from "@mooligan/domain/spoilers";
 import type { JSONType } from "zod";
 
-import {
-  openPriceDatabase,
-  readPrintingPrices,
-  readPriceSnapshot,
-} from "../electron/prices/database.ts";
+import { openPriceDatabase } from "../electron/prices/database.ts";
+import { readPrintingPrices, readPriceSnapshot } from "@mooligan/catalog/prices";
 import { importPrices, type PriceImportSource } from "../electron/prices/import.ts";
-import { compileScryfallQuery } from "../electron/catalog/scryfall-query.ts";
+import { compileScryfallQuery } from "@mooligan/catalog/scryfall-query";
 
 const uuidA = "00000000-0000-4000-8000-000000000001";
 const uuidB = "00000000-0000-4000-8000-000000000002";

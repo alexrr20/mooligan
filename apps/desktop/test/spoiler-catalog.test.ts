@@ -17,7 +17,7 @@ import {
   createCatalogDetailQuery,
   createCatalogImageSourceQuery,
   createCatalogSetSymbolSourceQuery,
-} from "../electron/catalog/detail.ts";
+} from "@mooligan/catalog/detail";
 import { importCatalog } from "../electron/catalog/import.ts";
 import {
   createCatalogQuery,
@@ -25,7 +25,8 @@ import {
   createCatalogSpoilerRevealSummariesQuery,
   createCatalogUpcomingPrintingsQuery,
   createCatalogUpcomingQuery,
-} from "../electron/catalog/query.ts";
+} from "@mooligan/catalog/query";
+import { createCatalogVisibilityQuery } from "@mooligan/catalog/visibility";
 
 const PROTECTED: SpoilerVisibilitySnapshot = {
   currentDate: "2026-08-19",
@@ -131,6 +132,20 @@ void test("catalog reads enforce spoiler visibility before any card data crosses
       const resolveRoot = createCatalogRootSetQuery(database);
       const revealSummaries = createCatalogSpoilerRevealSummariesQuery(database);
       const symbolSource = createCatalogSetSymbolSourceQuery(database);
+      const isVisible = createCatalogVisibilityQuery(database);
+
+      assert.equal(isVisible("old-reprint", PROTECTED), true);
+      assert.equal(isVisible("secret-card", PROTECTED), false);
+      assert.equal(isVisible("missing-card", PROTECTED), false);
+      assert.equal(
+        isVisible("secret-card", { ...PROTECTED, revealedPrintingIds: ["secret-card"] }),
+        true,
+      );
+      assert.equal(
+        isVisible("secret-treatment", { ...PROTECTED, revealedRootSetIds: ["set-future"] }),
+        true,
+      );
+      assert.equal(isVisible("secret-card", { ...PROTECTED, policy: "show" }), true);
 
       assert.deepEqual(list(undefined, PROTECTED), {
         cards: [assertionCard("old-reprint", "Returning Card", "old")],
