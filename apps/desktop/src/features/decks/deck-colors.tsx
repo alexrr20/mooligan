@@ -1,10 +1,9 @@
 import type { Deck } from "@mooligan/domain/decks";
 import * as stylex from "@stylexjs/stylex";
-import { useQueries } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotionConfig } from "motion/react";
 
 import { ManaSymbol } from "../cards/oracle-text";
-import { catalogCardDetailQueryOptions } from "../cards/use-card-detail";
 
 export function DeckColors({ deck, compact = false }: { deck: Deck; compact?: boolean }) {
   const reduceMotion = useReducedMotionConfig() ?? false;
@@ -12,16 +11,16 @@ export function DeckColors({ deck, compact = false }: { deck: Deck; compact?: bo
   const entries = commanders.length
     ? commanders
     : deck.entries.filter(({ section }) => section !== "maybeboard");
-  const ids = [...new Set(entries.map(({ printingId }) => printingId))];
-  const queries = useQueries({
-    queries: ids.map((id) => catalogCardDetailQueryOptions(window.catalog.detail, id)),
+  const ids = [...new Set(entries.map(({ printingId }) => printingId))].sort();
+  const { data: colors } = useQuery({
+    queryKey: ["catalog", "colors", ids],
+    queryFn: () => window.catalog.colors(ids),
+    enabled: ids.length > 0,
+    retry: 1,
+    staleTime: Infinity,
   });
-  const ready = queries.length > 0 && queries.every(({ data }) => data?.status === "visible");
-  const identity = new Set(
-    queries.flatMap(({ data }) =>
-      data?.status === "visible" ? data.detail.card.colorIdentity : [],
-    ),
-  );
+  const ready = colors != null;
+  const identity = new Set(colors);
   const symbols = (["W", "U", "B", "R", "G"] as const).filter((color) => identity.has(color));
 
   return (

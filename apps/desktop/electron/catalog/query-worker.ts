@@ -5,6 +5,7 @@ import { CollectionLotSchema } from "@mooligan/domain/collection";
 import * as z from "zod";
 
 import {
+  createCatalogColorsQuery,
   createCatalogQuery,
   createCatalogRootSetQuery,
   createCatalogSpoilerRevealSummariesQuery,
@@ -43,6 +44,7 @@ const collectionProjection = createCollectionProjection(database);
 collectionProjection.replace(startup.data.collectionLots);
 const listCatalog = createCatalogQuery(database);
 const listCollection = createCollectionQuery(database);
+const queryColors = createCatalogColorsQuery(database);
 const queryDetail = createCatalogDetailQuery(database);
 const queryImageSource = createCatalogImageSourceQuery(database);
 const queryRootSet = createCatalogRootSetQuery(database);
@@ -88,6 +90,13 @@ port.on("message", (message) => {
 
   try {
     switch (operation.type) {
+      case "colors":
+        response = {
+          id,
+          operation: operation.type,
+          result: queryColors(operation.printingIds, operation.visibility),
+        };
+        break;
       case "collection-list":
         response = {
           id,

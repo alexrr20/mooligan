@@ -56,6 +56,7 @@ export const desktopApi = {
   },
 
   catalog: {
+    colors: (printingIds) => ipcRenderer.invoke("catalog:colors", printingIds),
     cancelQuery: (requestId) =>
       ipcRenderer.invoke("catalog:cancel-query", z.uuid().parse(requestId)),
     detail: (printingId) => ipcRenderer.invoke("catalog:detail", printingId),

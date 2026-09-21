@@ -4,7 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import { ReadableStream as TransferableReadableStream } from "node:stream/web";
 import { Worker } from "node:worker_threads";
 
-import { CatalogSnapshotSchema, type CatalogSnapshot } from "@mooligan/domain/catalog";
+import { CatalogSnapshotSchema, type CatalogSnapshot, type Color } from "@mooligan/domain/catalog";
 import type { CatalogImageDescriptor } from "@mooligan/domain/catalog-detail";
 import type { CatalogListPage, CatalogUpcomingPrintingPage } from "@mooligan/domain/catalog-search";
 import {
@@ -36,6 +36,7 @@ import { CatalogQueryQueue } from "./query-queue";
 import { validateCatalogPrintingId } from "@mooligan/catalog/detail";
 import { catalogSchemaVersion } from "@mooligan/catalog/import";
 import {
+  CatalogColorPrintingIdsSchema,
   parseCatalogQueryWorkerResponse,
   validateCatalogListRequest,
 } from "@mooligan/catalog/query";
@@ -80,6 +81,7 @@ let getCollectionProjectionLots: (() => CollectionLot[]) | undefined;
 let isCollectionProjectionReady: (() => boolean) | undefined;
 let onCollectionProjectionInvalidated: (() => void) | undefined;
 type CatalogQueryResult =
+  | Color[]
   | CatalogListPage
   | CollectionListPage
   | CatalogPrintingResult
@@ -139,6 +141,14 @@ export function registerCatalogIpc(options: CatalogIpcOptions) {
         queryCatalog({ request: validRequest, type: "list", visibility }, signal),
       );
     });
+  });
+  ipcMain.handle("catalog:colors", async (event, printingIds) => {
+    assertTrustedSender(event);
+    const ids = CatalogColorPrintingIdsSchema.parse(printingIds);
+    await catalogQueriesAvailable;
+    return queryCatalogWithStableVisibility((visibility) =>
+      queryCatalog({ type: "colors", printingIds: ids, visibility }),
+    );
   });
   ipcMain.handle("catalog:detail", async (event, printingId) => {
     assertTrustedSender(event);
@@ -578,6 +588,9 @@ async function queryCatalogWithStableVisibility<Result>(
   return (await readWithStableCatalogVisibility(readCatalogVisibilitySnapshot, query)).result;
 }
 
+function queryCatalog(
+  operation: Extract<CatalogQueryOperation, { type: "colors" }>,
+): Promise<Color[] | null>;
 function queryCatalog(
   operation: Extract<CatalogQueryOperation, { type: "detail" }>,
 ): Promise<CatalogPrintingResult | null>;

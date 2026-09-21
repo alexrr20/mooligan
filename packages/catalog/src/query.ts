@@ -1,5 +1,6 @@
 import type { CatalogDatabase as DatabaseSync } from "./database.ts";
 
+import { ColorSchema } from "@mooligan/domain/catalog";
 import { CatalogImageDescriptorSchema } from "@mooligan/domain/catalog-detail";
 import {
   CatalogCardSummarySchema,
@@ -40,7 +41,14 @@ import { compileScryfallQuery } from "@mooligan/catalog/scryfall-query";
 
 const catalogPrintingIdSchema = z.string().min(1).max(128);
 
+export const CatalogColorPrintingIdsSchema = z.array(catalogPrintingIdSchema).max(100_000);
+
 const CatalogQueryOperationSchema = z.discriminatedUnion("type", [
+  z.object({
+    printingIds: CatalogColorPrintingIdsSchema,
+    type: z.literal("colors"),
+    visibility: SpoilerVisibilitySnapshotSchema,
+  }),
   z.object({
     printingId: catalogPrintingIdSchema,
     type: z.literal("detail"),
@@ -84,6 +92,11 @@ const CatalogQueryWorkerRequestSchema = z.object({
 export type CatalogQueryWorkerRequest = z.infer<typeof CatalogQueryWorkerRequestSchema>;
 
 const CatalogQueryWorkerResponseSchema = z.union([
+  z.object({
+    id: z.number().int().positive(),
+    operation: z.literal("colors"),
+    result: z.array(ColorSchema).nullable(),
+  }),
   z.object({
     id: z.number().int().positive(),
     operation: z.literal("detail"),
@@ -133,6 +146,7 @@ const CatalogQueryWorkerResponseSchema = z.union([
     error: z.string().min(1),
     id: z.number().int().positive(),
     operation: z.enum([
+      "colors",
       "detail",
       "collection-list",
       "image-source",
@@ -690,4 +704,23 @@ export function validateCatalogUpcomingPrintingRequest(
   value: CatalogUpcomingPrintingRequest | JSONType | undefined,
 ): CatalogUpcomingPrintingRequest {
   return CatalogUpcomingPrintingRequestSchema.parse(value ?? {});
+}
+
+export function createCatalogColorsQuery(database: DatabaseSync) {
+  const select = database.prepare(
+    `SELECT CASE WHEN cards.id IS NOT NULL AND ${catalogVisibilitySql}
+                 THEN COALESCE(json_extract(cards.json, '$.color_identity'), '[]')
+                 ELSE NULL END AS colors
+     FROM json_each(?) AS requested
+     LEFT JOIN cards ON cards.id = requested.value`,
+  );
+  return (printingIds: readonly string[], visibility: SpoilerVisibilitySnapshot) => {
+    const rows = z
+      .array(z.object({ colors: z.string().nullable() }))
+      .parse(select.all(...catalogVisibilityArguments(visibility), JSON.stringify(printingIds)));
+    if (!rows.length || rows.some(({ colors }) => colors === null)) return null;
+    return [
+      ...new Set(rows.flatMap(({ colors }) => z.array(ColorSchema).parse(JSON.parse(colors!)))),
+    ];
+  };
 }

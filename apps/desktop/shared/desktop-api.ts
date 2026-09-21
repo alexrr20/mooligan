@@ -1,4 +1,4 @@
-import type { CatalogSnapshot } from "@mooligan/domain/catalog";
+import type { CatalogSnapshot, Color } from "@mooligan/domain/catalog";
 import type { ExchangeRates, PriceStatus, PrintingPrices } from "@mooligan/domain/market";
 import type {
   CatalogListPage,
@@ -129,6 +129,7 @@ export type DesktopApi = {
     signOut: () => Promise<AuthSnapshot>;
   };
   catalog: {
+    colors: (printingIds: string[]) => Promise<Color[] | null>;
     cancelQuery: (requestId: string) => Promise<void>;
     detail: (printingId: string) => Promise<CatalogPrintingResult | null>;
     download: () => Promise<CatalogStatus>;

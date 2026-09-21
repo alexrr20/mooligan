@@ -148,24 +148,34 @@ export class MobileAccount<Workspace extends LocalWorkspace> {
     return this.#run(async () => {
       this.#set({ busy: true, error: null });
       const pending = this.#registry.beginRestore();
-      let temporary: Workspace | undefined;
+      const runtime: WorkspaceRuntime = {
+        ...pending,
+        sync: null,
+        syncIssue: null,
+        workspaces: this.#registry.workspaces(),
+      };
+      let restored: Workspace | undefined;
       try {
-        temporary = await this.#open({
-          ...pending,
-          sync: null,
-          syncIssue: null,
-          workspaces: this.#registry.workspaces(),
-        });
-        await restore(temporary);
-        await temporary.close();
-        temporary = undefined;
+        restored = await this.#open(runtime);
+        await restore(restored);
         this.#registry.activateRestore(pending.workspaceId);
-        this.#selectedAccountId = this.#snapshot.auth.user?.id ?? null;
-        await this.#account.workspaceActivated();
       } catch (error) {
-        await temporary?.close();
-        this.#registry.cancelRestore(pending.workspaceId);
+        try {
+          await restored?.close();
+        } finally {
+          this.#registry.cancelRestore(pending.workspaceId);
+        }
         throw error;
+      }
+
+      // Adopt the verified store so activation cannot fail while reopening SQLite.
+      const previous = this.#snapshot.workspace;
+      this.#setWorkspace({ ...runtime, workspaces: this.#registry.workspaces() }, restored);
+      this.#selectedAccountId = this.#snapshot.auth.user?.id ?? null;
+      try {
+        await this.#account.workspaceActivated();
+      } finally {
+        await previous?.close();
       }
     });
   }
@@ -242,7 +252,12 @@ export class MobileAccount<Workspace extends LocalWorkspace> {
     this.#set({ workspace: null, connected: false });
     await current.workspace?.close();
     const workspace = await this.#open(runtime);
-    this.#set({ runtime, workspace });
+    this.#setWorkspace(runtime, workspace);
+  }
+
+  #setWorkspace(runtime: WorkspaceRuntime, workspace: Workspace) {
+    this.#stopConnection?.();
+    this.#set({ runtime, workspace, connected: false });
     this.#stopConnection = workspace.observeConnection((connected) => this.#set({ connected }));
   }
 
