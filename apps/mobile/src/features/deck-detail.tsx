@@ -16,6 +16,7 @@ import { CatalogSearch } from "./search";
 import { DeckMetadataForm } from "./decks";
 import { AddDeckCard } from "./card-detail";
 import { finishes } from "./collection";
+import { DeckCost } from "./deck-cost";
 
 export default function DeckDetailScreen() {
   const { deckId } = useLocalSearchParams<{ deckId: string }>();
@@ -84,6 +85,7 @@ function DeckEditor({ deck }: { deck: Deck }) {
         {deck.notes && <Copy>{deck.notes}</Copy>}
         {deck.tags.length > 0 && <Copy>{deck.tags.join(" · ")}</Copy>}
       </Panel>
+      <DeckCost entries={deck.entries} />
       <Choice
         label="Deck actions"
         value={mode}
