@@ -18,6 +18,7 @@ import { DeckImportExport } from "./deck-import-export";
 import { DeckHeader } from "./deck-header";
 import { DeckMetadataEditor } from "./deck-metadata-editor";
 import { DeckStats } from "./deck-stats";
+import { DeckCost } from "./deck-cost";
 import { summarizeDeck } from "@mooligan/workspace/client/deck-summary";
 import { useDeckMutations } from "./use-decks";
 
@@ -64,6 +65,7 @@ export function DeckDetail({
       {action.error ? <DeckMessage error>{action.error.message}</DeckMessage> : null}
       {deck.notes ? <p {...stylex.props(deckStyles.notes)}>{deck.notes}</p> : null}
       <DeckStats summary={summary} />
+      <DeckCost entries={deck.entries} />
       {queries.some((query) => query.isError) ? (
         <DeckMessage error>
           Some local card details could not be read.{" "}
