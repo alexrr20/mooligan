@@ -5,6 +5,7 @@ import { ReadableStream as TransferableReadableStream } from "node:stream/web";
 import { Worker } from "node:worker_threads";
 
 import { CatalogSnapshotSchema, type CatalogSnapshot, type Color } from "@mooligan/domain/catalog";
+import { DeckCostRequestSchema, type DeckCost } from "@mooligan/domain/deck-cost";
 import type { CatalogImageDescriptor } from "@mooligan/domain/catalog-detail";
 import type { CatalogListPage, CatalogUpcomingPrintingPage } from "@mooligan/domain/catalog-search";
 import {
@@ -81,6 +82,7 @@ let getCollectionProjectionLots: (() => CollectionLot[]) | undefined;
 let isCollectionProjectionReady: (() => boolean) | undefined;
 let onCollectionProjectionInvalidated: (() => void) | undefined;
 type CatalogQueryResult =
+  | DeckCost
   | Color[]
   | CatalogListPage
   | CollectionListPage
@@ -153,6 +155,14 @@ export function registerCatalogIpc(options: CatalogIpcOptions) {
   ipcMain.handle("catalog:detail", async (event, printingId) => {
     assertTrustedSender(event);
     return queryCatalogPrintingDetail(printingId);
+  });
+  ipcMain.handle("catalog:deck-cost", async (event, value) => {
+    assertTrustedSender(event);
+    const request = DeckCostRequestSchema.parse(value);
+    await catalogQueriesAvailable;
+    return queryCatalogWithStableVisibility((visibility) =>
+      queryCatalog({ type: "deck-cost", request, visibility }),
+    );
   });
   ipcMain.handle("catalog:validate-collection-printing", async (event, value) => {
     assertTrustedSender(event);
@@ -588,6 +598,9 @@ async function queryCatalogWithStableVisibility<Result>(
   return (await readWithStableCatalogVisibility(readCatalogVisibilitySnapshot, query)).result;
 }
 
+function queryCatalog(
+  operation: Extract<CatalogQueryOperation, { type: "deck-cost" }>,
+): Promise<DeckCost>;
 function queryCatalog(
   operation: Extract<CatalogQueryOperation, { type: "colors" }>,
 ): Promise<Color[] | null>;

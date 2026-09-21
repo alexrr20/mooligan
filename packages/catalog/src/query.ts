@@ -1,6 +1,7 @@
 import type { CatalogDatabase as DatabaseSync } from "./database.ts";
 
 import { ColorSchema } from "@mooligan/domain/catalog";
+import { DeckCostRequestSchema, DeckCostSchema } from "@mooligan/domain/deck-cost";
 import { CatalogImageDescriptorSchema } from "@mooligan/domain/catalog-detail";
 import {
   CatalogCardSummarySchema,
@@ -44,6 +45,11 @@ const catalogPrintingIdSchema = z.string().min(1).max(128);
 export const CatalogColorPrintingIdsSchema = z.array(catalogPrintingIdSchema).max(100_000);
 
 const CatalogQueryOperationSchema = z.discriminatedUnion("type", [
+  z.object({
+    request: DeckCostRequestSchema,
+    type: z.literal("deck-cost"),
+    visibility: SpoilerVisibilitySnapshotSchema,
+  }),
   z.object({
     printingIds: CatalogColorPrintingIdsSchema,
     type: z.literal("colors"),
@@ -92,6 +98,11 @@ const CatalogQueryWorkerRequestSchema = z.object({
 export type CatalogQueryWorkerRequest = z.infer<typeof CatalogQueryWorkerRequestSchema>;
 
 const CatalogQueryWorkerResponseSchema = z.union([
+  z.object({
+    id: z.number().int().positive(),
+    operation: z.literal("deck-cost"),
+    result: DeckCostSchema,
+  }),
   z.object({
     id: z.number().int().positive(),
     operation: z.literal("colors"),
@@ -146,6 +157,7 @@ const CatalogQueryWorkerResponseSchema = z.union([
     error: z.string().min(1),
     id: z.number().int().positive(),
     operation: z.enum([
+      "deck-cost",
       "colors",
       "detail",
       "collection-list",

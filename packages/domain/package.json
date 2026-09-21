@@ -11,6 +11,7 @@
     "./catalog-download": "./src/catalog-download.ts",
     "./catalog-search": "./src/catalog-search.ts",
     "./collection": "./src/collection.ts",
+    "./deck-cost": "./src/deck-cost.ts",
     "./decks": "./src/decks.ts",
     "./lists": "./src/lists.ts",
     "./market": "./src/market.ts",

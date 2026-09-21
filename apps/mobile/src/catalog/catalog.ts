@@ -15,6 +15,7 @@ import {
 } from "@mooligan/catalog/query";
 import { createCollectionProjection } from "@mooligan/catalog/collection-projection";
 import { createCollectionQuery } from "@mooligan/catalog/collection-query";
+import { createDeckCostQuery } from "@mooligan/catalog/deck-cost";
 import { createCatalogVisibilityQuery } from "@mooligan/catalog/visibility";
 import {
   initializePriceDatabase,
@@ -51,6 +52,7 @@ function catalogQueries(database: ReturnType<typeof openCatalogDatabase>) {
   return {
     isVisible: createCatalogVisibilityQuery(database),
     detail: createCatalogDetailQuery(database),
+    deckCost: createDeckCostQuery(database),
     image: createCatalogImageSourceQuery(database),
     list: createCatalogQuery(database),
     collection: createCollectionQuery(database),

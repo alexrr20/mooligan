@@ -20,6 +20,7 @@ import {
   createCatalogSetSymbolSourceQuery,
 } from "@mooligan/catalog/detail";
 import { createCollectionQuery } from "@mooligan/catalog/collection-query";
+import { createDeckCostQuery } from "@mooligan/catalog/deck-cost";
 import {
   createCollectionProjection,
   parseCollectionProjectionWorkerRequest,
@@ -46,6 +47,7 @@ const listCatalog = createCatalogQuery(database);
 const listCollection = createCollectionQuery(database);
 const queryColors = createCatalogColorsQuery(database);
 const queryDetail = createCatalogDetailQuery(database);
+const queryDeckCost = createDeckCostQuery(database);
 const queryImageSource = createCatalogImageSourceQuery(database);
 const queryRootSet = createCatalogRootSetQuery(database);
 const querySetSymbolSource = createCatalogSetSymbolSourceQuery(database);
@@ -90,6 +92,13 @@ port.on("message", (message) => {
 
   try {
     switch (operation.type) {
+      case "deck-cost":
+        response = {
+          id,
+          operation: operation.type,
+          result: queryDeckCost(operation.request, operation.visibility),
+        };
+        break;
       case "colors":
         response = {
           id,
