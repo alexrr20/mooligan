@@ -21,20 +21,19 @@ import {
   createCatalogDetailQuery,
   createCatalogImageSourceQuery,
   validateCatalogPrintingId,
-} from "../electron/catalog/detail.ts";
+} from "@mooligan/catalog/detail";
 import {
-  compactCatalogName,
   importCatalog,
   readGzipJsonLines,
-  resolveCatalogSets,
   type CatalogImportWorkerMessage,
 } from "../electron/catalog/import.ts";
+import { compactCatalogName, resolveCatalogSets } from "@mooligan/catalog/import";
 import {
   createCatalogQuery,
   type CatalogQueryWorkerResponse,
   validateCatalogListRequest,
   validateCatalogUpcomingPrintingRequest,
-} from "../electron/catalog/query.ts";
+} from "@mooligan/catalog/query";
 import {
   reconcileCatalogSearchDraft,
   validateCatalogSearch,

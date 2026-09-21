@@ -7,7 +7,7 @@ import { useState, type RefObject } from "react";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../components/ui/dialog";
 import { DeckMessage, deckStyles } from "./deck-controls";
-import { exportDeckText, resolveDeckText } from "./deck-transfer";
+import { exportDeckText, resolveDeckText } from "@mooligan/workspace/client/deck-transfer";
 import { useDeckMutations } from "./use-decks";
 
 export function DeckImportExport({

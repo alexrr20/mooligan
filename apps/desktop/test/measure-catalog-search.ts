@@ -1,6 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 
-import { createCatalogQuery } from "../electron/catalog/query.ts";
+import { createCatalogQuery } from "@mooligan/catalog/query";
 
 const [path, ...queries] = process.argv.slice(2);
 if (!path) throw new Error("Pass the path to catalog/cards.sqlite, followed by optional queries.");

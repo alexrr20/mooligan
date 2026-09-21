@@ -42,7 +42,14 @@ export function PrintingViewer({ faces, printing }: PrintingViewerProps) {
 
   return (
     <figure {...stylex.props(styles.figure)}>
-      <PrintingImage variant="detail">
+      <PrintingImage
+        finish={
+          readyImage && !printing.isDigital && printing.finishes?.length === 1
+            ? printing.finishes[0]
+            : undefined
+        }
+        variant="detail"
+      >
         <AnimatePresence initial={false}>
           {readyImage ? (
             <motion.img

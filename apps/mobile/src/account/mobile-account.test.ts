@@ -309,3 +309,19 @@ test("a SecureStore startup failure leaves local data open and can be retried", 
   await fixture.account.signIn();
   expect(fixture.account.getSnapshot().auth.status).toBe("signed-in");
 });
+
+test("restoring while signed in leaves the new workspace unbound across session refresh", async () => {
+  const fixture = new Fixture();
+  await fixture.signIn();
+  const bound = fixture.account.getSnapshot().runtime.workspaceId;
+  await fixture.account.restoreWorkspace(async () => undefined);
+  const restored = fixture.account.getSnapshot().runtime.workspaceId;
+  expect(restored).not.toBe(bound);
+  expect(fixture.registry.accountId(restored)).toBeNull();
+  await fixture.account.refresh();
+  expect(fixture.account.getSnapshot().runtime).toMatchObject({
+    workspaceId: restored,
+    sync: null,
+  });
+  expect(fixture.registry.accountId(bound)).toBe(user.id);
+});

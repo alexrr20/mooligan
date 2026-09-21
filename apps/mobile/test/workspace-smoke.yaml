@@ -1,0 +1,49 @@
+appId: com.mooligan.mobile
+---
+- launchApp
+- openLink: com.mooligan.app://decks
+- tapOn:
+    text: "Open|Abrir"
+    optional: true
+- assertVisible: Built for your next game.
+- tapOn: Create deck
+- tapOn:
+    id: Deck name
+- inputText: Mobile parity smoke
+- hideKeyboard
+- tapOn: Create deck
+- assertVisible: Mobile parity smoke
+- assertVisible: 0 owned.*
+- stopApp
+- launchApp
+- openLink: com.mooligan.app://decks
+- tapOn:
+    text: "Open|Abrir"
+    optional: true
+- assertVisible: Mobile parity smoke
+- tapOn: Open deck
+- tapOn: Cards
+- tapOn: Duplicate, archive, or delete
+- tapOn: Duplicate deck
+- assertVisible: Mobile parity smoke \(copy\)
+- tapOn: Cards
+- tapOn: Duplicate, archive, or delete
+- tapOn: Delete deck
+- tapOn: Delete
+- assertVisible: Mobile parity smoke
+- tapOn: Open deck
+- tapOn: Cards
+- tapOn: Duplicate, archive, or delete
+- tapOn: Delete deck
+- tapOn: Delete
+- assertNotVisible: Mobile parity smoke
+- openLink: com.mooligan.app://collection
+- tapOn:
+    text: "Open|Abrir"
+    optional: true
+- assertVisible: Your collection
+- openLink: com.mooligan.app://settings
+- tapOn:
+    text: "Open|Abrir"
+    optional: true
+- assertVisible: ACCOUNT AND SYNC

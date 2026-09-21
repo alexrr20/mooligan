@@ -17,7 +17,7 @@ import {
 import {
   createWorkspaceBackup,
   restoreWorkspaceBackup,
-} from "../src/features/workspace/workspace-backup.ts";
+} from "@mooligan/workspace/client/workspace-backup";
 
 void test("price providers belong to each Workspace and survive backup restore and event replay", async () => {
   const source = await createStorePromise({

@@ -2,100 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import type { CatalogListPage } from "@mooligan/domain/catalog-search";
-import { QueryClient, QueryObserver } from "@tanstack/react-query";
 
 import { CatalogQueryQueue } from "../electron/catalog/query-queue.ts";
 import { readCatalogRequest } from "../src/features/catalog/catalog-request.ts";
-import { globalSearchCatalogQueryOptions } from "../src/features/search/global-search-query.ts";
 import { settleCatalogRequest, unwrapCatalogRequest } from "../shared/catalog-request.ts";
 
 const emptyPage: CatalogListPage = { cards: [], hasMore: false, total: 0 };
-
-void test("typing waits 160 ms and only dispatches the latest input", async (context) => {
-  context.mock.timers.enable({ apis: ["setTimeout"] });
-  const client = new QueryClient();
-  const reads: string[] = [];
-  const options = (query: string) =>
-    globalSearchCatalogQueryOptions(
-      async (request) => {
-        reads.push(request.query ?? "");
-        return emptyPage;
-      },
-      query,
-      "workspace",
-      "protected",
-      Boolean(query),
-    );
-  const observer = new QueryObserver(client, options("l"));
-  const stop = observer.subscribe(() => undefined);
-  try {
-    context.mock.timers.tick(100);
-    observer.setOptions(options("light"));
-    context.mock.timers.tick(100);
-    observer.setOptions(options("lightning bolt"));
-    context.mock.timers.tick(159);
-    await flush();
-    assert.deepEqual(reads, []);
-    context.mock.timers.tick(1);
-    await flush();
-    assert.deepEqual(reads, ["lightning bolt"]);
-    assert.equal(observer.getCurrentResult().status, "success");
-
-    observer.setOptions(options("dragon"));
-    observer.setOptions(options(""));
-    context.mock.timers.tick(160);
-    await flush();
-    assert.deepEqual(reads, ["lightning bolt"]);
-  } finally {
-    stop();
-    client.clear();
-  }
-});
-
-void test("obsolete searches leave the worker queue while unrelated reads and the latest search finish", async (context) => {
-  context.mock.timers.enable({ apis: ["setTimeout"] });
-  const queue = new CatalogQueryQueue();
-  const first = deferred<CatalogListPage>();
-  const reads: string[] = [];
-  const client = new QueryClient();
-  const options = (query: string) =>
-    globalSearchCatalogQueryOptions(
-      (request, signal) =>
-        queue.run(async () => {
-          reads.push(request.query ?? "");
-          return request.query === "l" ? first.promise : emptyPage;
-        }, signal),
-      query,
-      "workspace",
-      "protected",
-      true,
-    );
-  const observer = new QueryObserver(client, options("l"));
-  const stop = observer.subscribe(() => undefined);
-  try {
-    context.mock.timers.tick(160);
-    await flush();
-    const detail = queue.run(async () => {
-      reads.push("detail");
-      return "card details";
-    });
-    for (const query of ["li", "light", "lightning bolt"]) {
-      observer.setOptions(options(query));
-      context.mock.timers.tick(160);
-      await flush();
-    }
-    assert.deepEqual(reads, ["l"]);
-    first.resolve(emptyPage);
-    assert.equal(await detail, "card details");
-    await flush();
-    assert.deepEqual(reads, ["l", "detail", "lightning bolt"]);
-    assert.equal(observer.getCurrentResult().status, "success");
-  } finally {
-    first.resolve(emptyPage);
-    stop();
-    client.clear();
-  }
-});
 
 void test("worker failure clears waiting reads and the queue accepts new work", async () => {
   const queue = new CatalogQueryQueue();

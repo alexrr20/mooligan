@@ -1,0 +1,72 @@
+/* The shell remains the only scroller; these timelines never change layout. */
+[data-deck-plate] {
+  animation: deck-header-appear linear both;
+  animation-timeline: scroll(nearest block);
+  animation-range: 0px 48px;
+}
+
+[data-deck-compact-title] {
+  animation: deck-header-condense linear both;
+  animation-timeline: scroll(nearest block);
+  animation-range: 80px 160px;
+}
+
+[data-deck-heading],
+[data-deck-art] {
+  animation: deck-header-disappear linear both;
+  animation-timeline: scroll(nearest block);
+  animation-range: 0px 140px;
+}
+
+[data-deck-heading] {
+  transform-origin: left top;
+  animation-name: deck-header-recede;
+}
+
+[data-reduced-motion="true"] [data-deck-heading] {
+  animation-name: deck-header-disappear;
+}
+
+[data-reduced-motion="true"] [data-deck-compact-title] {
+  animation-name: deck-header-appear;
+}
+
+@keyframes deck-header-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes deck-header-disappear {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes deck-header-condense {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes deck-header-recede {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}

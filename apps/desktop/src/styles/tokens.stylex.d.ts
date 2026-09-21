@@ -5,6 +5,7 @@ export declare const colors: VarGroup<{
 }>;
 
 export declare const pageInsets: VarGroup<{
+  shellInline: string;
   top: string;
   inline: string;
 }>;

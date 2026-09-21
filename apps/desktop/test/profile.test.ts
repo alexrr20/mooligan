@@ -20,11 +20,11 @@ import { canAccessProfile } from "../src/features/profile/profile-access.ts";
 import {
   changeProfileBanner,
   featureProfileCard,
-} from "../src/features/profile/profile-mutations.ts";
+} from "@mooligan/workspace/client/profile-mutations";
 import {
   createWorkspaceBackup,
   restoreWorkspaceBackup,
-} from "../src/features/workspace/workspace-backup.ts";
+} from "@mooligan/workspace/client/workspace-backup";
 
 const signedIn: AuthSnapshot = {
   pendingAuth: false,

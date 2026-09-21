@@ -7,8 +7,8 @@ import {
   exportDeckText,
   parseDeckText,
   resolveDeckText,
-} from "../src/features/decks/deck-transfer.ts";
-import { summarizeDeck } from "../src/features/decks/deck-summary.ts";
+} from "@mooligan/workspace/client/deck-transfer";
+import { summarizeDeck } from "@mooligan/workspace/client/deck-summary";
 
 void test("deck text reads Arena, MTGO, foil markers and every deck section", () => {
   const parsed = parseDeckText(
@@ -147,6 +147,30 @@ void test("commanders belong to the main deck display and stats without counting
     ["main", "commander", "partner"],
   );
   assert.equal(summary.spells, 99);
+  assert.deepEqual(
+    summary.mainboardGroups.map(({ type, quantity, entries }) => [
+      type,
+      quantity,
+      entries.map(({ id }) => id),
+    ]),
+    [
+      ["Commander", 2, ["commander", "partner"]],
+      ["Instant", 98, ["main"]],
+    ],
+  );
+  assert.deepEqual(
+    summary.cardTypes.map(({ type, quantity }) => [type, quantity]),
+    [
+      ["Planeswalker", 0],
+      ["Battle", 0],
+      ["Creature", 0],
+      ["Sorcery", 0],
+      ["Instant", 99],
+      ["Artifact", 0],
+      ["Enchantment", 0],
+      ["Land", 0],
+    ],
+  );
   assert.equal(summary.unknown, 1);
   assert.equal(summary.averageMana, 1);
   assert.equal(summary.total, 103);
@@ -154,7 +178,120 @@ void test("commanders belong to the main deck display and stats without counting
   assert.equal(entries.find(({ id }) => id === "commander")?.section, "commander");
 });
 
-const visible: CatalogPrintingResult = {
+void test("type counts include each front-face type and ignore back faces and subtypes", () => {
+  const printing: CatalogPrintingResult = {
+    ...visible,
+    detail: {
+      ...visible.detail,
+      card: {
+        ...visible.detail.card,
+        faces: [
+          { name: "Front", typeLine: "Artifact Creature — Land" },
+          { name: "Back", typeLine: "Enchantment Land" },
+        ],
+      },
+    },
+  };
+  const summary = summarizeDeck(
+    [{ id: "main", printingId: "known", finish: "nonfoil", quantity: 3, section: "mainboard" }],
+    [],
+    new Map([["known", printing]]),
+  );
+  assert.deepEqual(
+    summary.cardTypes.filter(({ quantity }) => quantity > 0),
+    [
+      { type: "Creature", quantity: 3 },
+      { type: "Artifact", quantity: 3 },
+    ],
+  );
+  assert.equal(summary.lands, 0);
+  assert.deepEqual(
+    summary.mainboardGroups.map(({ type }) => type),
+    ["Creature"],
+  );
+});
+
+void test("main deck type groups keep every entry once, including commanders and unavailable cards", () => {
+  const printings = new Map<string, CatalogPrintingResult | null>();
+  const entries: DeckEntry[] = [];
+  for (const [id, typeLine] of [
+    ["walker", "Legendary Planeswalker — Test"],
+    ["battle", "Battle — Siege"],
+    ["creature", "Artifact Creature — Land"],
+    ["enchantment-creature", "Enchantment Creature — Nymph"],
+    ["sorcery", "Sorcery"],
+    ["instant", "Instant"],
+    ["artifact", "Artifact — Equipment"],
+    ["enchantment", "Enchantment"],
+    ["land", "Artifact Land"],
+    ["other", "Conspiracy"],
+  ] as const) {
+    printings.set(id, {
+      ...visible,
+      detail: {
+        ...visible.detail,
+        card: {
+          ...visible.detail.card,
+          faces: [
+            { name: id, typeLine },
+            { name: "Back", typeLine: "Land" },
+          ],
+        },
+      },
+    });
+    entries.push({ id, printingId: id, section: "mainboard", quantity: 2, finish: "nonfoil" });
+  }
+  printings.set("protected", {
+    status: "protected",
+    printingId: "protected",
+    releasedOn: "2099-01-01",
+    release: {
+      code: "future",
+      name: "Future",
+      nextReleaseOn: "2099-01-01",
+      rootSetId: "future",
+      symbol: { setId: "future" },
+    },
+  });
+  entries.push(
+    { id: "commander", printingId: "creature", section: "commander", quantity: 1, finish: "foil" },
+    { id: "missing", printingId: "missing", section: "mainboard", quantity: 3, finish: "nonfoil" },
+    {
+      id: "protected",
+      printingId: "protected",
+      section: "mainboard",
+      quantity: 1,
+      finish: "nonfoil",
+    },
+    { id: "side", printingId: "instant", section: "sideboard", quantity: 4, finish: "nonfoil" },
+  );
+  const summary = summarizeDeck(entries, [], printings);
+  assert.deepEqual(
+    summary.mainboardGroups.map(({ type, quantity }) => [type, quantity]),
+    [
+      ["Commander", 1],
+      ["Planeswalker", 2],
+      ["Battle", 2],
+      ["Creature", 4],
+      ["Sorcery", 2],
+      ["Instant", 2],
+      ["Artifact", 2],
+      ["Enchantment", 2],
+      ["Land", 2],
+      ["Other", 6],
+    ],
+  );
+  assert.deepEqual(
+    summary.mainboardGroups.flatMap(({ entries }) => entries.map(({ id }) => id)).sort(),
+    entries
+      .filter(({ section }) => section !== "sideboard")
+      .map(({ id }) => id)
+      .sort(),
+  );
+  assert.deepEqual(summarizeDeck([], [], printings).mainboardGroups, []);
+});
+
+const visible = {
   status: "visible",
   visibility: { reason: "released" },
   detail: {
@@ -181,4 +318,4 @@ const visible: CatalogPrintingResult = {
     legalities: [],
     siblingPrintings: [],
   },
-};
+} satisfies CatalogPrintingResult;

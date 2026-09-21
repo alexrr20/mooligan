@@ -5,6 +5,7 @@ import { CollectionLotSchema } from "@mooligan/domain/collection";
 import * as z from "zod";
 
 import {
+  createCatalogColorsQuery,
   createCatalogQuery,
   createCatalogRootSetQuery,
   createCatalogSpoilerRevealSummariesQuery,
@@ -12,17 +13,17 @@ import {
   createCatalogUpcomingQuery,
   parseCatalogQueryWorkerRequest,
   type CatalogQueryWorkerResponse,
-} from "./query.ts";
+} from "@mooligan/catalog/query";
 import {
   createCatalogDetailQuery,
   createCatalogImageSourceQuery,
   createCatalogSetSymbolSourceQuery,
-} from "./detail.ts";
-import { createCollectionQuery } from "./collection-query.ts";
+} from "@mooligan/catalog/detail";
+import { createCollectionQuery } from "@mooligan/catalog/collection-query";
 import {
   createCollectionProjection,
   parseCollectionProjectionWorkerRequest,
-} from "./collection-projection.ts";
+} from "@mooligan/catalog/collection-projection";
 
 const port = parentPort;
 const startup = z
@@ -43,6 +44,7 @@ const collectionProjection = createCollectionProjection(database);
 collectionProjection.replace(startup.data.collectionLots);
 const listCatalog = createCatalogQuery(database);
 const listCollection = createCollectionQuery(database);
+const queryColors = createCatalogColorsQuery(database);
 const queryDetail = createCatalogDetailQuery(database);
 const queryImageSource = createCatalogImageSourceQuery(database);
 const queryRootSet = createCatalogRootSetQuery(database);
@@ -88,6 +90,13 @@ port.on("message", (message) => {
 
   try {
     switch (operation.type) {
+      case "colors":
+        response = {
+          id,
+          operation: operation.type,
+          result: queryColors(operation.printingIds, operation.visibility),
+        };
+        break;
       case "collection-list":
         response = {
           id,

@@ -2,6 +2,7 @@
 import { Button } from "@base-ui/react/button";
 import { useRender } from "@base-ui/react/use-render";
 import * as stylex from "@stylexjs/stylex";
+import type { StyleXStyles } from "@stylexjs/stylex";
 
 import {
   useEffect,
@@ -185,15 +186,20 @@ export function SidebarMenuButton({
 
 export function SidebarMenuAction({
   className,
+  style,
   showOnHover = false,
   ...props
-}: Omit<Button.Props, "className"> & { className?: string; showOnHover?: boolean }) {
+}: Omit<Button.Props, "className" | "style"> & {
+  className?: string;
+  style?: StyleXStyles;
+  showOnHover?: boolean;
+}) {
   return (
     <Button
       {...props}
       data-sidebar="menu-action"
       className={[
-        stylex.props(styles.action, showOnHover && styles.hoverAction).className,
+        stylex.props(styles.action, showOnHover && styles.hoverAction, style).className,
         className,
       ]
         .filter(Boolean)
@@ -252,7 +258,7 @@ export function SidebarMenuSubButton({
     ref,
     props: {
       ...props,
-      children: <span {...stylex.props(styles.text)}>{children}</span>,
+      children: <span {...stylex.props(styles.text, styles.subText)}>{children}</span>,
       "data-sidebar": "menu-sub-button",
       "aria-current": isActive ? "page" : undefined,
       className: [
@@ -353,6 +359,7 @@ const styles = stylex.create({
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   },
+  subText: { flex: 1 },
   action: {
     position: "absolute",
     right: "6px",

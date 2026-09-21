@@ -1,6 +1,6 @@
 # Mooligan product context
 
-Mooligan is a desktop app for managing Magic: The Gathering cards, decks, and
+Mooligan is a desktop and mobile app for managing Magic: The Gathering cards, decks, and
 collections. The current implementation is an early foundation, not the limit
 of the intended product.
 
@@ -12,7 +12,7 @@ Mooligan should make it easy to:
 - Track a personal card collection.
 - Build, organize, and manage decks.
 - Use the core product locally without an internet connection or an account.
-- Optionally sign in to sync data with a future mobile app and share selected
+- Optionally sign in to sync data across devices and share selected
   content with friends.
 
 This describes the product direction rather than a committed feature roadmap.
@@ -163,7 +163,7 @@ prices from several markets; the supplier and market remain distinct.
 
 ### Local and offline first
 
-The desktop app's core card, collection, and deck workflows must work without
+Both apps' core card, collection, and deck workflows must work without
 an account or a continuous network connection. User-owned data should remain
 available locally. Network services may update reference data or add optional
 capabilities, but should not become a prerequisite for normal use.
@@ -180,11 +180,11 @@ Sync and sharing must be layered on top of a complete local experience. A
 service outage or missing login should not prevent users from viewing or
 editing their local cards, decks, and collection.
 
-### Plan for mobile without building it prematurely
+### Keep desktop and mobile aligned
 
-Domain concepts and data ownership decisions should leave a clear path to a
-future mobile client and synchronization. Do not implement speculative mobile
-or sync infrastructure before its requirements are known.
+Desktop and mobile should share domain concepts, Workspace events, and feature
+behavior. Adapt navigation and controls to each Device while keeping core
+workflows available locally. Add capabilities when their requirements are known.
 
 ## Decision guidance
 
@@ -196,7 +196,7 @@ When evaluating product or architecture choices:
 3. Keep authentication, sharing, and synchronization outside the critical path
    of offline use.
 4. Preserve clear, reusable domain concepts where that supports both desktop
-   and a future mobile client, without adding abstractions solely for possible
+   and mobile, without adding abstractions solely for possible
    future needs.
 
 ## Non-goals
@@ -209,6 +209,7 @@ When evaluating product or architecture choices:
 
 ## Current state
 
-The repository currently contains an early Electron desktop app, a small
-Cloudflare API, shared domain types, and an offline Scryfall catalog import and
-search foundation. See `README.md` for current setup and implementation details.
+The repository contains Electron desktop and Expo mobile apps, a Cloudflare
+API, shared domain types, shared offline catalog and price logic, and a synced
+LiveStore Workspace. Mobile and desktop share Collection and Deck editing,
+spoiler decisions, Profile choices, and Workspace backup contracts. See `README.md` for current setup and implementation details.

@@ -17,15 +17,17 @@ import {
   createCatalogDetailQuery,
   createCatalogImageSourceQuery,
   createCatalogSetSymbolSourceQuery,
-} from "../electron/catalog/detail.ts";
+} from "@mooligan/catalog/detail";
 import { importCatalog } from "../electron/catalog/import.ts";
 import {
+  createCatalogColorsQuery,
   createCatalogQuery,
   createCatalogRootSetQuery,
   createCatalogSpoilerRevealSummariesQuery,
   createCatalogUpcomingPrintingsQuery,
   createCatalogUpcomingQuery,
-} from "../electron/catalog/query.ts";
+} from "@mooligan/catalog/query";
+import { createCatalogVisibilityQuery } from "@mooligan/catalog/visibility";
 
 const PROTECTED: SpoilerVisibilitySnapshot = {
   currentDate: "2026-08-19",
@@ -41,6 +43,7 @@ void test("catalog reads enforce spoiler visibility before any card data crosses
   const cards = [
     card({
       id: "old-reprint",
+      color_identity: ["W", "U"],
       name: "Returning Card",
       oracle_id: "oracle-returning",
       released_at: "2025-01-01",
@@ -59,6 +62,7 @@ void test("catalog reads enforce spoiler visibility before any card data crosses
     }),
     card({
       id: "secret-card",
+      color_identity: ["U", "B"],
       image_uris: {
         art_crop: "https://cards.scryfall.io/art_crop/front/secret.jpg",
         normal: "https://cards.scryfall.io/normal/front/secret.jpg",
@@ -123,6 +127,19 @@ void test("catalog reads enforce spoiler visibility before any card data crosses
 
     const database = new DatabaseSync(path);
     try {
+      const colors = createCatalogColorsQuery(database);
+      assert.deepEqual(colors(["old-reprint", "old-reprint"], PROTECTED), ["W", "U"]);
+      assert.equal(colors([], PROTECTED), null);
+      assert.equal(colors(["old-reprint", "missing-card"], PROTECTED), null);
+      assert.equal(colors(["old-reprint", "secret-card"], PROTECTED), null);
+      assert.deepEqual(colors(["future-reprint"], { ...PROTECTED, policy: "show" }), []);
+      assert.deepEqual(
+        colors(["old-reprint", "secret-card"], {
+          ...PROTECTED,
+          revealedPrintingIds: ["secret-card"],
+        }),
+        ["W", "U", "B"],
+      );
       const list = createCatalogQuery(database);
       const detail = createCatalogDetailQuery(database);
       const image = createCatalogImageSourceQuery(database);
@@ -131,6 +148,20 @@ void test("catalog reads enforce spoiler visibility before any card data crosses
       const resolveRoot = createCatalogRootSetQuery(database);
       const revealSummaries = createCatalogSpoilerRevealSummariesQuery(database);
       const symbolSource = createCatalogSetSymbolSourceQuery(database);
+      const isVisible = createCatalogVisibilityQuery(database);
+
+      assert.equal(isVisible("old-reprint", PROTECTED), true);
+      assert.equal(isVisible("secret-card", PROTECTED), false);
+      assert.equal(isVisible("missing-card", PROTECTED), false);
+      assert.equal(
+        isVisible("secret-card", { ...PROTECTED, revealedPrintingIds: ["secret-card"] }),
+        true,
+      );
+      assert.equal(
+        isVisible("secret-treatment", { ...PROTECTED, revealedRootSetIds: ["set-future"] }),
+        true,
+      );
+      assert.equal(isVisible("secret-card", { ...PROTECTED, policy: "show" }), true);
 
       assert.deepEqual(list(undefined, PROTECTED), {
         cards: [assertionCard("old-reprint", "Returning Card", "old")],

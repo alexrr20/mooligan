@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { openPriceDatabase } from "../electron/prices/database.ts";
-import { updateExchangeRates } from "../electron/prices/exchange-rates.ts";
+import { updateExchangeRates } from "@mooligan/catalog/exchange-rates";
 
 void test("exchange rates persist and retain their last good snapshot on network failure", async (context) => {
   const database = openPriceDatabase(":memory:");

@@ -27,7 +27,7 @@ import {
   validateCollectionSearch,
 } from "../features/collection/collection-state";
 import { useCollection } from "../features/collection/use-collection";
-import { useCollectionViewPreference } from "../features/collection/use-collection-view-preference";
+import { useViewPreference } from "../features/preferences/use-view-preference";
 import { SearchForm } from "../features/search/search-controls";
 import { colors } from "../styles/tokens.stylex.js";
 
@@ -40,7 +40,7 @@ function CollectionPage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const collection = useCollection(search);
-  const { setView, view } = useCollectionViewPreference();
+  const { setView, view } = useViewPreference("mooligan.collection.view");
   const activeFilters = Boolean(
     search.query || search.set || search.finish || search.language || search.condition,
   );
@@ -323,23 +323,23 @@ const styles = stylex.create({
   addLink: {
     display: "inline-flex",
     alignItems: "center",
-    gap: "8px",
-    padding: "10px 16px",
+    gap: "6px",
+    padding: "6px 10px",
     borderRadius: "8px",
     backgroundColor: colors.accent,
     color: "#052e16",
-    fontSize: "14px",
+    fontSize: "13px",
     fontWeight: 500,
     textDecoration: "none",
     ":hover": { backgroundColor: "#30d77d" },
     ":focus-visible": { outline: `2px solid ${colors.accent}`, outlineOffset: "4px" },
   },
-  totals: { display: "flex", flexWrap: "wrap", gap: "24px 56px", margin: "4px 0 8px" },
-  stat: { display: "flex", flexDirection: "column-reverse", gap: "6px" },
-  statLabel: { fontSize: "13px", color: "#989b92" },
+  totals: { display: "flex", flexWrap: "wrap", gap: "12px 28px", margin: 0 },
+  stat: { display: "flex", flexDirection: "column-reverse", gap: "4px" },
+  statLabel: { fontSize: "12px", color: "#989b92" },
   statValue: {
     margin: 0,
-    fontSize: "30px",
+    fontSize: "22px",
     fontWeight: 400,
     letterSpacing: "-.025em",
     fontVariantNumeric: "tabular-nums",
@@ -349,10 +349,10 @@ const styles = stylex.create({
     display: "flex",
     alignItems: "end",
     flexWrap: "wrap",
-    gap: "12px",
-    marginTop: "18px",
+    gap: "8px",
+    marginTop: "10px",
   },
-  filter: { minWidth: "110px", maxWidth: "100%", display: "grid", gap: "7px" },
+  filter: { minWidth: 0, maxWidth: "100%", display: "grid", gap: "4px" },
   controlLabel: { color: "#989b92", fontSize: "12px", paddingLeft: "2px" },
   message: {
     minHeight: "300px",

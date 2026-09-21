@@ -2,7 +2,6 @@
 // https://www.fluidfunctionalism.com/r/base/sidebar.json
 import { Button } from "@base-ui/react/button";
 import { Dialog } from "@base-ui/react/dialog";
-import { ScrollArea } from "@base-ui/react/scroll-area";
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useRef, type ComponentProps } from "react";
 
@@ -229,34 +228,16 @@ export function Sidebar({
   );
 }
 
-export interface SidebarContentProps extends ComponentProps<"div"> {
-  viewportClassName?: string;
-}
-export function SidebarContent({
-  className,
-  viewportClassName,
-  children,
-  ...props
-}: SidebarContentProps) {
+export function SidebarContent({ className, children, ...props }: ComponentProps<"div">) {
   return (
-    <ScrollArea.Root
-      {...stylex.props(styles.scroll)}
-      className={[stylex.props(styles.scroll).className, className].filter(Boolean).join(" ")}
+    <div
+      {...props}
+      data-sidebar="content"
+      {...stylex.props(styles.content)}
+      className={[stylex.props(styles.content).className, className].filter(Boolean).join(" ")}
     >
-      <ScrollArea.Viewport
-        {...stylex.props(styles.viewport)}
-        className={[stylex.props(styles.viewport).className, viewportClassName]
-          .filter(Boolean)
-          .join(" ")}
-      >
-        <ScrollArea.Content {...props} data-sidebar="content" {...stylex.props(styles.content)}>
-          {children}
-        </ScrollArea.Content>
-      </ScrollArea.Viewport>
-      <ScrollArea.Scrollbar {...stylex.props(styles.scrollbar)}>
-        <ScrollArea.Thumb {...stylex.props(styles.thumb)} />
-      </ScrollArea.Scrollbar>
-    </ScrollArea.Root>
+      {children}
+    </div>
   );
 }
 
@@ -364,25 +345,13 @@ const styles = stylex.create({
   transparent: { opacity: 0 },
   instant: { transitionDuration: "0ms" },
   drawerClose: { display: "flex", justifyContent: "flex-end", padding: "8px 8px 0" },
-  scroll: { position: "relative", minHeight: 0, width: "100%", flex: "1 1 0", overflow: "hidden" },
-  viewport: {
-    height: "100%",
-    width: "100%",
-    overscrollBehavior: "contain",
-    scrollbarWidth: "thin",
-    ":focus-visible": { outline: "2px solid #6b97ff", outlineOffset: "-2px" },
-  },
-  content: { display: "flex", flexDirection: "column", minWidth: 0, width: "100%" },
-  scrollbar: {
+  content: {
     display: "flex",
-    justifyContent: "center",
-    width: "6px",
-    margin: "4px 2px",
-    borderRadius: "4px",
-    opacity: 0,
-    transition: "opacity 120ms ease",
-    "[data-hovering]": { opacity: 1 },
-    "[data-scrolling]": { opacity: 1 },
+    flexDirection: "column",
+    flex: "1 1 0",
+    minHeight: 0,
+    minWidth: 0,
+    width: "100%",
+    overflow: "clip",
   },
-  thumb: { width: "4px", borderRadius: "4px", backgroundColor: uiColors.foreground10 },
 });

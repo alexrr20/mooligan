@@ -15,7 +15,7 @@ import {
 import {
   createWorkspaceBackup,
   restoreWorkspaceBackup,
-} from "../src/features/workspace/workspace-backup.ts";
+} from "@mooligan/workspace/client/workspace-backup";
 
 void test("backup v7 reads collection, deck, and spoiler state from LiveStore", async () => {
   const store = await openStore("backup-source");

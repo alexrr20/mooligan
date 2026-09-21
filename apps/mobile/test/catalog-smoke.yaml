@@ -1,0 +1,78 @@
+appId: com.mooligan.mobile
+---
+- stopApp
+- launchApp
+- openLink: com.mooligan.app:///
+- tapOn:
+    text: "Open|Abrir"
+    optional: true
+- runFlow:
+    when:
+      visible: Download card catalog
+    commands:
+      - tapOn: Download card catalog
+      - extendedWaitUntil:
+          visible: Search cards
+          timeout: 600000
+- tapOn:
+    id: Search cards
+- eraseText
+- inputText: Lightning Bolt
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: Open Lightning Bolt
+    direction: DOWN
+- tapOn: Open Lightning Bolt
+- scrollUntilVisible:
+    element:
+      text: Oracle text
+    direction: DOWN
+- tapOn: Oracle text
+- tapOn: Add to collection
+- scrollUntilVisible:
+    element:
+      text: Add copies
+    direction: DOWN
+- tapOn: Add copies
+- assertVisible: 1 copy now in this holding.
+- openLink: com.mooligan.app://collection
+- tapOn:
+    text: "Open|Abrir"
+    optional: true
+- runFlow:
+    when:
+      visible: Grid
+    commands:
+      - tapOn: Grid
+      - tapOn: List
+- assertVisible: Open 1 copy of Lightning Bolt
+- tapOn: Edit holding
+- scrollUntilVisible:
+    element:
+      id: Quantity
+    direction: DOWN
+- tapOn:
+    id: Quantity
+- eraseText
+- inputText: "2"
+- scrollUntilVisible:
+    element:
+      text: Save holding
+    direction: DOWN
+- tapOn: Save holding
+- stopApp
+- launchApp
+- openLink: com.mooligan.app://collection
+- tapOn:
+    text: "Open|Abrir"
+    optional: true
+- assertVisible: Open 2 copies of Lightning Bolt
+- tapOn: Edit holding
+- scrollUntilVisible:
+    element:
+      text: Delete holding
+    direction: DOWN
+- tapOn: Delete holding
+- tapOn: Delete
+- assertNotVisible: Open 2 copies of Lightning Bolt

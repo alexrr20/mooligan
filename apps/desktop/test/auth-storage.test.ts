@@ -51,11 +51,11 @@ void test("authentication state is asynchronously encrypted, atomically replaced
   }
 });
 
-void test("version 1 authentication state is upgraded without losing the session", async () => {
+void test("unsupported authentication state is rejected without rewriting the file", async () => {
   const directory = await mkdtemp(join(tmpdir(), "mooligan-auth-storage-v1-"));
   const path = join(directory, "auth-state");
   const safeStorage = new FakeSafeStorage();
-  const legacyState = {
+  const unsupportedState = {
     cookies: {
       "better-auth.session_token": { expiresAt: 1_800_000, value: "session-secret" },
     },
@@ -64,19 +64,13 @@ void test("version 1 authentication state is upgraded without losing the session
   };
 
   try {
-    await writeFile(path, await safeStorage.encryptStringAsync(JSON.stringify(legacyState)));
+    const ciphertext = await safeStorage.encryptStringAsync(JSON.stringify(unsupportedState));
+    await writeFile(path, ciphertext);
     const encryptionsBeforeLoad = safeStorage.encryptions;
 
-    assert.deepEqual(await new EncryptedAuthStorage(path, safeStorage).load(), {
-      ...legacyState,
-      user: null,
-      version: 2,
-    });
-    assert.equal(safeStorage.encryptions, encryptionsBeforeLoad + 1);
-
-    const encryptionsBeforeReopen = safeStorage.encryptions;
-    assert.equal((await new EncryptedAuthStorage(path, safeStorage).load()).version, 2);
-    assert.equal(safeStorage.encryptions, encryptionsBeforeReopen);
+    await assert.rejects(new EncryptedAuthStorage(path, safeStorage).load(), ProtectedStorageError);
+    assert.equal(safeStorage.encryptions, encryptionsBeforeLoad);
+    assert.deepEqual(await readFile(path), ciphertext);
   } finally {
     await rm(directory, { force: true, recursive: true });
   }

@@ -13,7 +13,10 @@ import { PrintingImage } from "../cards/printing-image";
 import { useCollection } from "../collection/use-collection";
 import { useCatalogSearch } from "../search/use-catalog-search";
 import { useWorkspaceLiveStore } from "../workspace/workspace-store-context";
-import { changeProfileBanner, featureProfileCard } from "./profile-mutations";
+import {
+  changeProfileBanner,
+  featureProfileCard,
+} from "@mooligan/workspace/client/profile-mutations";
 import { profileStyles as styles } from "./profile-styles";
 
 export type ProfileSelection = { kind: "banner" } | { kind: "card"; slot: number };

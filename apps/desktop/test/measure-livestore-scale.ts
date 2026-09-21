@@ -17,7 +17,7 @@ import { parseWorkspaceBackup, serializeWorkspaceBackup } from "../electron/work
 import {
   createWorkspaceBackup,
   restoreWorkspaceBackup,
-} from "../src/features/workspace/workspace-backup.ts";
+} from "@mooligan/workspace/client/workspace-backup";
 
 const collectionLotCount = 100_000;
 const spoilerDecisionCount = 100_000;
