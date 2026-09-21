@@ -1,6 +1,12 @@
 import * as z from "zod";
 
-import { ColorSchema, FinishSchema, LegalityStatusSchema, RaritySchema } from "./catalog.ts";
+import {
+  ColorSchema,
+  FinishSchema,
+  LegalityStatusSchema,
+  ManaTypeSchema,
+  RaritySchema,
+} from "./catalog.ts";
 import type { ScryfallCardDownload } from "./catalog-download.ts";
 
 const idSchema = z.string().min(1);
@@ -24,8 +30,10 @@ export const CatalogCardIdentitySchema = z.object({
   hasSharedIdentity: z.boolean(),
   id: idSchema,
   keywords: z.array(textSchema),
+  layout: textSchema.optional(),
   manaValue: z.number().nonnegative().optional(),
   name: textSchema,
+  producedMana: z.array(ManaTypeSchema),
 });
 export type CatalogCardIdentity = z.infer<typeof CatalogCardIdentitySchema>;
 
@@ -225,7 +233,12 @@ export function normalizeScryfallCardDetail(
     id: selectedCard.oracle_id ?? selectedCard.id,
     keywords: selectedCard.keywords ?? [],
     name: selectedCard.name,
+    producedMana: (selectedCard.produced_mana ?? []).flatMap((value) => {
+      const mana = ManaTypeSchema.safeParse(value);
+      return mana.success ? [mana.data] : [];
+    }),
   };
+  if (selectedCard.layout) card.layout = selectedCard.layout;
   if (selectedCard.cmc !== undefined) {
     card.manaValue = selectedCard.cmc;
   }

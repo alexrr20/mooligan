@@ -136,6 +136,30 @@ void test("Scryfall cards reject unsupported rarities during ingestion", () => {
   );
 });
 
+void test("produced mana accepts Scryfall extras but normalizes only supported mana types", () => {
+  const selected = ScryfallCardDownloadSchema.parse({
+    ...scryfallCard(),
+    produced_mana: ["2", "W", "U", "B", "R", "G", "C", "T"],
+  });
+  assert.deepEqual(normalizeScryfallCardDetail(selected).card.producedMana, [
+    "W",
+    "U",
+    "B",
+    "R",
+    "G",
+    "C",
+  ]);
+  assert.deepEqual(
+    normalizeScryfallCardDetail({ ...selected, produced_mana: ["2", "T"] }).card.producedMana,
+    [],
+  );
+  assert.deepEqual(normalizeScryfallCardDetail(scryfallCard()).card.producedMana, []);
+  assert.equal(
+    ScryfallCardDownloadSchema.safeParse({ ...selected, produced_mana: ["invalid"] }).success,
+    false,
+  );
+});
+
 void test("a single-face card normalizes card, printing, and sibling facts", () => {
   const selected = scryfallCard({
     artist: "Christopher Rush",

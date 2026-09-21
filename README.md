@@ -97,6 +97,23 @@ shows main-deck lands, nonlands, and average nonland mana value. Card legality
 labels come from the installed catalog; they are not a full deck-construction
 rules validator.
 
+Mana analysis is available in desktop and mobile deck views. It includes a nonland
+mana curve, averages with and without lands, color pip demand versus land or all
+mana sources, opening-hand land distributions, land availability by turn, and an
+exact/at-least/at-most draw calculator for lands, colored land sources, or individual cards.
+The feature set draws on [Moxfield's mana statistics](https://github.com/moxfield/moxfield-public/wiki/Features)
+and [Archidekt's deck statistics](https://archidekt.com/news/9287631).
+
+Calculations run locally from the installed catalog and update with deck edits.
+Curves and costs include commanders; sources and draw odds use only the main-deck
+library. Modal land backs count as land options. Source counts use Scryfall's
+`produced_mana`, counting each card once per available color, including conditional
+abilities, without inferring fetch targets or tokens. Hybrid pips split between
+colors; Phyrexian pips count as colored. Draw odds use sampling without replacement,
+before mulligans, and do not model tapped lands, color payment, ramp, or land
+sequencing. Protected or unavailable library cards suppress probabilities until
+the data is complete.
+
 Text import accepts quantity/name lists, Arena set and collector numbers, MTGO
 `SB:` lines, and section headings. Check the import before adding it. Unresolved
 names block the import. Text exports include `[printing:ID]` and `[finish:VALUE]`
