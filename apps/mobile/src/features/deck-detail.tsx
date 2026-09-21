@@ -3,6 +3,8 @@ import { useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { deckSections, type Deck, type DeckEntry, type DeckMetadata } from "@mooligan/domain/decks";
 import { summarizeDeck } from "@mooligan/workspace/client/deck-summary";
+import { analyzeDeckMana } from "@mooligan/workspace/client/deck-mana";
+import { DeckManaAnalysis } from "./deck-mana-analysis";
 import {
   exportDeckText,
   resolveDeckText,
@@ -89,6 +91,7 @@ function DeckEditor({ deck }: { deck: Deck }) {
         value={mode}
         options={[
           { value: "cards", label: "Cards" },
+          { value: "mana", label: "Mana analysis" },
           { value: "add", label: "Add cards" },
           { value: "edit", label: "Name, format, tags, and notes" },
           { value: "transfer", label: "Import and export" },
@@ -99,6 +102,9 @@ function DeckEditor({ deck }: { deck: Deck }) {
           setSelected(null);
         }}
       />
+      {mode === "mana" && (
+        <DeckManaAnalysis analysis={analyzeDeckMana(deck.entries, printings ?? new Map())} />
+      )}
       {mode === "edit" && (
         <DeckMetadataForm initial={deck} submit="Save deck" onSave={saveMetadata} />
       )}

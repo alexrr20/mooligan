@@ -1,6 +1,6 @@
 import * as z from "zod";
 
-import { FinishSchema, RaritySchema } from "./catalog.ts";
+import { FinishSchema, ManaTypeSchema, RaritySchema } from "./catalog.ts";
 
 const httpsUrlSchema = z.url().refine((value) => new URL(value).protocol === "https:", {
   message: "Expected an HTTPS URL",
@@ -91,6 +91,7 @@ export const ScryfallCardDownloadSchema = z
     id: z.string().min(1),
     image_uris: ScryfallImageUrisSchema.nullish(),
     keywords: z.array(z.string().min(1)).optional(),
+    layout: z.string().min(1).optional(),
     lang: z.string().min(1).nullish(),
     legalities: z.record(z.string().min(1), ScryfallLegalityStatusSchema).optional(),
     loyalty: z.string().nullish(),
@@ -100,6 +101,7 @@ export const ScryfallCardDownloadSchema = z
     oracle_text: z.string().nullish(),
     oracle_id: z.string().min(1).nullable().optional(),
     power: z.string().nullish(),
+    produced_mana: z.array(ManaTypeSchema).optional(),
     promo: z.boolean().optional(),
     rarity: RaritySchema,
     released_at: z.iso.date().nullish(),

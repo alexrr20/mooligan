@@ -298,6 +298,7 @@ const visible = {
     card: {
       id: "known",
       hasSharedIdentity: false,
+      producedMana: [],
       name: "Known Card",
       colorIdentity: ["R"],
       faces: [{ name: "Known Card", typeLine: "Instant" }],
