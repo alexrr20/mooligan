@@ -233,7 +233,10 @@ export function normalizeScryfallCardDetail(
     id: selectedCard.oracle_id ?? selectedCard.id,
     keywords: selectedCard.keywords ?? [],
     name: selectedCard.name,
-    producedMana: selectedCard.produced_mana ?? [],
+    producedMana: (selectedCard.produced_mana ?? []).flatMap((value) => {
+      const mana = ManaTypeSchema.safeParse(value);
+      return mana.success ? [mana.data] : [];
+    }),
   };
   if (selectedCard.layout) card.layout = selectedCard.layout;
   if (selectedCard.cmc !== undefined) {

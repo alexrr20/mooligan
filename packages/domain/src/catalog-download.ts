@@ -101,7 +101,7 @@ export const ScryfallCardDownloadSchema = z
     oracle_text: z.string().nullish(),
     oracle_id: z.string().min(1).nullable().optional(),
     power: z.string().nullish(),
-    produced_mana: z.array(ManaTypeSchema).optional(),
+    produced_mana: z.array(z.union([ManaTypeSchema, z.enum(["2", "T"])])).optional(),
     promo: z.boolean().optional(),
     rarity: RaritySchema,
     released_at: z.iso.date().nullish(),

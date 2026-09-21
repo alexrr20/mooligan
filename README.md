@@ -100,7 +100,7 @@ rules validator.
 Mana analysis is available in desktop and mobile deck views. It includes a nonland
 mana curve, averages with and without lands, color pip demand versus land or all
 mana sources, opening-hand land distributions, land availability by turn, and an
-exact/at-least/at-most draw calculator for lands, color sources, or individual cards.
+exact/at-least/at-most draw calculator for lands, colored land sources, or individual cards.
 The feature set draws on [Moxfield's mana statistics](https://github.com/moxfield/moxfield-public/wiki/Features)
 and [Archidekt's deck statistics](https://archidekt.com/news/9287631).
 

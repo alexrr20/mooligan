@@ -67,7 +67,7 @@ export function analyzeDeckMana(
         if (isLand || modalLand) color.landSources += entry.quantity;
       }
     }
-    if (isLand) {
+    if (isLand || modalLand) {
       landCount += entry.quantity;
       continue;
     }

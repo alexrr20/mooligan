@@ -144,12 +144,15 @@ void test("modal land backs count as land options; transform backs and Adventure
   assert.equal(analysis.lands, 2);
   assert.equal(analysis.modalLands, 2);
   assert.equal(analysis.nonlandSources, 1);
-  assert.equal(analysis.spellCount, 5);
+  assert.equal(analysis.spellCount, 3);
+  assert.equal(analysis.manaTotal, 10);
+  assert.equal(analysis.averageMana, 10 / 3);
+  assert.equal(analysis.averageWithLands, 10 / 5);
   assert.deepEqual(
     analysis.colors.map((color) => color.pips),
-    [2, 0, 0, 1, 4, 0],
+    [2, 0, 0, 1, 2, 0],
   );
-  assert.equal(analysis.curve[3]?.total, 4);
+  assert.equal(analysis.curve[3]?.total, 2);
   assert.equal(analysis.curve[4]?.nonpermanents, 1);
 });
 
