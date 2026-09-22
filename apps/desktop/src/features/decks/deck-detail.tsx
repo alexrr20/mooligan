@@ -11,7 +11,6 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../com
 import { catalogCardDetailQueryOptions } from "../cards/use-card-detail";
 import { useWorkspaceLiveStore } from "../workspace/workspace-store-context";
 import { DeckActions } from "./deck-actions";
-import { DeckCardPicker } from "./deck-card-picker";
 import { DeckCards } from "./deck-cards";
 import { commanderArt } from "./deck-art";
 import { DeckMessage, deckStyles } from "./deck-controls";
@@ -66,9 +65,11 @@ export function DeckDetail({
         />
       </DeckHeader>
       {action.error ? <DeckMessage error>{action.error.message}</DeckMessage> : null}
-      {deck.notes ? <p {...stylex.props(deckStyles.notes)}>{deck.notes}</p> : null}
-      <DeckStats summary={summary} />
-      <DeckCost entries={deck.entries} />
+      {deck.notes ? <p {...stylex.props(deckStyles.notes, styles.notes)}>{deck.notes}</p> : null}
+      <div {...stylex.props(styles.overview)}>
+        <DeckStats summary={summary} />
+        <DeckCost entries={deck.entries} />
+      </div>
       {queries.some((query) => query.isError) ? (
         <DeckMessage error>
           Some local card details could not be read.{" "}
@@ -92,16 +93,12 @@ export function DeckDetail({
           </Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="cards">
-          <div {...stylex.props(deckStyles.section)}>
-            <DeckCardPicker deckId={deck.id} />
-            <DeckCards
-              deck={deck}
-              printings={printings}
-              summary={summary}
-              onEdit={setEntry}
-              onRemove={(entry) => action.mutate(() => mutations.removeEntry(deck.id, entry.id))}
-            />
-          </div>
+          <DeckCards
+            deck={deck}
+            printings={printings}
+            onEdit={setEntry}
+            onRemove={(entry) => action.mutate(() => mutations.removeEntry(deck.id, entry.id))}
+          />
         </Tabs.Panel>
         <Tabs.Panel value="mana">
           <DeckManaAnalysis analysis={analyzeDeckMana(deck.entries, printings)} />
@@ -159,17 +156,26 @@ export function DeckDetail({
 }
 
 const styles = stylex.create({
-  tabs: { minWidth: 0 },
+  notes: { maxWidth: "68ch", color: "#a6a89d" },
+  overview: {
+    display: "flex",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: "8px 24px",
+    minWidth: 0,
+  },
+  tabs: { minWidth: 0, marginBlockStart: "16px" },
   tabList: {
     display: "flex",
     gap: "24px",
     borderBottomWidth: "1px",
     borderBottomStyle: "solid",
-    borderBottomColor: "#34362f",
+    borderBottomColor: "#25271f",
     marginBottom: "20px",
   },
   tab: {
     color: "#a6a89d",
+    fontSize: "14px",
     backgroundColor: "transparent",
     borderWidth: 0,
     borderBottomWidth: "2px",

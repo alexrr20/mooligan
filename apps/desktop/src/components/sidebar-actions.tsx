@@ -1,3 +1,4 @@
+import { Button } from "@base-ui/react/button";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 
@@ -5,14 +6,78 @@ import { useAuth } from "../features/auth/use-auth";
 import { canAccessProfile } from "../features/profile/profile-access";
 import { useWorkspaceRuntime } from "../features/workspace/workspace-runtime-context";
 import { colors } from "../styles/tokens.stylex.js";
+import type { useCatalogSetup } from "./catalog-setup";
+import { uiColors } from "./ui/theme.stylex";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 
-export function SidebarActions({ onNavigate }: { onNavigate: () => void }) {
+export function SidebarActions({
+  catalog,
+  onNavigate,
+}: {
+  catalog: ReturnType<typeof useCatalogSetup>;
+  onNavigate: () => void;
+}) {
   return (
     <div {...stylex.props(styles.actions)}>
+      <CatalogUpdateButton catalog={catalog} />
       <SettingsButton onNavigate={onNavigate} />
       <ProfileButton onNavigate={onNavigate} />
     </div>
+  );
+}
+
+function CatalogUpdateButton({ catalog }: { catalog: ReturnType<typeof useCatalogSetup> }) {
+  const { state, downloading, updating, progressPercent, progressLabel, download } = catalog;
+  if (state.kind === "checking" || state.kind === "ready") return null;
+
+  const label = downloading
+    ? `${updating ? "Updating" : "Downloading"} card catalog: ${progressPercent === null ? progressLabel : `${progressPercent}%`}`
+    : state.kind === "error"
+      ? "Retry catalog download"
+      : updating
+        ? "Update card catalog"
+        : "Download card catalog";
+
+  return (
+    <TooltipProvider delay={450} closeDelay={0} timeout={350}>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              {...stylex.props(
+                styles.button,
+                styles.catalogButton,
+                state.kind === "error" && styles.catalogError,
+              )}
+              aria-label={label}
+              disabled={downloading}
+              focusableWhenDisabled
+              data-window-no-drag
+              onClick={() => void download()}
+            />
+          }
+        >
+          {downloading ? (
+            <span {...stylex.props(styles.progress)} aria-hidden="true">
+              {progressPercent === null ? "…" : `${progressPercent}%`}
+            </span>
+          ) : (
+            <svg {...stylex.props(styles.icon)} aria-hidden="true" fill="none" viewBox="0 0 24 24">
+              <path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4" />
+            </svg>
+          )}
+        </TooltipTrigger>
+        <TooltipContent align="end" side="top" sideOffset={9}>
+          {state.kind === "error" ? `${state.message} Click to retry.` : label}
+        </TooltipContent>
+      </Tooltip>
+      <span
+        {...stylex.props(styles.visuallyHidden)}
+        role={state.kind === "error" ? "alert" : "status"}
+      >
+        {state.kind === "error" ? `${state.message} ${label}.` : label}
+      </span>
+    </TooltipProvider>
   );
 }
 
@@ -141,6 +206,27 @@ const styles = stylex.create({
       color: "#0a1710",
       backgroundColor: "#37db82",
     },
+  },
+  catalogButton: {
+    padding: 0,
+    borderWidth: 0,
+    backgroundColor: "transparent",
+    color: colors.accent,
+    cursor: "pointer",
+    "[data-disabled]": { cursor: "default" },
+  },
+  catalogError: { color: uiColors.destructive },
+  progress: { fontSize: "9px", fontVariantNumeric: "tabular-nums", lineHeight: 1 },
+  visuallyHidden: {
+    position: "absolute",
+    width: "1px",
+    height: "1px",
+    padding: 0,
+    margin: "-1px",
+    overflow: "hidden",
+    clipPath: "inset(50%)",
+    whiteSpace: "nowrap",
+    borderWidth: 0,
   },
   initials: {
     fontSize: "7px",

@@ -3,8 +3,7 @@ import { createRootRoute, Outlet, useRouterState } from "@tanstack/react-router"
 import { motion, MotionConfig } from "motion/react";
 
 import { AppSidebar } from "../components/app-sidebar";
-import { SidebarProvider, SidebarInset } from "../components/ui/sidebar";
-import { CatalogSetup } from "../components/catalog-setup";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "../components/ui/sidebar";
 import { useSidebarPreference } from "../features/preferences/use-sidebar-preference";
 import { useMotionPreference } from "../features/preferences/use-motion-preference";
 import { usePriceUpdates } from "../features/prices/price-updates";
@@ -40,6 +39,9 @@ function AppShell() {
           width="15rem"
           persist={false}
         >
+          <div {...stylex.props(styles.sidebarToggle)} data-window-no-drag>
+            <SidebarTrigger />
+          </div>
           <AppSidebar />
           <SidebarInset>
             <div
@@ -60,7 +62,6 @@ function AppShell() {
           </SidebarInset>
         </SidebarProvider>
       </div>
-      <CatalogSetup />
     </MotionConfig>
   );
 }
@@ -82,6 +83,12 @@ const styles = stylex.create({
     width: "88px",
     height: "50px",
     zIndex: 1,
+  },
+  sidebarToggle: {
+    position: "absolute",
+    top: "15px",
+    left: "96px",
+    zIndex: 2,
   },
   main: {
     flex: "1 1 0",

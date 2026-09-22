@@ -120,7 +120,7 @@ export function DeckMetadataEditor({
             />
           ) : null}
           <label {...stylex.props(deckStyles.field)}>
-            Tags, separated by commas
+            Deck labels, separated by commas
             <Input value={tags} onValueChange={setTags} />
           </label>
           <label {...stylex.props(deckStyles.field)}>

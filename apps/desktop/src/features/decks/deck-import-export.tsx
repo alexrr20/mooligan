@@ -47,7 +47,7 @@ export function DeckImportExport({
         <DialogDescription>
           {mode === "import"
             ? "Paste a deck list with quantities and section headings. Imported cards are added to the deck."
-            : "This list includes exact printing and finish references for importing into Mooligan."}
+            : "This list includes exact printing and finish references. Use a workspace backup to preserve card tags and templates."}
         </DialogDescription>
         <label {...stylex.props(deckStyles.field)}>
           {mode === "import" ? "Deck list" : "Exported deck list"}

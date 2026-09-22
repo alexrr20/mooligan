@@ -92,7 +92,7 @@ function DecksPage() {
         <div {...stylex.props(deckStyles.toolbar)}>
           <label {...stylex.props(deckStyles.field, deckStyles.searchField)}>
             Search decks
-            <Input value={filter} onValueChange={setFilter} placeholder="Name, tags, or notes" />
+            <Input value={filter} onValueChange={setFilter} placeholder="Name, labels, or notes" />
           </label>
           <DeckSelect
             label="Status"

@@ -10,6 +10,8 @@ import { deckEntriesQuery, decksQuery, events, workspaceSchema } from "@mooligan
 
 import { deckSlotKey, materializeDecks } from "@mooligan/workspace/client/deck-state";
 
+import { duplicateDeckTags } from "./tag-mutations.ts";
+
 type NewEntry = Omit<DeckEntry, "id">;
 type EntryChange = Partial<NewEntry>;
 
@@ -66,7 +68,7 @@ export function createDeckMutations(
     },
     duplicate(deckId: string) {
       const deck = readDeck(deckId);
-      return create(
+      const duplicateId = create(
         {
           name: `${deck.name.slice(0, 193)} (copy)`,
           formatId: deck.formatId,
@@ -76,6 +78,8 @@ export function createDeckMutations(
         },
         deck.entries,
       );
+      duplicateDeckTags(store, deckId, duplicateId);
+      return duplicateId;
     },
     remove(deckId: string) {
       readDeck(deckId);

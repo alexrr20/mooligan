@@ -13,7 +13,7 @@ const decodeBackup = Schema.decodeUnknownSync(workspaceBackupSchema, {
   onExcessProperty: "error",
 });
 
-void test("backup v7 validation is strict and rejects old versions", () => {
+void test("backup v8 validation is strict and rejects old versions", () => {
   const backup = fixture();
 
   assert.deepEqual(decodeBackup(backup), backup);
@@ -27,7 +27,7 @@ void test("backup v7 validation is strict and rejects old versions", () => {
   );
 });
 
-void test("backup v7 rejects duplicate state and invalid collection values", () => {
+void test("backup v8 rejects duplicate state and invalid collection values", () => {
   const backup = fixture();
 
   assert.throws(() =>
@@ -54,7 +54,7 @@ void test("backup v7 rejects duplicate state and invalid collection values", () 
 });
 
 void test(
-  "backup v7 round trips 100,000 lots and 100,000 spoiler decisions within 50 MiB",
+  "backup v8 round trips 100,000 lots and 100,000 spoiler decisions within 50 MiB",
   { timeout: 60_000 },
   () => {
     const largeBackup = {
@@ -80,7 +80,10 @@ void test(
         policy: "protect" as const,
         resetGeneration: 12,
       },
-      version: 7 as const,
+      cardTags: [],
+      tagAssignments: [],
+      tagTemplates: [],
+      version: 8 as const,
     } satisfies WorkspaceBackup;
     const serialized = JSON.stringify(largeBackup);
 
@@ -115,6 +118,9 @@ function fixture(): WorkspaceBackup {
       policy: "protect",
       resetGeneration: 0,
     },
-    version: 7,
+    cardTags: [],
+    tagAssignments: [],
+    tagTemplates: [],
+    version: 8,
   };
 }

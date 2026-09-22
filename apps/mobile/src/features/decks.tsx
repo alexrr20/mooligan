@@ -125,7 +125,7 @@ export function DeckMetadataForm({
         options={[...new Set([...deckFormats, formatId])].map((value) => ({ value, label: value }))}
         onChange={setFormat}
       />
-      <Field label="Tags, separated by commas" value={tags} onChangeText={setTags} />
+      <Field label="Deck labels, separated by commas" value={tags} onChangeText={setTags} />
       <Field label="Notes" value={notes} onChangeText={setNotes} multiline />
       <Button
         label={submit}

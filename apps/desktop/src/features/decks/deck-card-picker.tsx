@@ -21,17 +21,27 @@ import {
 import { useDeckMutations, useDecks } from "./use-decks";
 
 export function DeckCardPicker({ deckId }: { deckId: string }) {
+  const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string>();
   return (
     <>
-      <DeckCardSearch onSelect={setSelected} />
-      {selected ? (
-        <SelectedCardDialog
-          printingId={selected}
-          deckId={deckId}
-          onClose={() => setSelected(undefined)}
-        />
-      ) : null}
+      <Button size="sm" onClick={() => setOpen(true)}>
+        Add cards
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent style={deckStyles.dialog}>
+          <DialogTitle>Add cards</DialogTitle>
+          <DialogDescription>Search by name or query, then choose a printing.</DialogDescription>
+          <DeckCardSearch onSelect={setSelected} />
+          {selected ? (
+            <SelectedCardDialog
+              printingId={selected}
+              deckId={deckId}
+              onClose={() => setSelected(undefined)}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

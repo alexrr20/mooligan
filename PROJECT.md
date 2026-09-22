@@ -142,6 +142,26 @@ _Avoid_: Locale
 A planned arrangement of cards for play. A deck does not consume, reserve, or
 move copies from the collection.
 
+**Deck label**:
+A label attached to a whole Deck for finding and organizing Decks, such as a
+strategy or theme. It does not classify the Cards inside the Deck.
+
+**Card tag**:
+A named, colored role assigned to a Card. A Card can have several tags, and its
+tags apply to all of its Printings within the tag's scope.
+
+**Deck category**:
+A Card tag scoped to one Deck. Grouping a Deck by tags shows Cards in every
+assigned category, while Deck totals count each copy once.
+
+**Global card tag**:
+A Card tag scoped to the Workspace. Its assignments follow Cards into every
+Deck, including Decks created later.
+
+**Category template**:
+A reusable set of Deck category names and colors. Applying a template adds
+missing categories without replacing existing categories or assigning Cards.
+
 ### Pricing
 
 **Market price**:
