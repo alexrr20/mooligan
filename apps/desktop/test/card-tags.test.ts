@@ -146,6 +146,83 @@ void test("tag groups share rules identity, count copies once per category, and 
   );
 });
 
+void test("tag events enforce scoped Unicode name uniqueness without blocking valid edits", async () => {
+  const store = await openStore("tag-name-conflicts");
+  try {
+    const deckId = createDeckMutations(store, async () => null).create({
+      name: "Roles",
+      formatId: "casual",
+      tags: [],
+      notes: "",
+      archived: false,
+    });
+    const tag = { id: "first", name: "Énergie", color: "sage" as const, deckId: null };
+    store.commit(
+      events.cardTagCreated(tag),
+      events.cardTagCreated({ ...tag, id: "collision", name: "éNERGIE" }),
+      events.cardTagCreated({ ...tag, id: "local", deckId }),
+      events.cardTagCreated({ ...tag, id: "other", name: "Draw" }),
+      events.cardTagChanged({ id: "other", name: "énergie", color: "rose" }),
+    );
+    assert.deepEqual(
+      store.query(cardTagsQuery).map(({ id, name, color }) => [id, name, color]),
+      [
+        ["first", "Énergie", "sage"],
+        ["local", "Énergie", "sage"],
+        ["other", "Draw", "sage"],
+      ],
+    );
+    store.commit(
+      events.cardTagChanged({ id: "first", name: "ÉNERGIE", color: "blue" }),
+      events.cardTagChanged({ id: "other", color: "amber" }),
+    );
+    assert.equal(store.query(cardTagsQuery)[0]?.name, "ÉNERGIE");
+    assert.equal(store.query(cardTagsQuery).find(({ id }) => id === "other")?.color, "amber");
+    store.commit(
+      events.cardTagDeleted({ id: "first" }),
+      events.cardTagCreated({ ...tag, id: "reuse" }),
+    );
+    assert.ok(store.query(cardTagsQuery).some(({ id }) => id === "reuse"));
+
+    const template = {
+      id: "first",
+      name: "Énergie",
+      categories: [{ name: "Draw", color: "blue" as const }],
+    };
+    store.commit(
+      events.tagTemplateSaved(template),
+      events.tagTemplateSaved({ ...template, id: "collision", name: "éNERGIE" }),
+      events.tagTemplateSaved({ ...template, id: "other", name: "Other" }),
+      events.tagTemplateSaved({ ...template, id: "other", name: "énergie" }),
+    );
+    assert.deepEqual(
+      store.query(tagTemplatesQuery).map(({ id, name }) => [id, name]),
+      [
+        ["first", "Énergie"],
+        ["other", "Other"],
+      ],
+    );
+    store.commit(
+      events.tagTemplateSaved({
+        ...template,
+        name: "ÉNERGIE",
+        categories: [{ name: "Ramp", color: "sage" }],
+      }),
+    );
+    assert.equal(store.query(tagTemplatesQuery)[0]?.name, "ÉNERGIE");
+    assert.deepEqual(JSON.parse(store.query(tagTemplatesQuery)[0]!.categories), [
+      { name: "Ramp", color: "sage" },
+    ]);
+    store.commit(
+      events.tagTemplateDeleted({ id: "first" }),
+      events.tagTemplateSaved({ ...template, id: "reuse" }),
+    );
+    assert.ok(store.query(tagTemplatesQuery).some(({ id }) => id === "reuse"));
+  } finally {
+    await store.shutdownPromise();
+  }
+});
+
 void test("sync validates tagging payloads", () => {
   const decode = Schema.decodeUnknownSync(workspaceSyncedEventSchema);
   assert.doesNotThrow(() =>

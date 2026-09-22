@@ -3,7 +3,9 @@ import type { DeckEntry } from "@mooligan/domain/decks";
 import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
 import type { tables } from "../schema.ts";
 
-export function materializeTagTemplates(rows: readonly (typeof tables.tagTemplates.Type)[]) {
+export function materializeTagTemplates(
+  rows: readonly Omit<typeof tables.tagTemplates.Type, "nameKey">[],
+) {
   return rows.map(({ deleted: _deleted, categories, ...template }) =>
     TagTemplateSchema.parse({ ...template, categories: JSON.parse(categories) }),
   );

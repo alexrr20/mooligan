@@ -299,7 +299,11 @@ export function DeckManaAnalysis({ analysis }: { analysis: DeckManaAnalysis }) {
 function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
     <Tooltip>
-      <TooltipTrigger render={<div />} {...stylex.props(styles.metric)}>
+      <TooltipTrigger
+        render={<div role="group" tabIndex={0} />}
+        aria-label={`${value} ${label}. ${detail}`}
+        {...stylex.props(styles.metric)}
+      >
         <dt>{label}</dt>
         <dd {...stylex.props(styles.metricValue)}>{value}</dd>
       </TooltipTrigger>

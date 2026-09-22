@@ -109,7 +109,7 @@ export function useCatalogImageLoading<Element extends HTMLElement, ResetKey>(
     const frames = containerRef.current?.querySelectorAll<HTMLElement>("[data-catalog-image-id]");
     frames?.forEach((frame) => observer.observe(frame));
     return () => frames?.forEach((frame) => observer.unobserve(frame));
-  }, [containerRef, coordinator, enabled, imageIds]);
+  }, [containerRef, coordinator, enabled, imageIds, resetKey]);
 
   return {
     ...active,

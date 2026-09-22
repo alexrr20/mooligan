@@ -6,6 +6,8 @@ import { SyncBackend, validatePushPayload } from "@livestore/common";
 import { EventSequenceNumber } from "@livestore/common/schema";
 import { createStorePromise, type Store } from "@livestore/livestore";
 import {
+  cardTagsQuery,
+  tagTemplatesQuery,
   collectionLotsQuery,
   decksQuery,
   deckEntriesQuery,
@@ -22,6 +24,60 @@ import { Effect, Option, Queue, Scope, Stream, SubscriptionRef } from "effect";
 
 type WorkspaceStore = Store<typeof workspaceSchema>;
 type SyncEvent = Parameters<SyncBackend.SyncBackend["push"]>[0][number];
+
+void test("offline tag and template name collisions converge after creation and renaming", async () => {
+  await Effect.gen(function* () {
+    const server = yield* makeBroadcastSyncServer();
+    const first = yield* Effect.promise(() => openStore("tags-first", server));
+    const second = yield* Effect.promise(() => openStore("tags-second", server));
+    const snapshot = (store: WorkspaceStore) =>
+      JSON.stringify([store.query(cardTagsQuery), store.query(tagTemplatesQuery)]);
+    const categories = [{ name: "Draw", color: "blue" as const }];
+    try {
+      yield* server.disconnect;
+      first.commit(
+        events.cardTagCreated({ id: "first", name: "Énergie", color: "sage", deckId: null }),
+        events.tagTemplateSaved({ id: "first", name: "Énergie", categories }),
+      );
+      second.commit(
+        events.cardTagCreated({ id: "second", name: "éNERGIE", color: "rose", deckId: null }),
+        events.tagTemplateSaved({ id: "second", name: "éNERGIE", categories }),
+      );
+      yield* server.connect;
+      yield* Effect.promise(() =>
+        waitFor(() => server.eventCount() === 4 && snapshot(first) === snapshot(second)),
+      );
+      assert.equal(first.query(cardTagsQuery).length, 1);
+      assert.equal(first.query(tagTemplatesQuery).length, 1);
+
+      for (const id of ["a", "b"])
+        first.commit(
+          events.cardTagCreated({ id, name: id, color: "sage", deckId: null }),
+          events.tagTemplateSaved({ id, name: id, categories }),
+        );
+      yield* Effect.promise(() => waitFor(() => second.query(tagTemplatesQuery).length === 3));
+      yield* server.disconnect;
+      first.commit(
+        events.cardTagChanged({ id: "a", name: "Removal" }),
+        events.tagTemplateSaved({ id: "a", name: "Removal", categories }),
+      );
+      second.commit(
+        events.cardTagChanged({ id: "b", name: "REMOVAL" }),
+        events.tagTemplateSaved({ id: "b", name: "REMOVAL", categories }),
+      );
+      yield* server.connect;
+      yield* Effect.promise(() =>
+        waitFor(() => server.eventCount() === 12 && snapshot(first) === snapshot(second)),
+      );
+      for (const rows of [first.query(cardTagsQuery), first.query(tagTemplatesQuery)]) {
+        assert.equal(rows.length, 3);
+        assert.equal(rows.filter(({ name }) => name.toLowerCase() === "removal").length, 1);
+      }
+    } finally {
+      yield* Effect.promise(() => Promise.all([first.shutdownPromise(), second.shutdownPromise()]));
+    }
+  }).pipe(Effect.scoped, Effect.runPromise);
+});
 
 void test("offline provider toggles sync independently and same-provider conflicts converge", async () => {
   await Effect.gen(function* () {

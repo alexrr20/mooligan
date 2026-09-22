@@ -115,11 +115,25 @@ export async function restoreWorkspaceBackup(store: WorkspaceLiveStore, backup: 
       batch = [];
     }
   }
+  const cardsByTag = new Map<string, string[]>();
   for (const { tagId, cardId } of backup.tagAssignments) {
-    batch.push(events.cardsTagged({ tagId, cardIds: [cardId], assigned: true }));
-    if (batch.length >= RESTORE_EVENT_BATCH_SIZE) {
-      await commitRestoreBatch(store, batch);
-      batch = [];
+    const cardIds = cardsByTag.get(tagId) ?? [];
+    cardIds.push(cardId);
+    cardsByTag.set(tagId, cardIds);
+  }
+  for (const [tagId, cardIds] of cardsByTag) {
+    for (let offset = 0; offset < cardIds.length; offset += 10_000) {
+      batch.push(
+        events.cardsTagged({
+          tagId,
+          cardIds: cardIds.slice(offset, offset + 10_000),
+          assigned: true,
+        }),
+      );
+      if (batch.length >= RESTORE_EVENT_BATCH_SIZE) {
+        await commitRestoreBatch(store, batch);
+        batch = [];
+      }
     }
   }
   for (const template of backup.tagTemplates) {

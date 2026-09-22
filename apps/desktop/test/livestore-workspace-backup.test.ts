@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import { makeInMemoryAdapter } from "@livestore/adapter-web";
 import { createStorePromise } from "@livestore/livestore";
+import { Schema } from "effect";
 import type { WorkspaceBackup } from "@mooligan/workspace/backup";
 import {
   collectionLotsQuery,
@@ -10,6 +11,7 @@ import {
   spoilerDecisionsQuery,
   spoilerSettingsQuery,
   workspaceSchema,
+  workspaceSyncedEventSchema,
 } from "@mooligan/workspace/schema";
 
 import {
@@ -145,6 +147,43 @@ void test("restore verification rejects a non-empty target store", async () => {
     );
 
     await assert.rejects(restoreWorkspaceBackup(store, backupFixture), /could not be verified/u);
+  } finally {
+    await store.shutdownPromise();
+  }
+});
+
+void test("restore groups assignments by tag into bounded events and keeps 500-event batches", async (t) => {
+  const store = await openStore("backup-many-tags");
+  try {
+    const cardTags = Array.from({ length: 500 }, (_, index) => ({
+      id: `tag-${index}`,
+      name: `Tag ${index}`,
+      color: "sage" as const,
+      deckId: null,
+    }));
+    const tagAssignments = Array.from({ length: 10_001 }, (_, index) => [
+      { tagId: "tag-0", cardId: `card-${index}` },
+      { tagId: "tag-1", cardId: `card-${index}` },
+    ]).flat();
+    const commit = t.mock.method(store, "commit");
+    await restoreWorkspaceBackup(store, { ...backupFixture, cardTags, tagAssignments });
+    const batches = commit.mock.calls.map(({ arguments: args }) => args.slice(1));
+    assert.equal(batches[0]?.length, 500);
+    assert.ok(batches.every((batch) => batch.length <= 500));
+    const tagging = batches.flat().flatMap((event) => {
+      const decoded = Schema.decodeUnknownSync(workspaceSyncedEventSchema)(event);
+      return decoded.name === events.cardsTagged.name ? [decoded] : [];
+    });
+    assert.deepEqual(
+      tagging.map(({ args }) => [args.tagId, args.cardIds.length]),
+      [
+        ["tag-0", 10_000],
+        ["tag-0", 1],
+        ["tag-1", 10_000],
+        ["tag-1", 1],
+      ],
+    );
+    assert.equal(createWorkspaceBackup(store).tagAssignments.length, tagAssignments.length);
   } finally {
     await store.shutdownPromise();
   }

@@ -93,7 +93,23 @@ export function DeckCards({
     () => [...images].flatMap(([id, image]) => (image ? [id] : [])),
     [images],
   );
-  const imageLoading = useCatalogImageLoading(containerRef, imageIds, visual, visual, "240px 0px");
+  const imageResetKey = JSON.stringify([
+    deck.id,
+    view,
+    groupBy,
+    activeFilter,
+    includeGlobal,
+    deck.entries,
+    available.map(({ id, name }) => [id, name]),
+    [...allIds].map((id) => [id, byCard.get(id)?.map((tag) => tag.id)]),
+  ]);
+  const imageLoading = useCatalogImageLoading(
+    containerRef,
+    imageIds,
+    imageResetKey,
+    visual,
+    "240px 0px",
+  );
 
   return (
     <div ref={containerRef} data-deck-view={view} {...stylex.props(styles.sections)}>
