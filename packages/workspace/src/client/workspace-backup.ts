@@ -6,6 +6,9 @@ import {
   type WorkspaceBackupCollectionLot,
 } from "@mooligan/workspace/backup";
 import {
+  cardTagsQuery,
+  tagAssignmentsQuery,
+  tagTemplatesQuery,
   collectionLotsQuery,
   decksQuery,
   deckEntriesQuery,
@@ -25,8 +28,13 @@ import {
 
 import { materializeDecks } from "@mooligan/workspace/client/deck-state";
 
+import { materializeTagTemplates } from "./tag-state.ts";
+
 type WorkspaceLiveStore = Store<typeof workspaceSchema>;
 type RestoreEvent =
+  | ReturnType<typeof events.cardTagCreated>
+  | ReturnType<typeof events.cardsTagged>
+  | ReturnType<typeof events.tagTemplateSaved>
   | ReturnType<typeof events.priceCurrencyChanged>
   | ReturnType<typeof events.priceProviderChanged>
   | ReturnType<typeof events.profileChanged>
@@ -42,6 +50,11 @@ const RESTORE_EVENT_BATCH_SIZE = 500;
 export function createWorkspaceBackup(store: WorkspaceLiveStore): WorkspaceBackup {
   const settings = store.query(spoilerSettingsQuery);
   return {
+    cardTags: store.query(cardTagsQuery).map(({ deleted: _deleted, ...tag }) => tag),
+    tagAssignments: store
+      .query(tagAssignmentsQuery)
+      .map(({ id: _id, ...assignment }) => assignment),
+    tagTemplates: materializeTagTemplates(store.query(tagTemplatesQuery)),
     collectionLots: readBackupCollectionLots(store),
     decks: readBackupDecks(store),
     format: workspaceBackupFormat,
@@ -92,6 +105,28 @@ export async function restoreWorkspaceBackup(store: WorkspaceLiveStore, backup: 
         await commitRestoreBatch(store, batch);
         batch = [];
       }
+    }
+  }
+
+  for (const tag of backup.cardTags) {
+    batch.push(events.cardTagCreated(tag));
+    if (batch.length >= RESTORE_EVENT_BATCH_SIZE) {
+      await commitRestoreBatch(store, batch);
+      batch = [];
+    }
+  }
+  for (const { tagId, cardId } of backup.tagAssignments) {
+    batch.push(events.cardsTagged({ tagId, cardIds: [cardId], assigned: true }));
+    if (batch.length >= RESTORE_EVENT_BATCH_SIZE) {
+      await commitRestoreBatch(store, batch);
+      batch = [];
+    }
+  }
+  for (const template of backup.tagTemplates) {
+    batch.push(events.tagTemplateSaved(template));
+    if (batch.length >= RESTORE_EVENT_BATCH_SIZE) {
+      await commitRestoreBatch(store, batch);
+      batch = [];
     }
   }
 
@@ -147,6 +182,7 @@ export async function restoreWorkspaceBackup(store: WorkspaceLiveStore, backup: 
       ) ||
     JSON.stringify(readProfile(store.query(profileQuery))) !== JSON.stringify(backup.profile) ||
     JSON.stringify(readBackupDecks(store)) !== JSON.stringify(sortedDecks(backup.decks)) ||
+    !sameTagging(createWorkspaceBackup(store), backup) ||
     settings.policy !== backup.spoilers.policy ||
     settings.resetGeneration !== backup.spoilers.resetGeneration ||
     JSON.stringify(readBackupDecisions(store)) !==
@@ -234,4 +270,25 @@ function sortedDecks(decks: WorkspaceBackup["decks"]) {
           section: entry.section,
         })),
     }));
+}
+
+function sameTagging(left: WorkspaceBackup, right: WorkspaceBackup) {
+  function canonical(backup: WorkspaceBackup) {
+    return JSON.stringify({
+      tags: backup.cardTags
+        .map(({ id, deckId, name, color }) => [id, deckId, name, color])
+        .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
+      assignments: backup.tagAssignments
+        .map(({ tagId, cardId }) => [tagId, cardId])
+        .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
+      templates: backup.tagTemplates
+        .map(({ id, name, categories }) => [
+          id,
+          name,
+          categories.map(({ name, color }) => [name, color]),
+        ])
+        .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
+    });
+  }
+  return canonical(left) === canonical(right);
 }

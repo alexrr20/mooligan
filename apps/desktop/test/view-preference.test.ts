@@ -6,11 +6,12 @@ import {
   writeViewPreference,
 } from "../src/features/preferences/use-view-preference.ts";
 
-void test("the view defaults to list and only restores a valid grid preference", () => {
+void test("the view defaults to list and restores supported layouts", () => {
   assert.equal(readViewPreference("mooligan.search.view", { getItem: () => null }), "list");
   assert.equal(readViewPreference("mooligan.search.view", { getItem: () => "list" }), "list");
   assert.equal(readViewPreference("mooligan.search.view", { getItem: () => "invalid" }), "list");
   assert.equal(readViewPreference("mooligan.search.view", { getItem: () => "grid" }), "grid");
+  assert.equal(readViewPreference("mooligan.deck.view", { getItem: () => "stack" }), "stack");
 });
 
 void test("the view preference tolerates unavailable local storage", () => {
@@ -40,9 +41,9 @@ void test("search, collection, and deck views persist independently", () => {
 
   writeViewPreference("mooligan.search.view", "grid", storage);
   writeViewPreference("mooligan.collection.view", "list", storage);
-  writeViewPreference("mooligan.deck.view", "grid", storage);
+  writeViewPreference("mooligan.deck.view", "stack", storage);
 
   assert.equal(readViewPreference("mooligan.search.view", storage), "grid");
   assert.equal(readViewPreference("mooligan.collection.view", storage), "list");
-  assert.equal(readViewPreference("mooligan.deck.view", storage), "grid");
+  assert.equal(readViewPreference("mooligan.deck.view", storage), "stack");
 });

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CreateDeckDialog } from "../features/decks/create-deck-dialog";
 import { DeckSidebarName } from "../features/decks/deck-sidebar-name";
 import { useDecks } from "../features/decks/use-decks";
+import { CatalogSetup, useCatalogSetup } from "./catalog-setup";
 import { SidebarActions } from "./sidebar-actions";
 import {
   HomeIcon,
@@ -41,6 +42,7 @@ const navigation = [
 ] as const;
 
 export function AppSidebar() {
+  const catalog = useCatalogSetup();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const selectedDeck = useRouterState({ select: (state) => state.location.search.deck });
   const decks = useDecks();
@@ -53,7 +55,7 @@ export function AppSidebar() {
   return (
     <>
       <Sidebar variant="inset" side="left" data-window-no-drag>
-        <SidebarHeader style={{ paddingTop: "58px" }} data-window-drag-region>
+        <SidebarHeader style={{ paddingTop: "58px" }}>
           <Link to="/" {...stylex.props(styles.wordmark)} onClick={closeSidebar}>
             Mooligan
             <span {...stylex.props(styles.dot)} aria-hidden="true" />
@@ -132,9 +134,10 @@ export function AppSidebar() {
           </nav>
         </SidebarContent>
         <SidebarFooter style={{ padding: "14px 16px" }}>
-          <SidebarActions onNavigate={closeSidebar} />
+          <SidebarActions catalog={catalog} onNavigate={closeSidebar} />
         </SidebarFooter>
       </Sidebar>
+      <CatalogSetup catalog={catalog} />
       {creatingDeck && <CreateDeckDialog onClose={() => setCreatingDeck(false)} />}
     </>
   );

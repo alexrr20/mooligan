@@ -22,10 +22,8 @@ type SetupState =
   | { kind: "error"; message: string; updating: boolean }
   | { kind: "ready" };
 
-export function CatalogSetup() {
-  const [dismissed, setDismissed] = useState(false);
+export function useCatalogSetup() {
   const [state, setState] = useState<SetupState>({ kind: "checking" });
-  const visible = !dismissed && state.kind !== "checking" && state.kind !== "ready";
 
   useEffect(() => {
     const catalog = window.catalog;
@@ -68,10 +66,6 @@ export function CatalogSetup() {
     };
   }, []);
 
-  if (!visible) {
-    return null;
-  }
-
   const downloading = state.kind === "downloading";
   const updating =
     state.kind === "outdated" ||
@@ -104,11 +98,41 @@ export function CatalogSetup() {
     } catch (error) {
       setState({
         kind: "error",
-        message:
+        message: cleanError(
           error instanceof Error ? error.message : "The card library could not be downloaded.",
+        ),
         updating,
       });
     }
+  }
+
+  return {
+    state,
+    downloading,
+    updating,
+    progress,
+    indexing,
+    progressPercent,
+    progressLabel,
+    download,
+  };
+}
+
+export function CatalogSetup({ catalog }: { catalog: ReturnType<typeof useCatalogSetup> }) {
+  const [dismissed, setDismissed] = useState(false);
+  const {
+    state,
+    downloading,
+    updating,
+    progress,
+    indexing,
+    progressPercent,
+    progressLabel,
+    download,
+  } = catalog;
+
+  if (dismissed || updating || state.kind === "checking" || state.kind === "ready") {
+    return null;
   }
 
   return (
@@ -123,26 +147,16 @@ export function CatalogSetup() {
       <DialogContent showCloseButton={false} style={styles.content}>
         <DialogHeader>
           <DialogTitle style={styles.title}>
-            {downloading
-              ? updating
-                ? "Updating card catalog"
-                : "Downloading card catalog"
-              : updating
-                ? "Update card catalog"
-                : "Download card catalog"}
+            {downloading ? "Downloading card catalog" : "Download card catalog"}
           </DialogTitle>
           <DialogDescription style={styles.description}>
-            {updating
-              ? downloading
-                ? "Your current catalog stays available until the update is complete."
-                : "Get the latest cards and corrections for offline browsing."
-              : "Download the catalog to search cards and browse offline."}
+            Download the catalog to search cards and browse offline.
           </DialogDescription>
         </DialogHeader>
 
         {state.kind === "error" ? (
           <p {...stylex.props(styles.error)} role="alert">
-            {cleanError(state.message)}
+            {state.message}
           </p>
         ) : null}
 
@@ -177,11 +191,7 @@ export function CatalogSetup() {
               Not now
             </DialogClose>
             <Button onClick={() => void download()} size="lg" style={styles.action}>
-              {state.kind === "error"
-                ? "Try again"
-                : updating
-                  ? "Update catalog"
-                  : "Download catalog"}
+              {state.kind === "error" ? "Try again" : "Download catalog"}
             </Button>
           </div>
         )}

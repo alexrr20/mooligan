@@ -1,16 +1,21 @@
 import { useCallback, useState } from "react";
 
-type View = "grid" | "list";
+export type CardView = "grid" | "list" | "stack";
 
-export function readViewPreference(key: string, storage?: Pick<Storage, "getItem">): View {
+export function readViewPreference(key: string, storage?: Pick<Storage, "getItem">): CardView {
   try {
-    return (storage ?? window.localStorage).getItem(key) === "grid" ? "grid" : "list";
+    const view = (storage ?? window.localStorage).getItem(key);
+    return view === "grid" || view === "stack" ? view : "list";
   } catch {
     return "list";
   }
 }
 
-export function writeViewPreference(key: string, view: View, storage?: Pick<Storage, "setItem">) {
+export function writeViewPreference(
+  key: string,
+  view: CardView,
+  storage?: Pick<Storage, "setItem">,
+) {
   try {
     (storage ?? window.localStorage).setItem(key, view);
   } catch {
@@ -18,12 +23,12 @@ export function writeViewPreference(key: string, view: View, storage?: Pick<Stor
   }
 }
 
-export function useViewPreference(storageKey: string, initialOverride?: View) {
-  const [view, setViewState] = useState<View>(
+export function useViewPreference(storageKey: string, initialOverride?: CardView) {
+  const [view, setViewState] = useState<CardView>(
     () => initialOverride ?? readViewPreference(storageKey),
   );
   const setView = useCallback(
-    (next: View) => {
+    (next: CardView) => {
       setViewState(next);
       writeViewPreference(storageKey, next);
     },

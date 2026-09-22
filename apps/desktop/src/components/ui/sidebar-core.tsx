@@ -288,7 +288,7 @@ export function SidebarTrigger({
         {children ?? (
           <HugeiconsIcon
             icon={side === "left" ? SidebarLeft01Icon : SidebarRight01Icon}
-            size={18}
+            size={14}
             aria-hidden="true"
           />
         )}
@@ -485,8 +485,8 @@ const styles = stylex.create({
     },
   },
   trigger: {
-    width: "36px",
-    height: "36px",
+    width: "24px",
+    height: "24px",
     display: "inline-flex",
     flexShrink: 0,
     alignItems: "center",

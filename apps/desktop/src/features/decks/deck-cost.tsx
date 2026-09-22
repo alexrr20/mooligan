@@ -30,66 +30,57 @@ export function DeckCost({ entries }: { entries: DeckEntry[] }) {
   return (
     <section aria-label="Deck cost" {...stylex.props(styles.cost)}>
       {!providers.length ? (
-        <p {...stylex.props(styles.note)}>Enable a price provider in Settings to see deck cost.</p>
+        <p {...stylex.props(styles.note)}>Enable a price provider in Settings to see deck cost</p>
       ) : result.isPending ? (
         <p role="status" {...stylex.props(styles.note)}>
-          Calculating deck cost…
+          Pricing…
         </p>
       ) : result.isError ? (
         <p role="alert" {...stylex.props(styles.note)}>
           Deck cost could not be read.{" "}
-          <Button size="sm" variant="secondary" onClick={() => void result.refetch()}>
+          <Button size="xs" variant="ghost" onClick={() => void result.refetch()}>
             Retry
           </Button>
         </p>
       ) : (
-        <>
-          <div {...stylex.props(styles.metrics)}>
-            {deckCostMetrics(result.data).map((metric) => (
-              <Tooltip key={metric.label}>
-                <TooltipTrigger {...stylex.props(styles.metric)}>
-                  <span {...stylex.props(styles.label)}>
-                    {metric.label} <span aria-hidden="true">ⓘ</span>
-                  </span>
-                  <span {...stylex.props(styles.amount)}>{metric.value}</span>
-                  {metric.coverage ? (
-                    <span {...stylex.props(styles.note)}>{metric.coverage}</span>
-                  ) : null}
-                </TooltipTrigger>
-                <TooltipContent>{metric.description}</TooltipContent>
-              </Tooltip>
-            ))}
-          </div>
-          <p {...stylex.props(styles.note)}>
-            {deckCostScope}{" "}
-            {result.data.current.missingRates || result.data.cheapest.missingRates
-              ? "Some market prices could not be converted."
-              : null}
-          </p>
-        </>
+        deckCostMetrics(result.data).map((metric, index) => (
+          <Tooltip key={metric.label}>
+            <TooltipTrigger
+              aria-label={`${metric.label}: ${metric.value}`}
+              {...stylex.props(styles.metric)}
+            >
+              <span {...stylex.props(styles.amount)}>{metric.value}</span>
+              {index ? "cheapest" : "current"}
+            </TooltipTrigger>
+            <TooltipContent>
+              <strong>{metric.label}.</strong> {metric.description}{" "}
+              {metric.coverage ? `${metric.coverage}. ` : null}
+              {deckCostScope}
+            </TooltipContent>
+          </Tooltip>
+        ))
       )}
     </section>
   );
 }
 
 const styles = stylex.create({
-  cost: { display: "grid", gap: "10px", paddingBlock: "12px", borderBlock: "1px solid #252721" },
-  metrics: { display: "flex", flexWrap: "wrap", gap: "16px 40px" },
+  cost: { display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "8px 24px" },
   metric: {
-    display: "grid",
-    gap: "4px",
+    display: "inline-flex",
+    alignItems: "baseline",
+    gap: "6px",
     padding: 0,
     backgroundColor: "transparent",
     borderWidth: 0,
     borderRadius: "2px",
-    color: "#f4f1e8",
+    color: "#a6a89d",
     font: "inherit",
-    textAlign: "left",
+    fontSize: "13px",
     cursor: "help",
     fontVariantNumeric: "tabular-nums",
     ":focus-visible": { outline: "2px solid #c4ef8c", outlineOffset: "4px" },
   },
-  label: { color: "#a6a89d", fontSize: "12px" },
-  amount: { fontSize: "20px", fontWeight: 500, lineHeight: 1.4 },
-  note: { margin: 0, color: "#a6a89d", fontSize: "12px", lineHeight: 1.5 },
+  amount: { color: "#f4f1e8" },
+  note: { margin: 0, color: "#a6a89d", fontSize: "13px" },
 });

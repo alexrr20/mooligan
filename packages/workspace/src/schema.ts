@@ -1,5 +1,8 @@
 import { Events, makeSchema, queryDb, Schema, State } from "@livestore/livestore";
 
+import { tagEvents, tagMaterializers, tagTables } from "./tags.ts";
+export { cardTagsQuery, tagAssignmentsQuery, tagTemplatesQuery } from "./tags.ts";
+
 import { deckEvents, deckMaterializers, deckTables } from "./decks.ts";
 import { profileEvents, profileMaterializers, profileTables } from "./profile.ts";
 import {
@@ -18,7 +21,7 @@ export { profileQuery, readProfile } from "./profile.ts";
 export { decksQuery, deckEntriesQuery } from "./decks.ts";
 
 export const initialSpoilerResetId = "initial";
-export const workspaceEventSchemaVersion = 5;
+export const workspaceEventSchemaVersion = 6;
 
 const TargetId = Schema.String.pipe(Schema.minLength(1), Schema.maxLength(128));
 const DecisionId = Schema.String.pipe(Schema.minLength(1), Schema.maxLength(128));
@@ -118,6 +121,7 @@ export const tables = {
   ...pricePreferenceTables,
   ...profileTables,
   ...deckTables,
+  ...tagTables,
   collectionLots: State.SQLite.table({
     indexes: [
       {
@@ -136,6 +140,7 @@ export const events = {
   ...pricePreferenceEvents,
   ...profileEvents,
   ...deckEvents,
+  ...tagEvents,
   collectionCopiesAdded: Events.synced({
     name: "v1.CollectionCopiesAdded",
     schema: Schema.Struct({
@@ -184,6 +189,27 @@ export const events = {
 } as const;
 
 export const workspaceSyncedEventSchema = Schema.Union(
+  Schema.Struct({
+    args: events.tagTemplateDeleted.schema,
+    name: Schema.Literal(events.tagTemplateDeleted.name),
+  }),
+  Schema.Struct({
+    args: events.tagTemplateSaved.schema,
+    name: Schema.Literal(events.tagTemplateSaved.name),
+  }),
+  Schema.Struct({ args: events.cardsTagged.schema, name: Schema.Literal(events.cardsTagged.name) }),
+  Schema.Struct({
+    args: events.cardTagDeleted.schema,
+    name: Schema.Literal(events.cardTagDeleted.name),
+  }),
+  Schema.Struct({
+    args: events.cardTagChanged.schema,
+    name: Schema.Literal(events.cardTagChanged.name),
+  }),
+  Schema.Struct({
+    args: events.cardTagCreated.schema,
+    name: Schema.Literal(events.cardTagCreated.name),
+  }),
   Schema.Struct({
     args: events.priceCurrencyChanged.schema,
     name: Schema.Literal(events.priceCurrencyChanged.name),
@@ -267,6 +293,7 @@ const materializers = State.SQLite.materializers(events, {
   ...pricePreferenceMaterializers,
   ...profileMaterializers,
   ...deckMaterializers,
+  ...tagMaterializers,
   "v1.CollectionCopiesAdded": ({ lot }) => {
     const row = toCollectionLotRow(lot);
     if (!isUnattributedLot(row)) {

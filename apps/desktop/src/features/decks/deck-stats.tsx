@@ -34,23 +34,19 @@ export function DeckStats({ summary }: { summary: ReturnType<typeof summarizeDec
           </Tooltip>
         ))}
       </div>
-      <p {...stylex.props(styles.text)}>
-        {summary.sections
-          .filter(({ value, quantity }) => value === "mainboard" || quantity > 0)
-          .map(({ label, quantity }) => `${label} ${quantity}`)
-          .join(" · ")}
-      </p>
       <Tooltip>
         <TooltipTrigger
           aria-label={`Collection coverage: ${owned} of ${summary.total} copies owned, ${summary.missing} missing`}
           {...stylex.props(styles.coverage)}
         >
-          {owned}/{summary.total} owned · {summary.missing} missing
-          <span aria-hidden="true">ⓘ</span>
+          <span {...stylex.props(styles.value)}>
+            {owned}/{summary.total}
+          </span>
+          owned
         </TooltipTrigger>
         <TooltipContent>
-          Counts the selected printings and finishes, excluding the maybeboard. Decks do not reserve
-          collection copies.
+          {summary.missing} missing. Counts the selected printings and finishes, excluding the
+          maybeboard. Decks do not reserve collection copies.
         </TooltipContent>
       </Tooltip>
     </div>
@@ -58,14 +54,18 @@ export function DeckStats({ summary }: { summary: ReturnType<typeof summarizeDec
 }
 
 const styles = stylex.create({
-  types: {
+  stats: {
     display: "flex",
-    flexWrap: "wrap",
     alignItems: "center",
-    gap: "8px 20px",
-    width: "100%",
-    paddingBlock: "4px",
+    flexWrap: "wrap",
+    gap: "8px 24px",
+    flex: "1 1 auto",
+    minWidth: 0,
+    color: "#a6a89d",
+    fontSize: "13px",
+    fontVariantNumeric: "tabular-nums",
   },
+  types: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px 18px" },
   count: {
     display: "inline-flex",
     alignItems: "center",
@@ -76,7 +76,6 @@ const styles = stylex.create({
     backgroundColor: "transparent",
     color: "#f4f1e8",
     font: "inherit",
-    fontSize: "14px",
     lineHeight: 1.4,
     cursor: "help",
     ":focus-visible": { outline: "2px solid #c4ef8c", outlineOffset: "4px" },
@@ -91,29 +90,19 @@ const styles = stylex.create({
     textAlign: "center",
     color: "#a6a89d",
   },
-  stats: {
-    display: "flex",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: "6px 24px",
-    color: "#a6a89d",
-    fontSize: "13px",
-    fontVariantNumeric: "tabular-nums",
-  },
-  text: { margin: 0 },
   coverage: {
     display: "inline-flex",
-    alignItems: "center",
+    alignItems: "baseline",
     gap: "6px",
     marginInlineStart: "auto",
-    padding: "2px 0",
+    padding: 0,
     borderWidth: 0,
     borderRadius: "2px",
     backgroundColor: "transparent",
     color: "inherit",
     font: "inherit",
     cursor: "help",
-    ":hover": { color: "#f4f1e8" },
     ":focus-visible": { outline: "2px solid #c4ef8c", outlineOffset: "4px" },
   },
+  value: { color: "#f4f1e8" },
 });

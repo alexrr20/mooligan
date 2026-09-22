@@ -1,5 +1,5 @@
 import { ResultsLayout } from "@/components/results-layout";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { deckSections, type Deck, type DeckEntry, type DeckMetadata } from "@mooligan/domain/decks";
 import { summarizeDeck } from "@mooligan/workspace/client/deck-summary";
@@ -18,6 +18,13 @@ import { CatalogSearch } from "./search";
 import { DeckMetadataForm } from "./decks";
 import { AddDeckCard } from "./card-detail";
 import { finishes } from "./collection";
+import {
+  cardIdentity,
+  tagsForDeck,
+  indexCardTags,
+  groupEntriesByTag,
+} from "@mooligan/workspace/client/tag-state";
+import { CardTagBadges, CardTagEditor, CardTagManager } from "./card-tags";
 import { DeckCost } from "./deck-cost";
 
 export default function DeckDetailScreen() {
@@ -35,12 +42,23 @@ export default function DeckDetailScreen() {
   );
 }
 function DeckEditor({ deck }: { deck: Deck }) {
-  const { lots, deckActions } = useWorkspace();
+  const { lots, deckActions, cardTags, tagAssignments } = useWorkspace();
   const [mode, setMode] = useState("cards");
   const [selected, setSelected] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [section, setSection] = useState("all");
   const [query, setQuery] = useState("");
+  const [tagFilter, setTagFilter] = useState("all");
+  const [tagScope, setTagScope] = useState("all");
+  const [groupBy, setGroupBy] = useState("cards");
+  const [selection, setSelection] = useState<Set<string>>(new Set());
+  const [tagging, setTagging] = useState<{ title: string; cardIds: string[] } | null>(null);
+  const availableTags = tagsForDeck(cardTags, deck.id, tagScope === "all");
+  const byCard = indexCardTags(availableTags, tagAssignments);
+  const activeTagFilter =
+    tagFilter === "untagged" || availableTags.some(({ id }) => id === tagFilter)
+      ? tagFilter
+      : "all";
   const ids = [...new Set(deck.entries.map((entry) => entry.printingId))];
   const { data: printings } = useCatalogQuery(
     ["deck-printings", JSON.stringify(ids)],
@@ -54,11 +72,32 @@ function DeckEditor({ deck }: { deck: Deck }) {
   const entries = deck.entries.filter((entry) => {
     const result = printings?.get(entry.printingId);
     const name = result?.status === "visible" ? result.detail.card.name : "";
+    const identity = cardIdentity(result);
+    const assigned = identity ? (byCard.get(identity) ?? []) : [];
     return (
+      (activeTagFilter === "all" ||
+        (activeTagFilter === "untagged"
+          ? !assigned.length
+          : assigned.some(({ id }) => id === activeTagFilter))) &&
       (section === "all" || entry.section === section) &&
       name.toLowerCase().includes(query.toLowerCase())
     );
   });
+  const allIds = new Set(
+    deck.entries.flatMap((entry) => cardIdentity(printings?.get(entry.printingId)) ?? []),
+  );
+  const selectedIds = [...selection].filter((id) => allIds.has(id));
+  const groups =
+    groupBy === "tags"
+      ? groupEntriesByTag(entries, printings ?? new Map(), availableTags, tagAssignments)
+      : [
+          {
+            id: "all",
+            tag: null,
+            entries,
+            quantity: entries.reduce((sum, entry) => sum + entry.quantity, 0),
+          },
+        ];
   function saveMetadata(metadata: DeckMetadata, original: DeckMetadata = deck) {
     const change: Partial<DeckMetadata> = {};
     for (const key of ["name", "formatId", "notes"] as const)
@@ -94,8 +133,9 @@ function DeckEditor({ deck }: { deck: Deck }) {
         options={[
           { value: "cards", label: "Cards" },
           { value: "mana", label: "Mana analysis" },
+          { value: "tags", label: "Tags & categories" },
           { value: "add", label: "Add cards" },
-          { value: "edit", label: "Name, format, tags, and notes" },
+          { value: "edit", label: "Name, format, labels, and notes" },
           { value: "transfer", label: "Import and export" },
           { value: "manage", label: "Duplicate, archive, or delete" },
         ]}
@@ -104,6 +144,7 @@ function DeckEditor({ deck }: { deck: Deck }) {
           setSelected(null);
         }}
       />
+      {mode === "tags" && <CardTagManager deckId={deck.id} />}
       {mode === "mana" && (
         <DeckManaAnalysis analysis={analyzeDeckMana(deck.entries, printings ?? new Map())} />
       )}
@@ -144,6 +185,9 @@ function DeckEditor({ deck }: { deck: Deck }) {
       )}
       {mode === "transfer" && (
         <>
+          <Copy>
+            Text exports contain cards only. Use a workspace backup to preserve tags and templates.
+          </Copy>
           <Button
             label="Export deck text"
             onPress={() =>
@@ -184,47 +228,154 @@ function DeckEditor({ deck }: { deck: Deck }) {
             options={[{ value: "all", label: "All sections" }, ...deckSections]}
             onChange={setSection}
           />
-          <ResultsLayout preference="deck-cards">
-            {entries.map((entry) => {
-              const result = printings?.get(entry.printingId);
-              const detail = result?.status === "visible" ? result.detail : null;
-              return (
-                <Panel key={entry.id}>
-                  <CardRow
-                    printingId={entry.printingId}
-                    name={
-                      detail?.card.name ??
-                      (result?.status === "protected"
-                        ? "Protected preview"
-                        : "Unavailable printing")
-                    }
-                    image={detail?.selectedPrinting.images.find((i) => i.size === "small")}
-                    gridImage={detail?.selectedPrinting.images.find((i) => i.size === "normal")}
-                    detail={`${deckSections.find((s) => s.value === entry.section)?.label} · ${entry.finish}${detail ? ` · ${detail.legalities.find((l) => l.formatId === deck.formatId)?.status ?? "Legality unavailable"}` : ""}`}
-                    quantity={entry.quantity}
-                    finish={entry.finish}
-                  />
-                  <Button
-                    quiet
-                    label={editing === entry.id ? "Cancel edit" : "Edit card"}
-                    onPress={() => setEditing(editing === entry.id ? null : entry.id)}
-                  />
-                  {editing === entry.id && (
-                    <EntryEditor
-                      key={entry.id}
-                      entry={entry}
-                      deckId={deck.id}
-                      allowedFinishes={detail?.selectedPrinting.finishes ?? [entry.finish]}
-                      onDone={() => setEditing(null)}
-                    />
-                  )}
-                </Panel>
-              );
-            })}
-          </ResultsLayout>
+          <Choice
+            label="Tag scope"
+            value={tagScope}
+            onChange={setTagScope}
+            options={[
+              { value: "all", label: "Include global tags" },
+              { value: "deck", label: "This deck only" },
+            ]}
+          />
+          <Choice
+            label="Filter by tag"
+            value={activeTagFilter}
+            onChange={setTagFilter}
+            options={[
+              { value: "all", label: "All cards" },
+              { value: "untagged", label: "Untagged" },
+              ...availableTags.map((tag) => ({
+                value: tag.id,
+                label: tag.name + (tag.deckId === null ? " · Global" : ""),
+              })),
+            ]}
+          />
+          <Choice
+            label="Group by"
+            value={groupBy}
+            onChange={setGroupBy}
+            options={[
+              { value: "cards", label: "Cards" },
+              { value: "tags", label: "Tags & categories" },
+            ]}
+          />
+          <Button
+            quiet
+            label="Select visible cards"
+            disabled={!entries.length}
+            onPress={() =>
+              setSelection(
+                new Set(
+                  entries.flatMap((entry) => cardIdentity(printings?.get(entry.printingId)) ?? []),
+                ),
+              )
+            }
+          />
+          {selectedIds.length ? (
+            <Row>
+              <Button
+                label={`Tag ${selectedIds.length} selected cards`}
+                onPress={() =>
+                  setTagging({
+                    title: `Tag ${selectedIds.length} selected cards`,
+                    cardIds: selectedIds,
+                  })
+                }
+              />
+              <Button quiet label="Clear selection" onPress={() => setSelection(new Set())} />
+            </Row>
+          ) : null}
+          {tagging ? (
+            <CardTagEditor
+              deckId={deck.id}
+              cardIds={tagging.cardIds}
+              title={tagging.title}
+              onDone={() => setTagging(null)}
+            />
+          ) : null}
+          {groupBy === "tags" ? (
+            <Copy>Cards appear in each assigned category. Deck totals count each copy once.</Copy>
+          ) : null}
+          {groups.map((group) => (
+            <Fragment key={group.id}>
+              {groupBy === "tags" ? (
+                <Copy
+                  title={`${group.tag?.name ?? "Untagged"}${group.tag?.deckId === null ? " · Global" : ""} · ${group.quantity}`}
+                />
+              ) : null}
+              <ResultsLayout preference="deck-cards">
+                {group.entries.map((entry) => {
+                  const result = printings?.get(entry.printingId);
+                  const detail = result?.status === "visible" ? result.detail : null;
+                  const identity = cardIdentity(result);
+                  const assigned = identity ? (byCard.get(identity) ?? []) : [];
+                  return (
+                    <Panel key={entry.id}>
+                      <CardRow
+                        printingId={entry.printingId}
+                        name={
+                          detail?.card.name ??
+                          (result?.status === "protected"
+                            ? "Protected preview"
+                            : "Unavailable printing")
+                        }
+                        image={detail?.selectedPrinting.images.find((i) => i.size === "small")}
+                        gridImage={detail?.selectedPrinting.images.find((i) => i.size === "normal")}
+                        detail={`${deckSections.find((s) => s.value === entry.section)?.label} · ${entry.finish}${detail ? ` · ${detail.legalities.find((l) => l.formatId === deck.formatId)?.status ?? "Legality unavailable"}` : ""}`}
+                        quantity={entry.quantity}
+                        finish={entry.finish}
+                      />
+                      {assigned.length ? <CardTagBadges tags={assigned} /> : null}
+                      {identity ? (
+                        <Row>
+                          <Button
+                            quiet
+                            label={selection.has(identity) ? "Deselect card" : "Select card"}
+                            onPress={() =>
+                              setSelection((current) => {
+                                const next = new Set(current);
+                                if (next.has(identity)) next.delete(identity);
+                                else next.add(identity);
+                                return next;
+                              })
+                            }
+                          />
+                          <Button
+                            quiet
+                            label="Edit card tags"
+                            onPress={() =>
+                              setTagging({
+                                title: `Tag ${detail?.card.name ?? "card"}`,
+                                cardIds: [identity],
+                              })
+                            }
+                          />
+                        </Row>
+                      ) : null}
+                      <Button
+                        quiet
+                        label={editing === entry.id ? "Cancel edit" : "Edit card"}
+                        onPress={() => setEditing(editing === entry.id ? null : entry.id)}
+                      />
+                      {editing === entry.id && (
+                        <EntryEditor
+                          key={entry.id}
+                          entry={entry}
+                          deckId={deck.id}
+                          allowedFinishes={detail?.selectedPrinting.finishes ?? [entry.finish]}
+                          onDone={() => setEditing(null)}
+                        />
+                      )}
+                    </Panel>
+                  );
+                })}
+              </ResultsLayout>
+              {!group.quantity && groupBy === "tags" ? <Copy>No cards assigned.</Copy> : null}
+            </Fragment>
+          ))}
           {!entries.length && (
             <Copy>
-              No cards in this section. Use Add cards or Import and export to build your deck.
+              No cards match these filters. Change the filters, or add cards to your deck.
             </Copy>
           )}
         </>

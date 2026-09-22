@@ -42,10 +42,13 @@ const backup: WorkspaceBackup = {
     policy: "show",
     resetGeneration: 3,
   },
-  version: 7,
+  cardTags: [],
+  tagAssignments: [],
+  tagTemplates: [],
+  version: 8,
 };
 
-void test("version 5 backups round trip without device or account metadata", () => {
+void test("version 8 backups round trip without device or account metadata", () => {
   const parsed = parseWorkspaceBackup(serializeWorkspaceBackup(backup));
 
   assert.deepEqual(parsed, backup);

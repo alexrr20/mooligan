@@ -129,6 +129,16 @@ export const deckMaterializers = {
   "v1.DeckDeleted": ({ deckId, updatedAt }: typeof deckEvents.deckDeleted.schema.Type) => [
     deckTables.decks.update({ deleted: true, updatedAt }).where({ id: deckId }),
     deckTables.deckEntries.delete().where({ deckId }),
+    {
+      sql: 'DELETE FROM "tag_assignments" WHERE "tagId" IN (SELECT "id" FROM "card_tags" WHERE "deckId" = $deckId)',
+      bindValues: { deckId },
+      writeTables: new Set(["tag_assignments"]),
+    },
+    {
+      sql: 'UPDATE "card_tags" SET "deleted" = 1 WHERE "deckId" = $deckId',
+      bindValues: { deckId },
+      writeTables: new Set(["card_tags"]),
+    },
   ],
   "v1.DeckEntryAdded": ({
     deckId,

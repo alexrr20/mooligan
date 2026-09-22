@@ -2,6 +2,9 @@ import { createContext, useContext, useEffect, useSyncExternalStore, type ReactN
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { AppState } from "react-native";
 import {
+  cardTagsQuery,
+  tagAssignmentsQuery,
+  tagTemplatesQuery,
   collectionLotsQuery,
   decksQuery,
   deckEntriesQuery,
@@ -13,6 +16,8 @@ import {
   readEnabledPriceProviders,
 } from "@mooligan/workspace/schema";
 import { createCollectionMutations } from "@mooligan/workspace/client/collection-mutations";
+import { createTagMutations } from "@mooligan/workspace/client/tag-mutations";
+import { materializeTagTemplates } from "@mooligan/workspace/client/tag-state";
 import { createDeckMutations } from "@mooligan/workspace/client/deck-mutations";
 import { materializeDecks } from "@mooligan/workspace/client/deck-state";
 import { runSpoilerAction, type SpoilerAction } from "@mooligan/workspace/client/spoiler-actions";
@@ -86,6 +91,9 @@ function useWorkspaceData(store: WorkspaceStore) {
   const decisions = store.useQuery(spoilerDecisionsQuery);
   const currentDate = useSyncExternalStore(subscribeDate, localDate);
   const decks = materializeDecks(store.useQuery(decksQuery), store.useQuery(deckEntriesQuery));
+  const cardTags = store.useQuery(cardTagsQuery);
+  const tagAssignments = store.useQuery(tagAssignmentsQuery);
+  const tagTemplates = materializeTagTemplates(store.useQuery(tagTemplatesQuery));
   const currency = readPriceCurrency(store.useQuery(priceCurrencyQuery));
   const providers = readEnabledPriceProviders(store.useQuery(priceProviderPreferencesQuery));
   const visibility: SpoilerVisibilitySnapshot = {
@@ -131,6 +139,10 @@ function useWorkspaceData(store: WorkspaceStore) {
     providers,
     collection,
     deckActions: createDeckMutations(store, detail),
+    cardTags,
+    tagAssignments,
+    tagTemplates,
+    tagActions: createTagMutations(store),
     spoiler: (action: SpoilerAction) =>
       runSpoilerAction(store, action, async (id) => reference.catalog.rootSet(id)),
   };

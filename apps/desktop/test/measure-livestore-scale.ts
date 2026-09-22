@@ -152,7 +152,10 @@ function largeBackup(): WorkspaceBackup {
       policy: "protect",
       resetGeneration: 1,
     },
-    version: 7,
+    cardTags: [],
+    tagAssignments: [],
+    tagTemplates: [],
+    version: 8,
   };
 }
 

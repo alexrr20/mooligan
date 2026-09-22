@@ -29,8 +29,8 @@ would disappear after a restart.
 
 The user-owned workspace is separate from the replaceable Scryfall catalog
 database. Motion and view preferences stay in renderer local storage on the
-current device. Workspace backup version 7 contains only materialized
-collection lots, decks with their card entries, profile choices, price provider preferences, and spoiler state, and every restore creates a new unbound
+current device. Workspace backup version 8 contains only materialized
+collection lots, decks with their card entries, card tags, category templates, profile choices, price provider preferences, and spoiler state, and every restore creates a new unbound
 workspace before activation.
 
 ## Card prices
@@ -119,7 +119,8 @@ Text import accepts quantity/name lists, Arena set and collector numbers, MTGO
 names block the import. Text exports include `[printing:ID]` and `[finish:VALUE]`
 references so they can round trip through Mooligan even when that printing is
 absent from the local catalog or spoiler-protected. Exact unavailable references
-are retained with a warning. Workspace backups also retain deck metadata.
+are retained with a warning. Workspace backups also retain deck metadata, card tags, assignments, and category templates.
+Text exports contain cards only; use a workspace backup to preserve tagging.
 
 Decks use the same persistent LiveStore event log and optional account sync as
 the collection. Concurrent additions to a matching slot add quantities. Metadata
@@ -128,9 +129,25 @@ the same field resolve in the synchronized event order. Merged card IDs remain
 addressable by later offline edits. Removed cards cannot be revived by stale
 edits, and deleted decks reject later card additions and metadata changes.
 
-The workspace event schema is now version 5. Deploy the updated API alongside
-the clients to enable price provider preference sync. Older clients must update before syncing;
-their local workspace remains available. Backup version 7 replaces version 6,
+Card tags have two scopes: categories for one deck and global tags for the whole
+workspace. Assign several roles to a card, choose a color, filter for a tag or
+untagged cards, and group cards by tags. Both desktop and mobile support bulk
+selection, tag editing and deletion, and creating, applying, updating, and deleting
+category templates. Starter categories cover ramp, draw, removal, board wipes,
+protection, and finishers. Applying a template adds missing category names and
+leaves existing colors and assignments intact. Deck duplication copies local
+categories and assignments; global tags already apply to the copied cards.
+
+Assignments use the card's shared rules identity, so switching printings or
+finishes keeps tags. A printing without a shared identity uses its own card ID.
+Tags never change a deck card's section or quantity. Cards can appear in several
+tag groups, but deck totals still count each copy once. Protected and unavailable
+printings do not expose tags in card views. Deleting a deck removes its local
+categories and assignments; global tags and templates remain available.
+
+The workspace event schema is now version 6. Deploy the updated API alongside
+the clients to enable card tag and category template sync. Older clients must update before syncing;
+their local workspace remains available. Backup version 8 replaces version 7,
 with no backward compatibility for old backup files.
 
 ## Profile
@@ -274,7 +291,7 @@ supported maximum. The desktop pauses sync and keeps local editing available.
 
 ### Reset development data
 
-Workspace backup version 7 is the only supported backup format. Export a backup
+Workspace backup version 8 is the only supported backup format. Export a backup
 from Settings before resetting any data you care about.
 
 For an unbound development Workspace, quit Mooligan, clear the renderer origin's

@@ -28,16 +28,18 @@ export function DeckSelect<T extends string>({
   value,
   onChange,
   disabled = false,
+  hideLabel = false,
 }: {
   label: string;
   options: readonly { label: string; value: T }[];
   value: T;
   onChange: (value: T) => void;
   disabled?: boolean;
+  hideLabel?: boolean;
 }) {
   return (
     <div {...stylex.props(deckStyles.field)}>
-      <span>{label}</span>
+      {hideLabel ? null : <span>{label}</span>}
       <Select<T>
         items={options}
         value={value}

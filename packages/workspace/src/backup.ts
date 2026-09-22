@@ -1,11 +1,13 @@
 import { Schema } from "effect";
 
+import { cardTagSchema, tagAssignmentSchema, tagTemplateSchema } from "./tag-contract.ts";
+
 import { deckEntrySchema, deckMetadataSchema } from "./deck-contract.ts";
 import { profileSettingsSchema } from "./profile-contract.ts";
 import { PriceCurrencySchema, enabledPriceProvidersSchema } from "./price-preference-contract.ts";
 
 export const workspaceBackupFormat = "mooligan-workspace";
-export const workspaceBackupVersion = 7;
+export const workspaceBackupVersion = 8;
 export const workspaceBackupMaxBytes = 50 * 1024 * 1024;
 export const workspaceBackupMaxCollectionLots = 100_000;
 export const workspaceBackupMaxSpoilerDecisions = 100_000;
@@ -115,6 +117,22 @@ const Deck = Schema.Struct({
 });
 
 export const workspaceBackupSchema = Schema.Struct({
+  cardTags: Schema.Array(cardTagSchema).pipe(
+    Schema.maxItems(100_000),
+    Schema.filter((tags) => new Set(tags.map(({ id }) => id)).size === tags.length),
+  ),
+  tagAssignments: Schema.Array(tagAssignmentSchema).pipe(
+    Schema.maxItems(500_000),
+    Schema.filter(
+      (assignments) =>
+        new Set(assignments.map(({ tagId, cardId }) => JSON.stringify([tagId, cardId]))).size ===
+        assignments.length,
+    ),
+  ),
+  tagTemplates: Schema.Array(tagTemplateSchema).pipe(
+    Schema.maxItems(10_000),
+    Schema.filter((templates) => new Set(templates.map(({ id }) => id)).size === templates.length),
+  ),
   priceProviders: enabledPriceProvidersSchema,
   priceCurrency: PriceCurrencySchema,
   profile: profileSettingsSchema,
@@ -142,7 +160,22 @@ export const workspaceBackupSchema = Schema.Struct({
     ),
   }),
   version: Schema.Literal(workspaceBackupVersion),
-});
+}).pipe(
+  Schema.filter(
+    (backup) => {
+      const deckIds = new Set(backup.decks.map(({ id }) => id));
+      const tagIds = new Set(backup.cardTags.map(({ id }) => id));
+      return (
+        backup.cardTags.every(({ deckId }) => deckId === null || deckIds.has(deckId)) &&
+        backup.tagAssignments.every(({ tagId }) => tagIds.has(tagId))
+      );
+    },
+    {
+      message: () =>
+        "Tags must reference existing decks, and assignments must reference existing tags.",
+    },
+  ),
+);
 
 export type WorkspaceBackup = typeof workspaceBackupSchema.Type;
 export type WorkspaceBackupCollectionLot = typeof CollectionLot.Type;
