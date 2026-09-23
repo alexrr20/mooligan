@@ -1,3 +1,4 @@
+import { Schema } from "effect";
 import type { CatalogDatabase as DatabaseSync } from "./database.ts";
 import { ExchangeRatesSchema, priceCurrencies, type ExchangeRates } from "@mooligan/domain/market";
 import { readPriceMetadata } from "@mooligan/catalog/prices";
@@ -6,7 +7,7 @@ const quoteCurrencies = priceCurrencies.filter((currency) => currency !== "EUR")
 
 export async function updateExchangeRates(database: DatabaseSync): Promise<ExchangeRates | null> {
   const saved = readPriceMetadata(database, "exchange_rates");
-  const cached = saved ? ExchangeRatesSchema.parse(JSON.parse(saved)) : null;
+  const cached = saved ? Schema.decodeUnknownSync(ExchangeRatesSchema)(JSON.parse(saved)) : null;
   if (cached && Date.now() - Date.parse(cached.fetchedAt) < 86_400_000) return cached;
   try {
     const response = await fetch(
@@ -14,7 +15,7 @@ export async function updateExchangeRates(database: DatabaseSync): Promise<Excha
       { signal: AbortSignal.timeout(10_000) },
     );
     if (!response.ok) throw new Error("Exchange rates unavailable");
-    const snapshot = ExchangeRatesSchema.parse({
+    const snapshot = Schema.decodeUnknownSync(ExchangeRatesSchema)({
       fetchedAt: new Date().toISOString(),
       rates: await response.json(),
     });

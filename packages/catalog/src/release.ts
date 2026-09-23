@@ -1,15 +1,17 @@
 import type { CatalogDatabase as DatabaseSync } from "./database.ts";
 
 import type { CatalogReleaseSummary } from "@mooligan/domain/spoilers";
-import * as z from "zod";
+import { IsoDateSchema } from "@mooligan/domain/schema";
+import { Option, Schema } from "effect";
 
-export const CatalogReleaseSummaryRowSchema = z.object({
-  code: z.string().min(1),
-  name: z.string().min(1),
-  nextReleaseOn: z.iso.date(),
-  rootSetId: z.string().min(1),
+export const CatalogReleaseSummaryRowSchema = Schema.Struct({
+  code: Schema.NonEmptyString,
+  name: Schema.NonEmptyString,
+  nextReleaseOn: IsoDateSchema,
+  rootSetId: Schema.NonEmptyString,
 });
-export type CatalogReleaseSummaryRow = z.infer<typeof CatalogReleaseSummaryRowSchema>;
+export type CatalogReleaseSummaryRow = typeof CatalogReleaseSummaryRowSchema.Type;
+const decodeCatalogReleaseSummaryRow = Schema.decodeUnknownOption(CatalogReleaseSummaryRowSchema);
 
 export function createCatalogReleaseSummaryQuery(database: DatabaseSync) {
   const selectRelease = database.prepare(
@@ -25,11 +27,11 @@ export function createCatalogReleaseSummaryQuery(database: DatabaseSync) {
   );
 
   return (rootSetId: string, currentDate: string): CatalogReleaseSummary => {
-    const row = CatalogReleaseSummaryRowSchema.safeParse(selectRelease.get(rootSetId, currentDate));
-    if (!row.success) {
+    const row = decodeCatalogReleaseSummaryRow(selectRelease.get(rootSetId, currentDate));
+    if (Option.isNone(row)) {
       throw new Error("The local card catalog contains an invalid release family.");
     }
-    return toCatalogReleaseSummary(row.data);
+    return toCatalogReleaseSummary(row.value);
   };
 }
 

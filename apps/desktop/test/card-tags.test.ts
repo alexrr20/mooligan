@@ -244,7 +244,7 @@ function printing(id: string): CatalogPrintingResult {
     status: "visible",
     visibility: { reason: "released" },
     detail: normalizeScryfallCardDetail(
-      ScryfallCardDownloadSchema.parse({
+      Schema.decodeUnknownSync(ScryfallCardDownloadSchema)({
         id,
         oracle_id: "shared-card",
         name: "Sol Ring",

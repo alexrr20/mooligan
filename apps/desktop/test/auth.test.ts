@@ -3,8 +3,8 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import * as z from "zod";
-import type { JSONType } from "zod";
+import { Either, Schema } from "effect";
+import type { JsonValue } from "@mooligan/domain/schema";
 
 import { type AsyncSafeStorage, ProtectedAuthStateSchema } from "../electron/auth/storage.ts";
 import {
@@ -29,12 +29,12 @@ const sanitizedUser = {
   image: "https://images.example.com/molly.png",
   name: "Molly",
 };
-const TokenRequestSchema = z.object({
-  code_verifier: z.string(),
-  state: z.string(),
-  token: z.string(),
+const TokenRequestSchema = Schema.Struct({
+  code_verifier: Schema.String,
+  state: Schema.String,
+  token: Schema.String,
 });
-type TokenRequest = z.infer<typeof TokenRequestSchema>;
+type TokenRequest = typeof TokenRequestSchema.Type;
 
 void test("desktop sign-in persists PKCE first and keeps session material out of public state", async () => {
   const directory = await mkdtemp(join(tmpdir(), "mooligan-auth-"));
@@ -56,11 +56,11 @@ void test("desktop sign-in persists PKCE first and keeps session material out of
       assert.equal(headers.get("origin"), `${AUTH_PROTOCOL}:/`);
       assert.equal(headers.get("electron-origin"), `${AUTH_PROTOCOL}:/`);
       tokenCalls += 1;
-      const body = z.string().safeParse(init?.body);
-      if (!body.success) {
+      const body = Schema.decodeUnknownEither(Schema.String)(init?.body);
+      if (Either.isLeft(body)) {
         throw new Error("missing token request body");
       }
-      tokenRequest = TokenRequestSchema.parse(JSON.parse(body.data));
+      tokenRequest = Schema.decodeUnknownSync(TokenRequestSchema)(JSON.parse(body.right));
       return jsonResponse({ token: "raw-session-token", user }, [
         "better-auth.session_token=session-one; Path=/; HttpOnly; Max-Age=3600",
         "not-better-auth.session_token=ignored; Path=/; Max-Age=3600",
@@ -381,7 +381,7 @@ class FakeSafeStorage implements AsyncSafeStorage {
 
   async readState(path: string) {
     const decrypted = await this.decryptStringAsync(await readFile(path));
-    return ProtectedAuthStateSchema.parse(JSON.parse(decrypted.result));
+    return Schema.decodeUnknownSync(ProtectedAuthStateSchema)(JSON.parse(decrypted.result));
   }
 }
 
@@ -394,7 +394,7 @@ function encodeToken(identifier: string, state: string) {
   return unpadded.padEnd(Math.ceil(unpadded.length / 4) * 4, "=");
 }
 
-function jsonResponse(data: JSONType, cookies: string[] = []) {
+function jsonResponse(data: JsonValue, cookies: string[] = []) {
   const headers = new Headers({ "content-type": "application/json" });
   for (const cookie of cookies) {
     headers.append("set-cookie", cookie);

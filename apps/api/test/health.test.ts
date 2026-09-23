@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+
+import { Schema } from "effect";
 // oxlint-disable-next-line vite-plus/prefer-vite-plus-imports -- Cloudflare's pool must share Vitest's runner instance.
 import { test, vi } from "vitest";
-import * as z from "zod";
 
 import { refreshCatalogRelease } from "../src/catalog-release.ts";
 import { api } from "../src/index.ts";
@@ -158,7 +159,7 @@ type ReleaseRow = {
   updated_at: string;
 };
 
-const WriteParametersSchema = z.tuple([z.string(), z.string(), z.number()]);
+const WriteParametersSchema = Schema.Tuple(Schema.String, Schema.String, Schema.Number);
 
 function releaseDatabase(initial?: ReleaseRow) {
   let current = initial;
@@ -184,7 +185,8 @@ function releaseDatabase(initial?: ReleaseRow) {
           ) as T;
         },
         async run() {
-          const [updatedAt, downloadUrl, compressedSize] = WriteParametersSchema.parse(parameters);
+          const [updatedAt, downloadUrl, compressedSize] =
+            Schema.decodeUnknownSync(WriteParametersSchema)(parameters);
           current = {
             compressed_size: compressedSize,
             download_url: downloadUrl,

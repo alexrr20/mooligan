@@ -1,129 +1,153 @@
-import * as z from "zod";
+import { Schema } from "effect";
 
-import { FinishSchema, ManaTypeSchema, RaritySchema } from "./catalog.ts";
+import { ColorSchema, FinishSchema, ManaTypeSchema, RaritySchema } from "./catalog.ts";
+import {
+  HttpsUrlSchema,
+  IsoDateSchema,
+  IsoOffsetDateTimeSchema,
+  StrictStruct,
+  UrlSchema,
+} from "./schema.ts";
 
-const httpsUrlSchema = z.url().refine((value) => new URL(value).protocol === "https:", {
-  message: "Expected an HTTPS URL",
+const nonemptyTextSchema = Schema.NonEmptyString;
+
+export const CatalogReleaseSchema = Schema.Struct({
+  compressedSize: Schema.Int.pipe(Schema.positive()),
+  downloadUrl: HttpsUrlSchema,
+  updatedAt: IsoOffsetDateTimeSchema,
 });
-const nonemptyTextSchema = z.string().min(1);
+export type CatalogRelease = typeof CatalogReleaseSchema.Type;
 
-export const CatalogReleaseSchema = z.object({
-  compressedSize: z.number().int().positive(),
-  downloadUrl: httpsUrlSchema,
-  updatedAt: z.iso.datetime({ offset: true }),
-});
-export type CatalogRelease = z.infer<typeof CatalogReleaseSchema>;
-
-export const ScryfallBulkDataSchema = z.object({
-  compressed_size: z.number().int().positive(),
-  jsonl_download_uri: httpsUrlSchema,
-  type: z.literal("default_cards"),
-  updated_at: z.iso.datetime({ offset: true }),
+export const ScryfallBulkDataSchema = Schema.Struct({
+  compressed_size: Schema.Int.pipe(Schema.positive()),
+  jsonl_download_uri: HttpsUrlSchema,
+  type: Schema.Literal("default_cards"),
+  updated_at: IsoOffsetDateTimeSchema,
 });
 
-export const ScryfallSetDownloadSchema = z.strictObject({
-  arena_code: nonemptyTextSchema.optional(),
-  block: nonemptyTextSchema.optional(),
-  block_code: nonemptyTextSchema.optional(),
-  card_count: z.number().int().nonnegative(),
+export const ScryfallSetDownloadSchema = StrictStruct({
+  arena_code: Schema.optional(nonemptyTextSchema),
+  block: Schema.optional(nonemptyTextSchema),
+  block_code: Schema.optional(nonemptyTextSchema),
+  card_count: Schema.NonNegativeInt,
   code: nonemptyTextSchema,
-  digital: z.boolean(),
-  foil_only: z.boolean(),
-  icon_svg_uri: httpsUrlSchema,
+  digital: Schema.Boolean,
+  foil_only: Schema.Boolean,
+  icon_svg_uri: HttpsUrlSchema,
   id: nonemptyTextSchema,
-  mtgo_code: nonemptyTextSchema.optional(),
+  mtgo_code: Schema.optional(nonemptyTextSchema),
   name: nonemptyTextSchema,
-  nonfoil_only: z.boolean(),
-  object: z.literal("set"),
-  parent_set_code: nonemptyTextSchema.optional(),
-  printed_size: z.number().int().nonnegative().nullish(),
-  released_at: z.iso.date().nullish(),
-  scryfall_uri: httpsUrlSchema,
-  search_uri: httpsUrlSchema,
+  nonfoil_only: Schema.Boolean,
+  object: Schema.Literal("set"),
+  parent_set_code: Schema.optional(nonemptyTextSchema),
+  printed_size: Schema.optional(Schema.NullOr(Schema.NonNegativeInt)),
+  released_at: Schema.optional(Schema.NullOr(IsoDateSchema)),
+  scryfall_uri: HttpsUrlSchema,
+  search_uri: HttpsUrlSchema,
   set_type: nonemptyTextSchema,
-  tcgplayer_id: z.number().int().positive().optional(),
-  uri: httpsUrlSchema,
+  tcgplayer_id: Schema.optional(Schema.Int.pipe(Schema.positive())),
+  uri: HttpsUrlSchema,
 });
-export type ScryfallSetDownload = z.infer<typeof ScryfallSetDownloadSchema>;
+export type ScryfallSetDownload = typeof ScryfallSetDownloadSchema.Type;
 
-export const ScryfallSetListSchema = z.strictObject({
-  data: z.array(ScryfallSetDownloadSchema).min(1),
-  has_more: z.literal(false),
-  object: z.literal("list"),
+export const ScryfallSetListSchema = StrictStruct({
+  data: Schema.Array(ScryfallSetDownloadSchema).pipe(Schema.minItems(1)),
+  has_more: Schema.Literal(false),
+  object: Schema.Literal("list"),
 });
-export type ScryfallSetList = z.infer<typeof ScryfallSetListSchema>;
+export type ScryfallSetList = typeof ScryfallSetListSchema.Type;
 
-const ScryfallImageUrisSchema = z.object({
-  art_crop: z.url().nullish(),
-  grid: z.url().nullish(),
-  normal: z.url().nullish(),
-  small: z.url().nullish(),
-  thumb: z.url().nullish(),
-});
-
-const ScryfallCardFaceDownloadSchema = z.object({
-  artist: z.string().nullish(),
-  defense: z.string().nullish(),
-  flavor_text: z.string().nullish(),
-  image_uris: ScryfallImageUrisSchema.nullish(),
-  loyalty: z.string().nullish(),
-  mana_cost: z.string().nullish(),
-  name: z.string().min(1).optional(),
-  oracle_text: z.string().nullish(),
-  power: z.string().nullish(),
-  toughness: z.string().nullish(),
-  type_line: z.string().min(1).optional(),
+const optionalUrlSchema = Schema.optional(Schema.NullOr(UrlSchema));
+const ScryfallImageUrisSchema = Schema.Struct({
+  art_crop: optionalUrlSchema,
+  grid: optionalUrlSchema,
+  normal: optionalUrlSchema,
+  small: optionalUrlSchema,
+  thumb: optionalUrlSchema,
 });
 
-const ScryfallLegalityStatusSchema = z.enum(["legal", "not_legal", "restricted", "banned"]);
+const optionalTextSchema = Schema.optional(Schema.NullOr(Schema.String));
+const ScryfallCardFaceDownloadSchema = Schema.Struct({
+  artist: optionalTextSchema,
+  defense: optionalTextSchema,
+  flavor_text: optionalTextSchema,
+  image_uris: Schema.optional(Schema.NullOr(ScryfallImageUrisSchema)),
+  loyalty: optionalTextSchema,
+  mana_cost: optionalTextSchema,
+  name: Schema.optional(nonemptyTextSchema),
+  oracle_text: optionalTextSchema,
+  power: optionalTextSchema,
+  toughness: optionalTextSchema,
+  type_line: Schema.optional(nonemptyTextSchema),
+});
 
-export const ScryfallCardDownloadSchema = z
-  .object({
-    artist: z.string().nullish(),
-    card_faces: z.array(ScryfallCardFaceDownloadSchema).optional(),
-    collector_number: z.string().min(1),
-    color_identity: z.array(z.enum(["W", "U", "B", "R", "G"])).optional(),
-    cmc: z.number().nonnegative().optional(),
-    defense: z.string().nullish(),
-    digital: z.boolean().optional(),
-    finishes: z.array(FinishSchema).optional(),
-    flavor_text: z.string().nullish(),
-    id: z.string().min(1),
-    image_uris: ScryfallImageUrisSchema.nullish(),
-    keywords: z.array(z.string().min(1)).optional(),
-    layout: z.string().min(1).optional(),
-    lang: z.string().min(1).nullish(),
-    legalities: z.record(z.string().min(1), ScryfallLegalityStatusSchema).optional(),
-    loyalty: z.string().nullish(),
-    mana_cost: z.string().nullish(),
-    name: z.string().min(1),
-    object: z.literal("card"),
-    oracle_text: z.string().nullish(),
-    oracle_id: z.string().min(1).nullable().optional(),
-    power: z.string().nullish(),
-    produced_mana: z.array(z.union([ManaTypeSchema, z.enum(["2", "T"])])).optional(),
-    promo: z.boolean().optional(),
-    rarity: RaritySchema,
-    released_at: z.iso.date().nullish(),
-    set: z.string().min(1),
-    set_id: z.string().min(1),
-    set_name: z.string().min(1),
-    toughness: z.string().nullish(),
-    type_line: z.string().min(1).optional(),
-  })
-  .transform((card) => ({
-    ...card,
-    type_line:
-      card.type_line ??
-      [
-        ...new Set(
-          card.card_faces?.flatMap((face) => (face.type_line ? [face.type_line] : [])) ?? [],
-        ),
-      ].join(" // "),
-  }))
-  .refine((card) => card.type_line.length > 0, {
-    message: "A card or card face must provide a type line",
-    path: ["type_line"],
-  });
+const ScryfallLegalityStatusSchema = Schema.Literal("legal", "not_legal", "restricted", "banned");
 
-export type ScryfallCardDownload = z.infer<typeof ScryfallCardDownloadSchema>;
+const scryfallCardFields = {
+  artist: optionalTextSchema,
+  card_faces: Schema.optional(Schema.Array(ScryfallCardFaceDownloadSchema)),
+  collector_number: nonemptyTextSchema,
+  color_identity: Schema.optional(Schema.Array(ColorSchema)),
+  cmc: Schema.optional(Schema.Finite.pipe(Schema.nonNegative())),
+  defense: optionalTextSchema,
+  digital: Schema.optional(Schema.Boolean),
+  finishes: Schema.optional(Schema.Array(FinishSchema)),
+  flavor_text: optionalTextSchema,
+  id: nonemptyTextSchema,
+  image_uris: Schema.optional(Schema.NullOr(ScryfallImageUrisSchema)),
+  keywords: Schema.optional(Schema.Array(nonemptyTextSchema)),
+  layout: Schema.optional(nonemptyTextSchema),
+  lang: Schema.optional(Schema.NullOr(nonemptyTextSchema)),
+  legalities: Schema.optional(
+    Schema.Record({ key: nonemptyTextSchema, value: ScryfallLegalityStatusSchema }).annotations({
+      parseOptions: { onExcessProperty: "error" },
+    }),
+  ),
+  loyalty: optionalTextSchema,
+  mana_cost: optionalTextSchema,
+  name: nonemptyTextSchema,
+  object: Schema.Literal("card"),
+  oracle_text: optionalTextSchema,
+  oracle_id: Schema.optional(Schema.NullOr(nonemptyTextSchema)),
+  power: optionalTextSchema,
+  produced_mana: Schema.optional(
+    Schema.Array(Schema.Union(ManaTypeSchema, Schema.Literal("2", "T"))),
+  ),
+  promo: Schema.optional(Schema.Boolean),
+  rarity: RaritySchema,
+  released_at: Schema.optional(Schema.NullOr(IsoDateSchema)),
+  set: nonemptyTextSchema,
+  set_id: nonemptyTextSchema,
+  set_name: nonemptyTextSchema,
+  toughness: optionalTextSchema,
+  type_line: Schema.optional(nonemptyTextSchema),
+};
+
+/** A Scryfall card whose type line falls back to the distinct type lines of its faces. */
+export const ScryfallCardDownloadSchema = Schema.transform(
+  Schema.Struct(scryfallCardFields),
+  Schema.typeSchema(
+    Schema.Struct({
+      ...scryfallCardFields,
+      type_line: Schema.String.pipe(
+        Schema.minLength(1, { message: () => "A card or card face must provide a type line" }),
+      ),
+    }),
+  ),
+  {
+    strict: true,
+    decode: (card) => ({
+      ...card,
+      type_line:
+        card.type_line ??
+        [
+          ...new Set(
+            card.card_faces?.flatMap((face) => (face.type_line ? [face.type_line] : [])) ?? [],
+          ),
+        ].join(" // "),
+    }),
+    encode: (card) => card,
+  },
+);
+
+export type ScryfallCardDownload = typeof ScryfallCardDownloadSchema.Type;

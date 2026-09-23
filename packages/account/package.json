@@ -13,8 +13,9 @@
     "build": "tsc --noEmit"
   },
   "dependencies": {
+    "@mooligan/domain": "workspace:*",
     "@mooligan/workspace": "workspace:*",
-    "zod": "catalog:"
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

@@ -7,10 +7,16 @@ import { WorkspaceRegistry } from "@mooligan/account/registry";
 import type { WorkspaceRuntime } from "@mooligan/account/runtime";
 import { workspaceEventSchemaVersion, workspaceIdForBindingSecret } from "@mooligan/workspace";
 import { afterEach, expect, test, vi } from "vite-plus/test";
-import * as z from "zod";
+import { UuidSchema, UuidV4Schema } from "@mooligan/domain/schema";
+import { Schema } from "effect";
 
 import { accountConfiguration } from "./config";
 import { MobileAccount, type LocalWorkspace } from "./mobile-account";
+
+const decodeBody = Schema.decodeUnknownSync(Schema.parseJson());
+const decodeBinding = Schema.decodeUnknownSync(
+  Schema.parseJson(Schema.Struct({ workspaceId: UuidSchema, bindingSecret: UuidV4Schema })),
+);
 
 const user = { id: randomUUID(), name: "Molly", email: "molly@example.com", image: null };
 const initialTime = Date.now();
@@ -45,7 +51,7 @@ class Fixture {
       const url = new URL(input instanceof Request ? input.url : input);
       if (url.pathname === "/api/auth/sign-in/social") {
         this.signInRequests++;
-        expect(JSON.parse(z.string().parse(init?.body))).toEqual({
+        expect(decodeBody(init?.body)).toEqual({
           provider: "google",
           callbackURL: "com.mooligan.app://settings",
         });
@@ -65,16 +71,14 @@ class Fixture {
       }
       if (url.pathname === "/api/workspace/bind") {
         if (this.bindFails) return new Response(null, { status: 503 });
-        const body = z
-          .object({ workspaceId: z.uuid(), bindingSecret: z.uuidv4() })
-          .parse(JSON.parse(z.string().parse(init?.body)));
+        const body = decodeBinding(init?.body);
         expect(workspaceIdForBindingSecret(body.bindingSecret)).toBe(body.workspaceId);
         this.remoteWorkspaceId = body.workspaceId;
         return Response.json({ workspaceId: body.workspaceId, createdAt: "2026-09-06" });
       }
       if (url.pathname === "/api/workspace/sync-credential") {
         this.credentialRequests++;
-        expect(JSON.parse(z.string().parse(init?.body))).toEqual({
+        expect(decodeBody(init?.body)).toEqual({
           appVersion: "1.0.0",
           eventSchemaVersion: workspaceEventSchemaVersion,
         });

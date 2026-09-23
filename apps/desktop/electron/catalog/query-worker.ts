@@ -1,8 +1,9 @@
 import { DatabaseSync } from "node:sqlite";
 import { parentPort, workerData } from "node:worker_threads";
 
-import { CollectionLotTransportSchema } from "@mooligan/workspace/transport";
-import * as z from "zod";
+import { CollectionLotSchema } from "@mooligan/workspace/collection-contract";
+import { StrictStruct } from "@mooligan/domain/schema";
+import { Option, Schema } from "effect";
 
 import {
   createCatalogColorsQuery,
@@ -27,22 +28,22 @@ import {
 } from "@mooligan/catalog/collection-projection";
 
 const port = parentPort;
-const startup = z
-  .strictObject({
-    catalogPath: z.string().min(1),
-    pricePath: z.string().min(1),
-    collectionLots: z.array(CollectionLotTransportSchema).max(100_000),
-  })
-  .safeParse(workerData);
+const startup = Schema.decodeUnknownOption(
+  StrictStruct({
+    catalogPath: Schema.NonEmptyString,
+    pricePath: Schema.NonEmptyString,
+    collectionLots: Schema.Array(CollectionLotSchema).pipe(Schema.maxItems(100_000)),
+  }),
+)(workerData);
 
-if (!port || !startup.success) {
+if (!port || Option.isNone(startup)) {
   throw new Error("The catalog query worker was started without trusted catalog state.");
 }
 
-const database = new DatabaseSync(startup.data.catalogPath, { readOnly: true });
-database.prepare("ATTACH DATABASE ? AS market_prices").run(startup.data.pricePath);
+const database = new DatabaseSync(startup.value.catalogPath, { readOnly: true });
+database.prepare("ATTACH DATABASE ? AS market_prices").run(startup.value.pricePath);
 const collectionProjection = createCollectionProjection(database);
-collectionProjection.replace(startup.data.collectionLots);
+collectionProjection.replace(startup.value.collectionLots);
 const listCatalog = createCatalogQuery(database);
 const listCollection = createCollectionQuery(database);
 const queryColors = createCatalogColorsQuery(database);

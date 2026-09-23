@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+
+import { Schema } from "effect";
 import { normalizeScryfallCardDetail } from "@mooligan/domain/catalog-detail";
 import {
   ScryfallCardDownloadSchema,
@@ -19,7 +21,7 @@ function printing(id: string, fields: Partial<ScryfallCardDownload> = {}): Catal
     status: "visible",
     visibility: { reason: "released" },
     detail: normalizeScryfallCardDetail(
-      ScryfallCardDownloadSchema.parse({
+      Schema.decodeUnknownSync(ScryfallCardDownloadSchema)({
         id,
         name: id,
         object: "card",

@@ -33,8 +33,8 @@ import {
   type SpoilerVisibilitySnapshot,
 } from "@mooligan/domain/spoilers";
 import { app, ipcMain, net, type IpcMainInvokeEvent } from "electron";
-import * as z from "zod";
-import type { JSONType } from "zod";
+import { Either, Schema } from "effect";
+import { UuidSchema, StrictStruct, type JsonValue } from "@mooligan/domain/schema";
 
 import type { CatalogProgress, CatalogStatus } from "../../shared/desktop-api.ts";
 import { settleCatalogRequest } from "../../shared/catalog-request.ts";
@@ -71,11 +71,18 @@ const scryfallRequestHeaders = {
   Accept: "application/json",
   "User-Agent": "Mooligan/0.0.0 (https://github.com/alexrr20/mooligan)",
 };
-const CatalogMetadataSchema = CatalogSnapshotSchema.extend({ schemaVersion: z.number().int() });
-const CatalogImportWorkerMessageSchema = z.discriminatedUnion("type", [
-  z.strictObject({ completedCards: z.number().int().nonnegative(), type: z.literal("progress") }),
-  z.strictObject({ snapshot: CatalogSnapshotSchema, type: z.literal("complete") }),
-]);
+const CatalogMetadataSchema = Schema.Struct({
+  ...CatalogSnapshotSchema.fields,
+  schemaVersion: Schema.Int,
+});
+const CatalogImportWorkerMessageSchema = Schema.Union(
+  StrictStruct({ completedCards: Schema.NonNegativeInt, type: Schema.Literal("progress") }),
+  StrictStruct({ snapshot: CatalogSnapshotSchema, type: Schema.Literal("complete") }),
+);
+const decodeRequestId = Schema.decodeUnknownSync(UuidSchema);
+const decodeWorkerEnvelope = Schema.decodeUnknownEither(
+  Schema.Struct({ id: Schema.Int.pipe(Schema.positive()) }),
+);
 let activeDownload: Promise<CatalogStatus> | undefined;
 let catalogEpoch = 0;
 let pricePath: string;
@@ -89,11 +96,11 @@ let isCollectionProjectionReady: (() => boolean) | undefined;
 let onCollectionProjectionInvalidated: (() => void) | undefined;
 type CatalogQueryResult =
   | DeckCost
-  | Color[]
+  | readonly Color[]
   | CatalogListPage
   | CollectionListPage
   | CatalogPrintingResult
-  | CatalogReleaseSummary[]
+  | readonly CatalogReleaseSummary[]
   | CatalogUpcomingPrintingPage
   | SpoilerRevealSummaries
   | string
@@ -137,7 +144,7 @@ export function registerCatalogIpc(options: CatalogIpcOptions) {
   });
   ipcMain.handle("catalog:cancel-query", (event, requestId) => {
     assertTrustedSender(event);
-    const key = `${event.sender.id}:${z.uuid().parse(requestId)}`;
+    const key = `${event.sender.id}:${decodeRequestId(requestId)}`;
     catalogRequestControllers.get(key)?.abort();
   });
   ipcMain.handle("catalog:list", (event, request, requestId) => {
@@ -152,7 +159,7 @@ export function registerCatalogIpc(options: CatalogIpcOptions) {
   });
   ipcMain.handle("catalog:colors", async (event, printingIds) => {
     assertTrustedSender(event);
-    const ids = CatalogColorPrintingIdsSchema.parse(printingIds);
+    const ids = Schema.decodeUnknownSync(CatalogColorPrintingIdsSchema)(printingIds);
     await catalogQueriesAvailable;
     return queryCatalogWithStableVisibility((visibility) =>
       queryCatalog({ type: "colors", printingIds: ids, visibility }),
@@ -164,7 +171,7 @@ export function registerCatalogIpc(options: CatalogIpcOptions) {
   });
   ipcMain.handle("catalog:deck-cost", async (event, value) => {
     assertTrustedSender(event);
-    const request = DeckCostRequestSchema.parse(value);
+    const request = Schema.decodeUnknownSync(DeckCostRequestSchema)(value);
     await catalogQueriesAvailable;
     return queryCatalogWithStableVisibility((visibility) =>
       queryCatalog({ type: "deck-cost", request, visibility }),
@@ -172,7 +179,7 @@ export function registerCatalogIpc(options: CatalogIpcOptions) {
   });
   ipcMain.handle("catalog:validate-collection-printing", async (event, value) => {
     assertTrustedSender(event);
-    const request = CollectionPrintingValidationRequestSchema.parse(value);
+    const request = Schema.decodeUnknownSync(CollectionPrintingValidationRequestSchema)(value);
     const result = await queryCatalogPrintingDetail(request.printingId);
     assertPrintingCanUseFinish(result, request);
   });
@@ -240,11 +247,11 @@ export function registerCatalogIpc(options: CatalogIpcOptions) {
 
 async function withCatalogRequest<Result>(
   event: IpcMainInvokeEvent,
-  requestId: JSONType | undefined,
+  requestId: JsonValue | undefined,
   read: (signal?: AbortSignal) => Promise<Result>,
 ) {
   if (requestId === undefined) return settleCatalogRequest(() => read());
-  const key = `${event.sender.id}:${z.uuid().parse(requestId)}`;
+  const key = `${event.sender.id}:${decodeRequestId(requestId)}`;
   if (catalogRequestControllers.has(key)) throw new Error("Duplicate catalog request.");
   const controller = new AbortController();
   catalogRequestControllers.set(key, controller);
@@ -255,14 +262,14 @@ async function withCatalogRequest<Result>(
   }
 }
 
-export function replaceCatalogCollectionProjection(lots: CollectionLot[]) {
+export function replaceCatalogCollectionProjection(lots: readonly CollectionLot[]) {
   return catalogQueryWorker
     ? sendCollectionProjectionOperation({ lots, type: "collection-projection-replace" })
     : Promise.resolve();
 }
 
 export function applyCatalogCollectionProjection(
-  delta: Readonly<{ deletedLotIds: string[]; upserts: CollectionLot[] }>,
+  delta: Readonly<{ deletedLotIds: readonly string[]; upserts: readonly CollectionLot[] }>,
 ) {
   return catalogQueryWorker
     ? sendCollectionProjectionOperation({ ...delta, type: "collection-projection-apply" })
@@ -300,13 +307,13 @@ async function getCatalogStatus(): Promise<CatalogStatus> {
         )
         .get();
 
-      const snapshot = CatalogMetadataSchema.safeParse(row);
+      const snapshot = Schema.decodeUnknownEither(CatalogMetadataSchema)(row);
 
-      if (!snapshot.success || snapshot.data.schemaVersion !== catalogSchemaVersion) {
+      if (Either.isLeft(snapshot) || snapshot.right.schemaVersion !== catalogSchemaVersion) {
         return { installed: false };
       }
 
-      installed = snapshot.data;
+      installed = snapshot.right;
     } finally {
       database.close();
     }
@@ -436,19 +443,19 @@ function importCatalogInWorker(
     };
 
     worker.on("message", (value) => {
-      const message = CatalogImportWorkerMessageSchema.safeParse(value);
-      if (!message.success) {
+      const message = Schema.decodeUnknownEither(CatalogImportWorkerMessageSchema)(value);
+      if (Either.isLeft(message)) {
         void worker.terminate().catch(() => undefined);
         fail(new Error("The catalog import worker returned an invalid response."));
         return;
       }
-      if (message.data.type === "progress") {
-        onProgress(message.data.completedCards);
+      if (message.right.type === "progress") {
+        onProgress(message.right.completedCards);
         return;
       }
 
       settled = true;
-      resolve(message.data.snapshot);
+      resolve(message.right.snapshot);
     });
     worker.once("error", fail);
     worker.once("exit", (code) => {
@@ -461,7 +468,7 @@ function importCatalogInWorker(
   });
 }
 
-async function fetchScryfallSets(): Promise<ScryfallSetDownload[]> {
+async function fetchScryfallSets(): Promise<readonly ScryfallSetDownload[]> {
   const response = await net.fetch(scryfallSetsUrl, { headers: scryfallRequestHeaders });
   if (!response.ok) {
     throw new Error(`The Scryfall set catalog returned HTTP ${response.status}.`);
@@ -473,11 +480,11 @@ async function fetchScryfallSets(): Promise<ScryfallSetDownload[]> {
   } catch {
     throw new Error("The Scryfall set catalog returned invalid JSON.");
   }
-  const sets = ScryfallSetListSchema.safeParse(value);
-  if (!sets.success) {
+  const sets = Schema.decodeUnknownEither(ScryfallSetListSchema)(value);
+  if (Either.isLeft(sets)) {
     throw new Error("The Scryfall set catalog response was invalid.");
   }
-  return sets.data.data;
+  return sets.right.data;
 }
 
 async function fetchCatalogRelease(): Promise<CatalogRelease> {
@@ -491,13 +498,13 @@ async function fetchCatalogRelease(): Promise<CatalogRelease> {
     );
   }
 
-  const release = CatalogReleaseSchema.safeParse(await response.json());
+  const release = Schema.decodeUnknownEither(CatalogReleaseSchema)(await response.json());
 
-  if (!release.success) {
+  if (Either.isLeft(release)) {
     throw new Error("The catalog service returned an invalid release.");
   }
 
-  return release.data;
+  return release.right;
 }
 
 async function replaceCatalog(partial: string, destination: string, backup: string) {
@@ -563,7 +570,7 @@ export async function resolveCatalogRootSetId(targetId: string) {
 }
 
 export async function queryCatalogPrintingDetail(
-  printingId: JSONType,
+  printingId: JsonValue,
 ): Promise<CatalogPrintingResult | null> {
   const validPrintingId = validateCatalogPrintingId(printingId);
 
@@ -609,7 +616,7 @@ function queryCatalog(
 ): Promise<DeckCost>;
 function queryCatalog(
   operation: Extract<CatalogQueryOperation, { type: "colors" }>,
-): Promise<Color[] | null>;
+): Promise<readonly Color[] | null>;
 function queryCatalog(
   operation: Extract<CatalogQueryOperation, { type: "detail" }>,
 ): Promise<CatalogPrintingResult | null>;
@@ -635,7 +642,7 @@ function queryCatalog(
 ): Promise<SpoilerRevealSummaries>;
 function queryCatalog(
   operation: Extract<CatalogQueryOperation, { type: "upcoming" }>,
-): Promise<CatalogReleaseSummary[]>;
+): Promise<readonly CatalogReleaseSummary[]>;
 function queryCatalog(
   operation: Extract<CatalogQueryOperation, { type: "upcoming-printings" }>,
 ): Promise<CatalogUpcomingPrintingPage>;
@@ -711,27 +718,27 @@ function getCatalogQueryWorker() {
   );
 
   worker.on("message", (value) => {
-    const envelope = z.object({ id: z.number().int().positive() }).safeParse(value);
+    const envelope = decodeWorkerEnvelope(value);
 
-    if (!envelope.success) {
+    if (Either.isLeft(envelope)) {
       failCatalogQueryWorker(worker);
       return;
     }
 
-    const projectionPending = collectionProjectionRequests.get(envelope.data.id);
+    const projectionPending = collectionProjectionRequests.get(envelope.right.id);
     if (projectionPending) {
       const response = parseCollectionProjectionWorkerResponse(value, projectionPending.operation);
       if (!response) {
         failCatalogQueryWorker(worker);
         return;
       }
-      collectionProjectionRequests.delete(envelope.data.id);
+      collectionProjectionRequests.delete(envelope.right.id);
       if ("error" in response) projectionPending.reject(catalogReadError());
       else projectionPending.resolve();
       return;
     }
 
-    const pending = catalogQueries.get(envelope.data.id);
+    const pending = catalogQueries.get(envelope.right.id);
     if (!pending) {
       failCatalogQueryWorker(worker);
       return;
@@ -744,7 +751,7 @@ function getCatalogQueryWorker() {
       return;
     }
 
-    catalogQueries.delete(envelope.data.id);
+    catalogQueries.delete(envelope.right.id);
 
     if ("error" in response) {
       pending.reject(catalogReadError());

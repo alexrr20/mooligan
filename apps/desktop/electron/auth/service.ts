@@ -6,8 +6,8 @@ import {
   splitSetCookieHeader,
   stripSecureCookiePrefix,
 } from "better-auth/cookies";
-import * as z from "zod";
-import type { JSONType } from "zod";
+import { type JsonValue, JsonValueSchema, StrictStruct } from "@mooligan/domain/schema";
+import { Either, Option, Schema } from "effect";
 
 import type { AuthSnapshot, AuthStatus, AuthUser } from "../../shared/desktop-api.ts";
 import {
@@ -35,25 +35,27 @@ const SAFE_COOKIE_VALUE = /^[\x21\x23-\x2B\x2D-\x3A\x3C-\x5B\x5D-\x7E]*$/;
 const PKCE_VALUE = /^[A-Za-z0-9_-]{43}$/;
 const RAW_AUTHORIZATION_CODE = /^[A-Za-z0-9]{32}$/;
 const ENCODED_AUTHORIZATION_CODE = /^[A-Za-z0-9_-]+={0,2}$/;
-const RedirectTokenSchema = z.strictObject({
-  identifier: z.string().regex(RAW_AUTHORIZATION_CODE),
-  state: z.string().regex(PKCE_VALUE),
+const RedirectTokenSchema = StrictStruct({
+  identifier: Schema.String.pipe(Schema.pattern(RAW_AUTHORIZATION_CODE)),
+  state: Schema.String.pipe(Schema.pattern(PKCE_VALUE)),
 });
-const AuthUserPayloadSchema = z.object({
-  email: z
-    .string()
-    .min(1)
-    .max(320)
-    .refine((value) => !hasControlCharacter(value)),
-  id: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
-  image: z.json().optional(),
-  name: z
-    .string()
-    .min(1)
-    .max(200)
-    .refine((value) => !hasControlCharacter(value)),
+const AuthUserPayloadSchema = Schema.Struct({
+  email: Schema.String.pipe(
+    Schema.minLength(1),
+    Schema.maxLength(320),
+    Schema.filter((value) => !hasControlCharacter(value)),
+  ),
+  id: Schema.String.pipe(Schema.pattern(/^[A-Za-z0-9_-]{1,128}$/)),
+  image: Schema.optional(JsonValueSchema),
+  name: Schema.String.pipe(
+    Schema.minLength(1),
+    Schema.maxLength(200),
+    Schema.filter((value) => !hasControlCharacter(value)),
+  ),
 });
-const AuthUserEnvelopeSchema = z.object({ user: z.json() });
+const AuthUserEnvelopeSchema = Schema.Struct({ user: JsonValueSchema });
+const isCallbackCandidate = Schema.is(Schema.String);
+const decodeProfileImage = Schema.decodeUnknownOption(Schema.String.pipe(Schema.maxLength(2_048)));
 
 type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 export type AccountWorkspaceApiPath =
@@ -339,7 +341,7 @@ export class DesktopAuth {
       throw new AuthRequestError("The authentication service rejected the sign-in response.");
     }
 
-    const data = AuthUserEnvelopeSchema.parse(await readJson(response));
+    const data = Schema.decodeUnknownSync(AuthUserEnvelopeSchema)(await readJson(response));
     const user = sanitizeUser(data.user);
     const next = this.#cookiesFromResponse(response, state.cookies);
 
@@ -383,7 +385,7 @@ export class DesktopAuth {
         return this.#setSnapshot("signed-out", null);
       }
 
-      const session = AuthUserEnvelopeSchema.parse(data);
+      const session = Schema.decodeUnknownSync(AuthUserEnvelopeSchema)(data);
       const user = sanitizeUser(session.user);
       state.user = user;
       await this.#storage.save(state);
@@ -609,13 +611,12 @@ export function resolveAuthOrigin(value = process.env[AUTH_ORIGIN_ENV]) {
   return url.origin;
 }
 
-export function isAuthCallbackUrl(value: JSONType): value is string {
-  const candidate = z.string().safeParse(value);
-  if (!candidate.success) {
+export function isAuthCallbackUrl(value: JsonValue): value is string {
+  if (!isCallbackCandidate(value)) {
     return false;
   }
   try {
-    parseDeepLink(candidate.data);
+    parseDeepLink(value);
     return true;
   } catch {
     return false;
@@ -684,12 +685,12 @@ function parseEncodedAuthorizationCode(value: string): RedirectToken {
     throw new AuthInputError("The authorization code is invalid.");
   }
 
-  const token = RedirectTokenSchema.safeParse(data);
-  if (!token.success) {
+  const token = Schema.decodeUnknownEither(RedirectTokenSchema)(data);
+  if (Either.isLeft(token)) {
     throw new AuthInputError("The authorization code is invalid.");
   }
 
-  return token.data;
+  return token.right;
 }
 
 function createPendingAuth(now: number): PendingAuth {
@@ -732,17 +733,17 @@ function cookieExpiry(
   return null;
 }
 
-function sanitizeUser(value: JSONType): AuthUser {
-  const user = AuthUserPayloadSchema.safeParse(value);
-  if (!user.success) {
+function sanitizeUser(value: JsonValue): AuthUser {
+  const user = Schema.decodeUnknownEither(AuthUserPayloadSchema)(value);
+  if (Either.isLeft(user)) {
     throw new AuthRequestError("The authentication service returned an invalid user.");
   }
 
   let image: string | null = null;
-  const imageValue = z.string().max(2_048).safeParse(user.data.image);
-  if (imageValue.success) {
+  const imageValue = decodeProfileImage(user.right.image);
+  if (Option.isSome(imageValue)) {
     try {
-      const url = new URL(imageValue.data);
+      const url = new URL(imageValue.value);
       if (url.protocol === "https:") {
         image = url.href;
       }
@@ -751,10 +752,10 @@ function sanitizeUser(value: JSONType): AuthUser {
     }
   }
 
-  return { email: user.data.email, id: user.data.id, image, name: user.data.name };
+  return { email: user.right.email, id: user.right.id, image, name: user.right.name };
 }
 
-async function readJson(response: Response): Promise<JSONType> {
+async function readJson(response: Response): Promise<JsonValue> {
   try {
     return await response.json();
   } catch (error) {

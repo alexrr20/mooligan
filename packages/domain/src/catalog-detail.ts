@@ -1,4 +1,5 @@
-import * as z from "zod";
+import { Schema } from "effect";
+import type { Mutable } from "effect/Types";
 
 import {
   ColorSchema,
@@ -8,101 +9,107 @@ import {
   RaritySchema,
 } from "./catalog.ts";
 import type { ScryfallCardDownload } from "./catalog-download.ts";
+import { IsoDateSchema } from "./schema.ts";
 
-const idSchema = z.string().min(1);
-const textSchema = z.string().min(1);
+const idSchema = Schema.NonEmptyString;
+const textSchema = Schema.NonEmptyString;
 
-export const CatalogCardFaceSchema = z.object({
-  defense: textSchema.optional(),
-  loyalty: textSchema.optional(),
-  manaCost: textSchema.optional(),
+export const CatalogCardFaceSchema = Schema.Struct({
+  defense: Schema.optional(textSchema),
+  loyalty: Schema.optional(textSchema),
+  manaCost: Schema.optional(textSchema),
   name: textSchema,
-  oracleText: textSchema.optional(),
-  power: textSchema.optional(),
-  toughness: textSchema.optional(),
+  oracleText: Schema.optional(textSchema),
+  power: Schema.optional(textSchema),
+  toughness: Schema.optional(textSchema),
   typeLine: textSchema,
 });
-export type CatalogCardFace = z.infer<typeof CatalogCardFaceSchema>;
+export type CatalogCardFace = typeof CatalogCardFaceSchema.Type;
 
-export const CatalogCardIdentitySchema = z.object({
-  colorIdentity: z.array(ColorSchema),
-  faces: z.array(CatalogCardFaceSchema).min(1),
-  hasSharedIdentity: z.boolean(),
+export const CatalogCardIdentitySchema = Schema.Struct({
+  colorIdentity: Schema.Array(ColorSchema),
+  faces: Schema.Array(CatalogCardFaceSchema).pipe(Schema.minItems(1)),
+  hasSharedIdentity: Schema.Boolean,
   id: idSchema,
-  keywords: z.array(textSchema),
-  layout: textSchema.optional(),
-  manaValue: z.number().nonnegative().optional(),
+  keywords: Schema.Array(textSchema),
+  layout: Schema.optional(textSchema),
+  manaValue: Schema.optional(Schema.Finite.pipe(Schema.nonNegative())),
   name: textSchema,
-  producedMana: z.array(ManaTypeSchema),
+  producedMana: Schema.Array(ManaTypeSchema),
 });
-export type CatalogCardIdentity = z.infer<typeof CatalogCardIdentitySchema>;
+export type CatalogCardIdentity = typeof CatalogCardIdentitySchema.Type;
 
-export const CatalogImageSizeSchema = z.enum(["art_crop", "grid", "normal", "small", "thumb"]);
-export type CatalogImageSize = z.infer<typeof CatalogImageSizeSchema>;
+export const CatalogImageSizeSchema = Schema.Literal(
+  "art_crop",
+  "grid",
+  "normal",
+  "small",
+  "thumb",
+);
+export type CatalogImageSize = typeof CatalogImageSizeSchema.Type;
 
-export const CatalogImageDescriptorSchema = z.object({
-  faceIndex: z.number().int().nonnegative(),
+export const CatalogImageDescriptorSchema = Schema.Struct({
+  faceIndex: Schema.NonNegativeInt,
   printingId: idSchema,
   size: CatalogImageSizeSchema,
 });
-export type CatalogImageDescriptor = z.infer<typeof CatalogImageDescriptorSchema>;
+export type CatalogImageDescriptor = typeof CatalogImageDescriptorSchema.Type;
 
-export const CatalogSelectedPrintingSchema = z.object({
-  artists: z.array(textSchema).min(1).optional(),
+export const CatalogSelectedPrintingSchema = Schema.Struct({
+  artists: Schema.optional(Schema.Array(textSchema).pipe(Schema.minItems(1))),
   collectorNumber: textSchema,
-  finishes: z.array(FinishSchema).min(1).optional(),
+  finishes: Schema.optional(Schema.Array(FinishSchema).pipe(Schema.minItems(1))),
   id: idSchema,
-  images: z.array(CatalogImageDescriptorSchema),
-  isDigital: z.boolean(),
-  isPromo: z.boolean(),
-  language: textSchema.optional(),
+  images: Schema.Array(CatalogImageDescriptorSchema),
+  isDigital: Schema.Boolean,
+  isPromo: Schema.Boolean,
+  language: Schema.optional(textSchema),
   rarity: RaritySchema,
-  releasedOn: z.iso.date().optional(),
+  releasedOn: Schema.optional(IsoDateSchema),
   setCode: textSchema,
   setName: textSchema,
 });
-export type CatalogSelectedPrinting = z.infer<typeof CatalogSelectedPrintingSchema>;
+export type CatalogSelectedPrinting = typeof CatalogSelectedPrintingSchema.Type;
 
-export const CatalogSiblingPrintingSchema = z.object({
+export const CatalogSiblingPrintingSchema = Schema.Struct({
   collectorNumber: textSchema,
   id: idSchema,
-  image: CatalogImageDescriptorSchema.optional(),
-  isDigital: z.boolean(),
-  isPromo: z.boolean(),
-  language: textSchema.optional(),
+  image: Schema.optional(CatalogImageDescriptorSchema),
+  isDigital: Schema.Boolean,
+  isPromo: Schema.Boolean,
+  language: Schema.optional(textSchema),
   rarity: RaritySchema,
-  releasedOn: z.iso.date().optional(),
+  releasedOn: Schema.optional(IsoDateSchema),
   setCode: textSchema,
   setName: textSchema,
 });
-export type CatalogSiblingPrinting = z.infer<typeof CatalogSiblingPrintingSchema>;
+export type CatalogSiblingPrinting = typeof CatalogSiblingPrintingSchema.Type;
 
-export const CatalogFormatLegalitySchema = z.object({
+export const CatalogFormatLegalitySchema = Schema.Struct({
   formatId: idSchema,
   formatName: textSchema,
   status: LegalityStatusSchema,
 });
-export type CatalogFormatLegality = z.infer<typeof CatalogFormatLegalitySchema>;
+export type CatalogFormatLegality = typeof CatalogFormatLegalitySchema.Type;
 
-export const CatalogCardDetailSchema = z
-  .object({
-    card: CatalogCardIdentitySchema,
-    legalities: z.array(CatalogFormatLegalitySchema),
-    selectedPrinting: CatalogSelectedPrintingSchema,
-    siblingPrintings: z.array(CatalogSiblingPrintingSchema),
-  })
-  .superRefine((detail, context) => {
+export const CatalogCardDetailSchema = Schema.Struct({
+  card: CatalogCardIdentitySchema,
+  legalities: Schema.Array(CatalogFormatLegalitySchema),
+  selectedPrinting: CatalogSelectedPrintingSchema,
+  siblingPrintings: Schema.Array(CatalogSiblingPrintingSchema),
+}).pipe(
+  Schema.filter((detail) => {
+    const issues: Schema.FilterIssue[] = [];
+
     if (!detail.card.hasSharedIdentity && detail.card.id !== detail.selectedPrinting.id) {
-      context.addIssue({
-        code: "custom",
+      issues.push({
         message: "A standalone card identity must use its printing ID.",
         path: ["card", "id"],
       });
     }
 
     if (!detail.card.hasSharedIdentity && detail.siblingPrintings.length > 0) {
-      context.addIssue({
-        code: "custom",
+      issues.push({
         message: "A standalone card cannot have sibling printings.",
         path: ["siblingPrintings"],
       });
@@ -112,8 +119,7 @@ export const CatalogCardDetailSchema = z
       detail.card.hasSharedIdentity &&
       !detail.siblingPrintings.some((printing) => printing.id === detail.selectedPrinting.id)
     ) {
-      context.addIssue({
-        code: "custom",
+      issues.push({
         message: "A shared printing set must include the selected printing.",
         path: ["siblingPrintings"],
       });
@@ -121,16 +127,14 @@ export const CatalogCardDetailSchema = z
 
     for (const [index, image] of detail.selectedPrinting.images.entries()) {
       if (image.printingId !== detail.selectedPrinting.id) {
-        context.addIssue({
-          code: "custom",
+        issues.push({
           message: "A selected-printing image must reference the selected printing.",
           path: ["selectedPrinting", "images", index, "printingId"],
         });
       }
 
       if (image.faceIndex >= detail.card.faces.length) {
-        context.addIssue({
-          code: "custom",
+        issues.push({
           message: "A selected-printing image must reference an existing card face.",
           path: ["selectedPrinting", "images", index, "faceIndex"],
         });
@@ -141,8 +145,7 @@ export const CatalogCardDetailSchema = z
 
     for (const [index, printing] of detail.siblingPrintings.entries()) {
       if (siblingIds.has(printing.id)) {
-        context.addIssue({
-          code: "custom",
+        issues.push({
           message: "Sibling printings must be unique.",
           path: ["siblingPrintings", index, "id"],
         });
@@ -151,15 +154,17 @@ export const CatalogCardDetailSchema = z
       siblingIds.add(printing.id);
 
       if (printing.image && printing.image.printingId !== printing.id) {
-        context.addIssue({
-          code: "custom",
+        issues.push({
           message: "A sibling image must reference its sibling printing.",
           path: ["siblingPrintings", index, "image", "printingId"],
         });
       }
     }
-  });
-export type CatalogCardDetail = z.infer<typeof CatalogCardDetailSchema>;
+
+    return issues;
+  }),
+);
+export type CatalogCardDetail = typeof CatalogCardDetailSchema.Type;
 
 const formatNames = new Map<string, string>([
   ["alchemy", "Alchemy"],
@@ -226,17 +231,14 @@ export function normalizeScryfallCardDetail(
         },
       )
     : [];
-  const card: CatalogCardIdentity = {
+  const card: Mutable<CatalogCardIdentity> = {
     colorIdentity: selectedCard.color_identity ?? [],
     faces: normalizeFaces(selectedCard),
     hasSharedIdentity,
     id: selectedCard.oracle_id ?? selectedCard.id,
     keywords: selectedCard.keywords ?? [],
     name: selectedCard.name,
-    producedMana: (selectedCard.produced_mana ?? []).flatMap((value) => {
-      const mana = ManaTypeSchema.safeParse(value);
-      return mana.success ? [mana.data] : [];
-    }),
+    producedMana: (selectedCard.produced_mana ?? []).filter(Schema.is(ManaTypeSchema)),
   };
   if (selectedCard.layout) card.layout = selectedCard.layout;
   if (selectedCard.cmc !== undefined) {
@@ -253,7 +255,7 @@ export function normalizeScryfallCardDetail(
     siblingPrintings,
   };
 
-  return CatalogCardDetailSchema.parse(normalized);
+  return Schema.decodeUnknownSync(CatalogCardDetailSchema)(normalized);
 }
 
 function normalizeFaces(card: ScryfallCardDownload): CatalogCardFace[] {
@@ -305,7 +307,7 @@ function normalizeFace(face: {
   const power = nonempty(face.power);
   const toughness = nonempty(face.toughness);
 
-  const normalized: CatalogCardFace = {
+  const normalized: Mutable<CatalogCardFace> = {
     name: face.name,
     typeLine: face.typeLine,
   };
@@ -326,7 +328,7 @@ function normalizeSelectedPrinting(card: ScryfallCardDownload): CatalogSelectedP
   const finishes = card.finishes?.length ? card.finishes : undefined;
   const language = nonempty(card.lang);
 
-  const printing: CatalogSelectedPrinting = {
+  const printing: Mutable<CatalogSelectedPrinting> = {
     collectorNumber: card.collector_number,
     id: card.id,
     images: normalizeImages(card),
@@ -347,7 +349,7 @@ function normalizeSiblingPrinting(card: ScryfallCardDownload): CatalogSiblingPri
   const image = normalizeImages(card, ["grid"])[0];
   const language = nonempty(card.lang);
 
-  const printing: CatalogSiblingPrinting = {
+  const printing: Mutable<CatalogSiblingPrinting> = {
     collectorNumber: card.collector_number,
     id: card.id,
     isDigital: card.digital ?? false,

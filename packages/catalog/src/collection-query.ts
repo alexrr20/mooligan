@@ -8,41 +8,45 @@ import {
   type CollectionListPage,
   type CollectionListRequest,
 } from "@mooligan/domain/collection";
-import * as z from "zod";
-import type { JSONType } from "zod";
+import type { JsonValue } from "@mooligan/domain/schema";
+import { Schema } from "effect";
 
 import { catalogVisibilityArguments, catalogVisibilitySql } from "@mooligan/catalog/visibility";
 import type { SpoilerVisibilitySnapshot } from "@mooligan/domain/spoilers";
 
-const CollectionQueryRowSchema = z.object({
-  availableFinishes: z.string().nullable(),
-  cardId: z.string().nullable(),
-  collectorNumber: z.string().nullable(),
-  condition: z.string().nullable(),
-  editableLotId: z.string().nullable(),
-  filteredCards: z.number().int().nonnegative().nullable(),
-  filteredCopies: z.number().int().nonnegative().nullable(),
-  filteredHoldings: z.number().int().nonnegative().nullable(),
-  finish: z.string().nullable(),
-  hasGridImage: z.union([z.literal(0), z.literal(1)]).nullable(),
-  hasImage: z.union([z.literal(0), z.literal(1)]).nullable(),
-  isSummary: z.union([z.literal(0), z.literal(1)]),
-  language: z.string().nullable(),
-  name: z.string().nullable(),
-  position: z.number().int().positive().nullable(),
-  printingId: z.string().nullable(),
-  protectedCopies: z.number().int().nonnegative().nullable(),
-  quantity: z.number().int().positive().nullable(),
-  routePrintingId: z.string().nullable(),
-  setCode: z.string().nullable(),
-  setName: z.string().nullable(),
-  sets: z.string().nullable(),
-  status: z.enum(["protected", "unavailable", "visible"]).nullable(),
-  totalCards: z.number().int().nonnegative().nullable(),
-  totalCopies: z.number().int().nonnegative().nullable(),
-  totalHoldings: z.number().int().nonnegative().nullable(),
+const CollectionQueryRowSchema = Schema.Struct({
+  availableFinishes: Schema.NullOr(Schema.String),
+  cardId: Schema.NullOr(Schema.String),
+  collectorNumber: Schema.NullOr(Schema.String),
+  condition: Schema.NullOr(Schema.String),
+  editableLotId: Schema.NullOr(Schema.String),
+  filteredCards: Schema.NullOr(Schema.NonNegativeInt),
+  filteredCopies: Schema.NullOr(Schema.NonNegativeInt),
+  filteredHoldings: Schema.NullOr(Schema.NonNegativeInt),
+  finish: Schema.NullOr(Schema.String),
+  hasGridImage: Schema.NullOr(Schema.Literal(0, 1)),
+  hasImage: Schema.NullOr(Schema.Literal(0, 1)),
+  isSummary: Schema.Literal(0, 1),
+  language: Schema.NullOr(Schema.String),
+  name: Schema.NullOr(Schema.String),
+  position: Schema.NullOr(Schema.Int.pipe(Schema.positive())),
+  printingId: Schema.NullOr(Schema.String),
+  protectedCopies: Schema.NullOr(Schema.NonNegativeInt),
+  quantity: Schema.NullOr(Schema.Int.pipe(Schema.positive())),
+  routePrintingId: Schema.NullOr(Schema.String),
+  setCode: Schema.NullOr(Schema.String),
+  setName: Schema.NullOr(Schema.String),
+  sets: Schema.NullOr(Schema.String),
+  status: Schema.NullOr(Schema.Literal("protected", "unavailable", "visible")),
+  totalCards: Schema.NullOr(Schema.NonNegativeInt),
+  totalCopies: Schema.NullOr(Schema.NonNegativeInt),
+  totalHoldings: Schema.NullOr(Schema.NonNegativeInt),
 });
-type CollectionQueryRow = z.infer<typeof CollectionQueryRowSchema>;
+type CollectionQueryRow = typeof CollectionQueryRowSchema.Type;
+const decodeCollectionQueryRows = Schema.decodeUnknownSync(Schema.Array(CollectionQueryRowSchema));
+const decodeCollectionListRequest = Schema.decodeUnknownSync(CollectionListRequestSchema);
+const decodeCollectionListPage = Schema.decodeUnknownSync(CollectionListPageSchema);
+const decodeCollectionHolding = Schema.decodeUnknownSync(CollectionHoldingSchema);
 
 const collectionOrderSql = `CASE WHEN status = 'protected' THEN 1 ELSE 0 END,
   CASE WHEN ? = 'quantity' THEN quantity END DESC,
@@ -62,7 +66,7 @@ export function createCollectionQuery(database: DatabaseSync) {
     input: CollectionListRequest = {},
     visibility: SpoilerVisibilitySnapshot,
   ): CollectionListPage => {
-    const request = CollectionListRequestSchema.parse(input);
+    const request = decodeCollectionListRequest(input);
     const query = request.query?.trim() ?? "";
     const setCode = request.setCode?.trim() ?? "";
     const finish = request.finish ?? "";
@@ -212,28 +216,26 @@ export function createCollectionQuery(database: DatabaseSync) {
       FROM summary
       ORDER BY isSummary, position
     `);
-    const rows = z
-      .array(CollectionQueryRowSchema)
-      .parse(
-        statement.all(
-          ...catalogVisibilityArguments(visibility),
-          query,
-          query,
-          setCode,
-          setCode,
-          finish,
-          finish,
-          language,
-          language,
-          condition,
-          condition,
-          sort,
-          sort,
-          sort,
-          offset,
-          offset + limit + 1,
-        ),
-      );
+    const rows = decodeCollectionQueryRows(
+      statement.all(
+        ...catalogVisibilityArguments(visibility),
+        query,
+        query,
+        setCode,
+        setCode,
+        finish,
+        finish,
+        language,
+        language,
+        condition,
+        condition,
+        sort,
+        sort,
+        sort,
+        offset,
+        offset + limit + 1,
+      ),
+    );
     const summary = rows.at(-1);
 
     if (!summary || summary.isSummary !== 1) {
@@ -259,12 +261,14 @@ export function createCollectionQuery(database: DatabaseSync) {
       },
     };
 
-    return CollectionListPageSchema.parse(result);
+    return decodeCollectionListPage(result);
   };
 }
 
-export function validateCollectionListRequest(value: CollectionListRequest | JSONType | undefined) {
-  return CollectionListRequestSchema.parse(value ?? {});
+export function validateCollectionListRequest(
+  value: CollectionListRequest | JsonValue | undefined,
+) {
+  return decodeCollectionListRequest(value ?? {});
 }
 
 function toCollectionHolding(row: CollectionQueryRow): CollectionHolding {
@@ -291,7 +295,7 @@ function toCollectionHolding(row: CollectionQueryRow): CollectionHolding {
   };
 
   if (row.status === "unavailable") {
-    return CollectionHoldingSchema.parse({
+    return decodeCollectionHolding({
       ...common,
       label: "Unavailable printing",
       status: "unavailable",
@@ -310,7 +314,7 @@ function toCollectionHolding(row: CollectionQueryRow): CollectionHolding {
     throw new Error("The local Collection returned an invalid Holding.");
   }
 
-  return CollectionHoldingSchema.parse({
+  return decodeCollectionHolding({
     ...common,
     availableFinishes: JSON.parse(row.availableFinishes),
     cardId: row.cardId,

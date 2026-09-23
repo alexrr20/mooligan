@@ -45,7 +45,6 @@ catalog:
   vite-plus: 0.2.6
   vitest: 4.1.10
   wrangler: ^4.113.0
-  zod: ^4.4.3
   expo-dev-client: ~57.0.16
   "@react-native-async-storage/async-storage": 2.2.0
   "@livestore/adapter-expo": 0.4.0

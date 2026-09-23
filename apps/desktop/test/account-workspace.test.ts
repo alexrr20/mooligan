@@ -4,8 +4,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import * as z from "zod";
-import type { JSONType } from "zod";
+import { Schema } from "effect";
+import type { JsonValue } from "@mooligan/domain/schema";
 import { workspaceEventSchemaVersion } from "@mooligan/workspace";
 
 import type { AuthSnapshot } from "../shared/desktop-api.ts";
@@ -28,13 +28,13 @@ void test("sign-in binds the active unbound Workspace and refreshes its in-memor
           : jsonResponse({ error: "workspace_not_found" }, 404);
       }
       if (path === "/api/workspace/bind") {
-        const body = JSON.parse(z.string().parse(init.body));
+        const body = JSON.parse(Schema.decodeUnknownSync(Schema.String)(init.body));
         assert.deepEqual(body, { bindingSecret, workspaceId: initial.workspaceId });
         remoteWorkspaceId = initial.workspaceId;
         return jsonResponse(workspaceResponse(initial.workspaceId));
       }
       if (path === "/api/workspace/sync-credential") {
-        assert.deepEqual(JSON.parse(z.string().parse(init.body)), {
+        assert.deepEqual(JSON.parse(Schema.decodeUnknownSync(Schema.String)(init.body)), {
           appVersion: "0.0.0",
           eventSchemaVersion: workspaceEventSchemaVersion,
         });
@@ -391,7 +391,7 @@ function workspaceResponse(workspaceId: string) {
   return { createdAt: "2026-08-26T12:00:00.000Z", workspaceId };
 }
 
-function jsonResponse(body: JSONType, status = 200) {
+function jsonResponse(body: JsonValue, status = 200) {
   return new Response(JSON.stringify(body), {
     headers: { "content-type": "application/json" },
     status,

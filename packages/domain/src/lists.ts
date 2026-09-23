@@ -1,28 +1,29 @@
-import * as z from "zod";
+import { Schema } from "effect";
 
 import { FinishSchema } from "./catalog.ts";
+import { IsoOffsetDateTimeSchema } from "./schema.ts";
 
-export const DesiredPrintingSchema = z.object({
-  finish: FinishSchema.optional(),
-  printingId: z.string().min(1),
+export const DesiredPrintingSchema = Schema.Struct({
+  finish: Schema.optional(FinishSchema),
+  printingId: Schema.NonEmptyString,
 });
-export type DesiredPrinting = z.infer<typeof DesiredPrintingSchema>;
+export type DesiredPrinting = typeof DesiredPrintingSchema.Type;
 
-export const CardListEntrySchema = z.object({
-  cardId: z.string().min(1),
-  desiredPrinting: DesiredPrintingSchema.optional(),
-  id: z.string().min(1),
-  notes: z.string().optional(),
-  quantity: z.number().int().positive(),
+export const CardListEntrySchema = Schema.Struct({
+  cardId: Schema.NonEmptyString,
+  desiredPrinting: Schema.optional(DesiredPrintingSchema),
+  id: Schema.NonEmptyString,
+  notes: Schema.optional(Schema.String),
+  quantity: Schema.Int.pipe(Schema.positive()),
 });
-export type CardListEntry = z.infer<typeof CardListEntrySchema>;
+export type CardListEntry = typeof CardListEntrySchema.Type;
 
-export const CardListSchema = z.object({
-  createdAt: z.iso.datetime({ offset: true }),
-  entries: z.array(CardListEntrySchema),
-  id: z.string().min(1),
-  name: z.string().min(1),
-  notes: z.string().optional(),
-  updatedAt: z.iso.datetime({ offset: true }),
+export const CardListSchema = Schema.Struct({
+  createdAt: IsoOffsetDateTimeSchema,
+  entries: Schema.Array(CardListEntrySchema),
+  id: Schema.NonEmptyString,
+  name: Schema.NonEmptyString,
+  notes: Schema.optional(Schema.String),
+  updatedAt: IsoOffsetDateTimeSchema,
 });
-export type CardList = z.infer<typeof CardListSchema>;
+export type CardList = typeof CardListSchema.Type;

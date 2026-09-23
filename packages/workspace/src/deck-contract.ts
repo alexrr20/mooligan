@@ -1,12 +1,8 @@
+import { FinishSchema } from "@mooligan/domain/catalog";
 import { deckSections } from "@mooligan/domain/decks";
 import { Schema } from "effect";
 
-import {
-  FinishSchema,
-  IdentifierSchema,
-  TimestampSchema,
-  trimmedTextSchema,
-} from "./primitives.ts";
+import { IdentifierSchema, TimestampSchema, trimmedTextSchema } from "./primitives.ts";
 
 export const DeckSectionSchema = Schema.Literal(...deckSections);
 export const deckEntryMaxQuantity = 1_000_000;

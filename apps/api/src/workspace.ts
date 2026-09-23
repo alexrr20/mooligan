@@ -1,8 +1,11 @@
 import { workspaceIdForBindingSecret } from "@mooligan/workspace";
-import * as z from "zod";
+import { UuidSchema, UuidV4Schema } from "@mooligan/domain/schema";
+import { Schema } from "effect";
 
-export const WorkspaceBindingSecretSchema = z.uuidv4();
-export const WorkspaceIdSchema = z.uuid();
+export const WorkspaceBindingSecretSchema = UuidV4Schema;
+export const WorkspaceIdSchema = UuidSchema;
+export const decodeWorkspaceId = Schema.decodeUnknownSync(WorkspaceIdSchema);
+const decodeWorkspaceBindingSecret = Schema.decodeUnknownSync(WorkspaceBindingSecretSchema);
 
 export type PersonalWorkspace = {
   createdAt: string;
@@ -68,8 +71,8 @@ export async function bindPersonalWorkspace(
   workspaceId: string,
   bindingSecret: string,
 ): Promise<PersonalWorkspace> {
-  const validatedWorkspaceId = WorkspaceIdSchema.parse(workspaceId);
-  const validatedBindingSecret = WorkspaceBindingSecretSchema.parse(bindingSecret);
+  const validatedWorkspaceId = decodeWorkspaceId(workspaceId);
+  const validatedBindingSecret = decodeWorkspaceBindingSecret(bindingSecret);
   if (workspaceIdForBindingSecret(validatedBindingSecret) !== validatedWorkspaceId) {
     throw new WorkspaceBindingError("workspace_control_required");
   }

@@ -43,7 +43,8 @@ import {
   SpoilerProjectionSnapshotSchema,
 } from "@mooligan/domain/spoilers";
 import type { WorkspaceBackup } from "@mooligan/workspace/backup";
-import type { JSONType } from "zod";
+import type { JsonValue } from "@mooligan/domain/schema";
+import { Schema } from "effect";
 
 export type { WorkspaceBackup } from "@mooligan/workspace/backup";
 
@@ -68,44 +69,44 @@ export type {
 } from "@mooligan/account/runtime";
 import type { WorkspaceBootstrap, WorkspaceRuntime, AuthSnapshot } from "@mooligan/account/runtime";
 
-export function validateCollectionListResult(value: JSONType) {
-  return CollectionListResultSchema.parse(value);
+export function validateCollectionListResult(value: JsonValue) {
+  return Schema.decodeUnknownSync(CollectionListResultSchema)(value);
 }
 
-export function validateCollectionPrintingRequest(value: JSONType) {
-  return CollectionPrintingValidationRequestSchema.parse(value);
+export function validateCollectionPrintingRequest(value: JsonValue) {
+  return Schema.decodeUnknownSync(CollectionPrintingValidationRequestSchema)(value);
 }
 
-export function validateCollectionProjectionConnection(value: JSONType) {
-  return CollectionProjectionConnectionSchema.parse(value);
+export function validateCollectionProjectionConnection(value: JsonValue) {
+  return Schema.decodeUnknownSync(CollectionProjectionConnectionSchema)(value);
 }
 
-export function validateCollectionProjectionDelta(value: JSONType) {
-  return CollectionProjectionDeltaSchema.parse(value);
+export function validateCollectionProjectionDelta(value: JsonValue) {
+  return Schema.decodeUnknownSync(CollectionProjectionDeltaSchema)(value);
 }
 
-export function validateCollectionProjectionResult(value: JSONType) {
-  return CollectionProjectionResultSchema.parse(value);
+export function validateCollectionProjectionResult(value: JsonValue) {
+  return Schema.decodeUnknownSync(CollectionProjectionResultSchema)(value);
 }
 
-export function validateCollectionProjectionSnapshot(value: JSONType) {
-  return CollectionProjectionSnapshotSchema.parse(value);
+export function validateCollectionProjectionSnapshot(value: JsonValue) {
+  return Schema.decodeUnknownSync(CollectionProjectionSnapshotSchema)(value);
 }
 
-export function validateSpoilerProjectionConnection(value: JSONType) {
-  return SpoilerProjectionConnectionSchema.parse(value);
+export function validateSpoilerProjectionConnection(value: JsonValue) {
+  return Schema.decodeUnknownSync(SpoilerProjectionConnectionSchema)(value);
 }
 
-export function validateSpoilerProjectionDelta(value: JSONType) {
-  return SpoilerProjectionDeltaSchema.parse(value);
+export function validateSpoilerProjectionDelta(value: JsonValue) {
+  return Schema.decodeUnknownSync(SpoilerProjectionDeltaSchema)(value);
 }
 
-export function validateSpoilerProjectionResult(value: JSONType) {
-  return SpoilerProjectionResultSchema.parse(value);
+export function validateSpoilerProjectionResult(value: JsonValue) {
+  return Schema.decodeUnknownSync(SpoilerProjectionResultSchema)(value);
 }
 
-export function validateSpoilerProjectionSnapshot(value: JSONType) {
-  return SpoilerProjectionSnapshotSchema.parse(value);
+export function validateSpoilerProjectionSnapshot(value: JsonValue) {
+  return Schema.decodeUnknownSync(SpoilerProjectionSnapshotSchema)(value);
 }
 
 export type CatalogProgress = {

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
+import { Either, Schema } from "effect";
 
 import { createDeckCostQuery } from "@mooligan/catalog/deck-cost";
 import { deckCostMetrics } from "@mooligan/catalog/deck-cost-summary";
@@ -53,7 +54,7 @@ void test("deck cost compares selected finishes with visible paper siblings usin
         updatedAt: "2026-09-21T00:00:00Z",
       },
       [
-        ScryfallSetDownloadSchema.parse({
+        Schema.decodeUnknownSync(ScryfallSetDownloadSchema)({
           id: "set-tst",
           code: "tst",
           name: "Test",
@@ -132,8 +133,12 @@ void test("deck cost compares selected finishes with visible paper siblings usin
       parseCatalogQueryWorkerResponse({ id: 1, operation: "deck-cost", result }, "deck-cost"),
     );
     assert.equal(
-      DeckCostRequestSchema.safeParse({ ...request, entries: [{ ...entries[0], quantity: -1 }] })
-        .success,
+      Either.isRight(
+        Schema.decodeUnknownEither(DeckCostRequestSchema)({
+          ...request,
+          entries: [{ ...entries[0], quantity: -1 }],
+        }),
+      ),
       false,
     );
 

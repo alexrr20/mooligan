@@ -1,70 +1,72 @@
-import * as z from "zod";
+import { Schema } from "effect";
 
 import { CatalogImageDescriptorSchema } from "./catalog-detail.ts";
+import { IsoDateSchema, StrictStruct } from "./schema.ts";
 import { CatalogReleaseSummarySchema } from "./spoilers.ts";
 
-const catalogPrintingIdSchema = z.string().min(1).max(128);
+const catalogPrintingIdSchema = Schema.String.pipe(Schema.minLength(1), Schema.maxLength(128));
+const pageLimitSchema = Schema.Int.pipe(Schema.between(1, 250));
 
-export const CatalogCardSummarySchema = z.object({
-  collectorNumber: z.string(),
-  gridImage: CatalogImageDescriptorSchema.nullable(),
+export const CatalogCardSummarySchema = Schema.Struct({
+  collectorNumber: Schema.String,
+  gridImage: Schema.NullOr(CatalogImageDescriptorSchema),
   id: catalogPrintingIdSchema,
-  image: CatalogImageDescriptorSchema.nullable(),
-  isDigital: z.boolean(),
-  name: z.string(),
-  rarity: z.string(),
-  setCode: z.string(),
-  setName: z.string(),
-  typeLine: z.string(),
+  image: Schema.NullOr(CatalogImageDescriptorSchema),
+  isDigital: Schema.Boolean,
+  name: Schema.String,
+  rarity: Schema.String,
+  setCode: Schema.String,
+  setName: Schema.String,
+  typeLine: Schema.String,
 });
-export type CatalogCardSummary = z.infer<typeof CatalogCardSummarySchema>;
+export type CatalogCardSummary = typeof CatalogCardSummarySchema.Type;
 
-export const CatalogListRequestSchema = z.strictObject({
-  includeAdCards: z.boolean().optional(),
-  includeArtSeries: z.boolean().optional(),
-  includeDigital: z.boolean().optional(),
-  includeTokens: z.boolean().optional(),
-  limit: z.number().int().min(1).max(250).optional(),
-  offset: z.number().int().nonnegative().optional(),
-  query: z.string().max(500).optional(),
-  uniqueCards: z.boolean().optional(),
-  universe: z.enum(["beyond", "within"]).optional(),
+export const CatalogListRequestSchema = StrictStruct({
+  includeAdCards: Schema.optional(Schema.Boolean),
+  includeArtSeries: Schema.optional(Schema.Boolean),
+  includeDigital: Schema.optional(Schema.Boolean),
+  includeTokens: Schema.optional(Schema.Boolean),
+  limit: Schema.optional(pageLimitSchema),
+  offset: Schema.optional(Schema.NonNegativeInt),
+  query: Schema.optional(Schema.String.pipe(Schema.maxLength(500))),
+  uniqueCards: Schema.optional(Schema.Boolean),
+  universe: Schema.optional(Schema.Literal("beyond", "within")),
 });
-export type CatalogListRequest = z.infer<typeof CatalogListRequestSchema>;
+export type CatalogListRequest = typeof CatalogListRequestSchema.Type;
 
-export const CatalogListPageSchema = z.object({
-  cards: z.array(CatalogCardSummarySchema),
-  hasMore: z.boolean(),
-  queryError: z.string().min(1).optional(),
-  total: z.number().int().nonnegative().nullable(),
+export const CatalogListPageSchema = Schema.Struct({
+  cards: Schema.Array(CatalogCardSummarySchema),
+  hasMore: Schema.Boolean,
+  queryError: Schema.optional(Schema.NonEmptyString),
+  total: Schema.NullOr(Schema.NonNegativeInt),
 });
-export type CatalogListPage = z.infer<typeof CatalogListPageSchema>;
+export type CatalogListPage = typeof CatalogListPageSchema.Type;
 
-export const CatalogUpcomingPrintingRequestSchema = z.strictObject({
-  limit: z.number().int().min(1).max(250).optional(),
-  offset: z.number().int().nonnegative().optional(),
+export const CatalogUpcomingPrintingRequestSchema = StrictStruct({
+  limit: Schema.optional(pageLimitSchema),
+  offset: Schema.optional(Schema.NonNegativeInt),
 });
-export type CatalogUpcomingPrintingRequest = z.infer<typeof CatalogUpcomingPrintingRequestSchema>;
+export type CatalogUpcomingPrintingRequest = typeof CatalogUpcomingPrintingRequestSchema.Type;
 
-export const CatalogUpcomingPrintingSchema = z.discriminatedUnion("status", [
-  z.strictObject({
+export const CatalogUpcomingPrintingSchema = Schema.Union(
+  StrictStruct({
     card: CatalogCardSummarySchema,
     release: CatalogReleaseSummarySchema,
-    releasedOn: z.iso.date(),
-    status: z.literal("visible"),
+    releasedOn: IsoDateSchema,
+    status: Schema.Literal("visible"),
   }),
-  z.strictObject({
+  StrictStruct({
     printingId: catalogPrintingIdSchema,
     release: CatalogReleaseSummarySchema,
-    releasedOn: z.iso.date(),
-    status: z.literal("protected"),
+    releasedOn: IsoDateSchema,
+    status: Schema.Literal("protected"),
   }),
-]);
-export type CatalogUpcomingPrinting = z.infer<typeof CatalogUpcomingPrintingSchema>;
+);
+export type CatalogUpcomingPrinting = typeof CatalogUpcomingPrintingSchema.Type;
 
-export const CatalogUpcomingPrintingPageSchema = z.strictObject({
-  hasMore: z.boolean(),
-  printings: z.array(CatalogUpcomingPrintingSchema),
-  total: z.number().int().nonnegative(),
+export const CatalogUpcomingPrintingPageSchema = StrictStruct({
+  hasMore: Schema.Boolean,
+  printings: Schema.Array(CatalogUpcomingPrintingSchema),
+  total: Schema.NonNegativeInt,
 });
-export type CatalogUpcomingPrintingPage = z.infer<typeof CatalogUpcomingPrintingPageSchema>;
+export type CatalogUpcomingPrintingPage = typeof CatalogUpcomingPrintingPageSchema.Type;

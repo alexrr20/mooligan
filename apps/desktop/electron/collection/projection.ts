@@ -22,7 +22,7 @@ export type CollectionProjectionOptions = {
     delta: Pick<CollectionProjectionDelta, "deletedLotIds" | "upserts">,
   ) => Promise<void>;
   onResyncRequired?: () => void;
-  replace?: (lots: CollectionLot[]) => Promise<void>;
+  replace?: (lots: readonly CollectionLot[]) => Promise<void>;
 };
 
 export class CollectionProjection {

@@ -1,5 +1,6 @@
+import { UuidSchema } from "@mooligan/domain/schema";
 import { ipcMain } from "electron";
-import * as z from "zod";
+import { Schema } from "effect";
 
 import { assertTrustedSender } from "../ipc-security.ts";
 import { queryCatalogPrintingDetail } from "../catalog/ipc.ts";
@@ -20,7 +21,7 @@ export function registerPriceIpc(prices: PriceService) {
   });
   ipcMain.handle("prices:printing", async (event, value) => {
     assertTrustedSender(event);
-    const printingId = z.uuid().parse(value);
+    const printingId = Schema.decodeUnknownSync(UuidSchema)(value);
     const result = await queryCatalogPrintingDetail(printingId);
     if (!result || result.status !== "visible" || result.detail.selectedPrinting.isDigital) {
       return { prices: [], snapshot: prices.status().snapshot };

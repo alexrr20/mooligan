@@ -2,7 +2,7 @@ import { getCatalogFormatName } from "@mooligan/domain/catalog-detail";
 import * as stylex from "@stylexjs/stylex";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import * as z from "zod";
+import { Schema } from "effect";
 
 import { PageFrame } from "../components/page-frame";
 import { Button } from "../components/ui/button";
@@ -13,13 +13,13 @@ import { DeckGrid } from "../features/decks/deck-grid";
 import { CreateDeckDialog } from "../features/decks/create-deck-dialog";
 import { useDecks } from "../features/decks/use-decks";
 
-const DeckSearchSchema = z.object({
-  deck: z.string().min(1).max(128).optional(),
+const DeckSearchSchema = Schema.Struct({
+  deck: Schema.optional(Schema.String.pipe(Schema.minLength(1), Schema.maxLength(128))),
 });
 
 export const Route = createFileRoute("/decks")({
   component: DecksPage,
-  validateSearch: DeckSearchSchema,
+  validateSearch: Schema.standardSchemaV1(DeckSearchSchema),
 });
 
 function DecksPage() {

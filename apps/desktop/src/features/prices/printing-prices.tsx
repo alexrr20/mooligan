@@ -1,4 +1,4 @@
-import * as z from "zod";
+import { Schema } from "effect";
 import { finishLabels } from "@mooligan/domain/catalog";
 import { priceProviderLabels, type MarketPrice, type PriceProvider } from "@mooligan/domain/market";
 import * as stylex from "@stylexjs/stylex";
@@ -112,7 +112,9 @@ function PriceValue({ price }: { price: MarketPrice | undefined }) {
     currency: price.money.currency,
     currencyDisplay: "code",
   });
-  const digits = z.number().parse(formatter.resolvedOptions().maximumFractionDigits);
+  const digits = Schema.decodeUnknownSync(Schema.Number)(
+    formatter.resolvedOptions().maximumFractionDigits,
+  );
   const stale = Date.now() - Date.parse(price.priceDate) > 2 * 86_400_000;
   return (
     <span {...stylex.props(styles.value)}>

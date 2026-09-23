@@ -192,8 +192,7 @@ PR 1 merges.
 Create `packages/workspace` as `@mooligan/workspace` with:
 
 - LiveStore event, table, materializer, query, and sync-payload schemas.
-- Effect Schema limited to LiveStore's schema boundary.
-- Zod retained in `@mooligan/domain` and existing IPC contracts.
+- Effect Schema shared by LiveStore, `@mooligan/domain`, and IPC contracts.
 - Versioned event names from the first event.
 - Pure schema exports usable by the renderer worker and later Cloudflare code.
 - Node tests for deterministic materializer replay.

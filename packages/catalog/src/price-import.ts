@@ -1,35 +1,43 @@
 import type { CatalogDatabase } from "./database.ts";
 import { PriceSnapshotSchema, type PriceStatus } from "@mooligan/domain/market";
-import * as z from "zod";
-import type { JSONType } from "zod";
+import { UuidSchema, IsoDateSchema, type JsonValue } from "@mooligan/domain/schema";
+import { Schema } from "effect";
 import { readPriceMetadata, readPriceSnapshot } from "./prices.ts";
 export type PriceFeedSource = (
   file: "AllPricesToday" | "AllIdentifiers",
-  onCard: (uuid: string, value: JSONType) => void,
+  onCard: (uuid: string, value: JsonValue) => void,
 ) => Promise<string>;
-const IdentifierSchema = z.object({
-  identifiers: z.object({ scryfallId: z.uuid().optional() }),
-  availability: z.array(z.string()),
+const decodeIdentifiers = Schema.decodeUnknownSync(
+  Schema.Struct({
+    identifiers: Schema.Struct({ scryfallId: Schema.optional(UuidSchema) }),
+    availability: Schema.Array(Schema.String),
+  }),
+);
+const PointsSchema = Schema.Record({
+  key: IsoDateSchema,
+  value: Schema.Finite.pipe(Schema.nonNegative()),
+}).annotations({ parseOptions: { onExcessProperty: "error" } });
+const FinishesSchema = Schema.Struct({
+  normal: Schema.optional(PointsSchema),
+  foil: Schema.optional(PointsSchema),
+  etched: Schema.optional(PointsSchema),
 });
-const PointsSchema = z.record(z.iso.date(), z.number().finite().nonnegative());
-const FinishesSchema = z.object({
-  normal: PointsSchema.optional(),
-  foil: PointsSchema.optional(),
-  etched: PointsSchema.optional(),
-});
-const PricesSchema = z.object({
-  paper: z
-    .record(
-      z.string().regex(/^[a-z0-9_-]+$/),
-      z.object({
-        currency: z.string().regex(/^[A-Z]{3}$/),
-        retail: FinishesSchema.optional(),
-        buylist: FinishesSchema.optional(),
-      }),
-    )
-    .optional(),
-});
-const CountSchema = z.object({ count: z.number().int().nonnegative() });
+const decodePrices = Schema.decodeUnknownSync(
+  Schema.Struct({
+    paper: Schema.optional(
+      Schema.Record({
+        key: Schema.String.pipe(Schema.pattern(/^[a-z0-9_-]+$/)),
+        value: Schema.Struct({
+          currency: Schema.String.pipe(Schema.pattern(/^[A-Z]{3}$/)),
+          retail: Schema.optional(FinishesSchema),
+          buylist: Schema.optional(FinishesSchema),
+        }).annotations({ parseOptions: { onExcessProperty: "ignore" } }),
+      }).annotations({ parseOptions: { onExcessProperty: "error" } }),
+    ),
+  }),
+);
+const decodeFractionDigits = Schema.decodeUnknownSync(Schema.NonNegativeInt);
+const decodeCount = Schema.decodeUnknownSync(Schema.Struct({ count: Schema.NonNegativeInt }));
 
 export async function importPriceData(
   live: CatalogDatabase,
@@ -54,7 +62,7 @@ export async function importPriceData(
   const insertPrice = staging.prepare("INSERT INTO candidates VALUES (?, ?, ?, ?, ?, ?, ?)");
   const scales = new Map<string, number>();
   const priceDate = await source("AllPricesToday", (uuid, value) => {
-    const card = PricesSchema.parse(value);
+    const card = decodePrices(value);
     for (const [market, prices] of Object.entries(card.paper ?? {})) {
       for (const kind of ["retail", "buylist"] as const) {
         for (const finish of ["normal", "foil", "etched"] as const) {
@@ -65,7 +73,7 @@ export async function importPriceData(
           if (!latest) continue;
           let scale = scales.get(prices.currency);
           if (scale === undefined) {
-            const digits = z.number().parse(
+            const digits = decodeFractionDigits(
               new Intl.NumberFormat("en", {
                 style: "currency",
                 currency: prices.currency,
@@ -107,7 +115,7 @@ export async function importPriceData(
     onPhase("identifiers");
     const insertIdentifier = staging.prepare("INSERT INTO identifiers VALUES (?, ?)");
     identifiersDate = await source("AllIdentifiers", (uuid, value) => {
-      const card = IdentifierSchema.parse(value);
+      const card = decodeIdentifiers(value);
       if (card.identifiers.scryfallId && card.availability.includes("paper")) {
         insertIdentifier.run(uuid, card.identifiers.scryfallId);
       }
@@ -130,7 +138,7 @@ export async function importPriceData(
       FROM candidates JOIN identifiers USING(uuid)
       GROUP BY printing_id, market, kind, finish, currency;
     `);
-  const snapshot = PriceSnapshotSchema.parse({
+  const snapshot = Schema.decodeUnknownSync(PriceSnapshotSchema)({
     date: priceDate,
     fetchedAt: now.toISOString(),
     priceCount: count(staging, "SELECT count(*) AS count FROM grouped WHERE consistent = 1"),
@@ -168,5 +176,5 @@ export async function importPriceData(
 }
 
 function count(database: CatalogDatabase, sql: string, ...parameters: string[]) {
-  return CountSchema.parse(database.prepare(sql).get(...parameters)).count;
+  return decodeCount(database.prepare(sql).get(...parameters)).count;
 }

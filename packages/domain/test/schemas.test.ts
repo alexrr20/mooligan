@@ -1,5 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { Either, Schema } from "effect";
+import {
+  IsoDateSchema,
+  IsoDateTimeSchema,
+  IsoOffsetDateTimeSchema,
+  UuidSchema,
+  UuidV4Schema,
+} from "../src/schema.ts";
 
 import { CatalogCardDetailSchema, normalizeScryfallCardDetail } from "../src/catalog-detail.ts";
 import {
@@ -16,7 +24,7 @@ import {
 } from "../src/collection.ts";
 
 function scryfallCard(overrides: Partial<ScryfallCardDownload> = {}) {
-  return ScryfallCardDownloadSchema.parse({
+  return Schema.decodeUnknownSync(ScryfallCardDownloadSchema)({
     collector_number: "1",
     id: "printing-1",
     name: "Test Card",
@@ -30,18 +38,62 @@ function scryfallCard(overrides: Partial<ScryfallCardDownload> = {}) {
   });
 }
 
+void test("date contracts reject invalid calendar dates, times, and offsets", () => {
+  assert.equal(Schema.is(IsoDateSchema)("2024-02-29"), true);
+  for (const value of ["2026-02-29", "2026-04-31", "2026-13-01", "2026-09-23T00:00:00Z"]) {
+    assert.equal(Schema.is(IsoDateSchema)(value), false, value);
+  }
+  for (const value of ["2026-09-23T10:00Z", "2026-09-23T10:00:00.123Z"]) {
+    assert.equal(Schema.is(IsoDateTimeSchema)(value), true, value);
+  }
+  assert.equal(Schema.is(IsoOffsetDateTimeSchema)("2026-09-23T10:00:00+01:00"), true);
+  assert.equal(Schema.is(IsoDateTimeSchema)("2026-09-23T10:00:00+01:00"), false);
+  for (const value of [
+    "2026-02-30T10:00:00Z",
+    "2026-09-23T24:00:00Z",
+    "2026-09-23T10:00:00+24:00",
+    "2026-09-23T10:00:00+01:60",
+    "2026-09-23T10:00:00",
+  ]) {
+    assert.equal(Schema.is(IsoOffsetDateTimeSchema)(value), false, value);
+  }
+});
+
+void test("UUID contracts validate versions and variants and keep binding secrets at version 4", () => {
+  const v4 = "0116d9f3-b986-4a0c-a6b1-d18da840576b";
+  const v7 = "0198f089-41f2-7000-8000-000000000001";
+  assert.equal(Schema.is(UuidSchema)(v4), true);
+  assert.equal(Schema.is(UuidSchema)(v7), true);
+  assert.equal(Schema.is(UuidV4Schema)(v4), true);
+  assert.equal(Schema.is(UuidV4Schema)(v7), false);
+  for (const value of [
+    "0116d9f3-b986-0a0c-a6b1-d18da840576b",
+    "0116d9f3-b986-4a0c-06b1-d18da840576b",
+  ]) {
+    assert.equal(Schema.is(UuidSchema)(value), false, value);
+  }
+});
+
 void test("collection contracts accept known physical properties and stay strict", () => {
-  assert.equal(CardLanguageSchema.safeParse("ph").success, true);
-  assert.equal(CardLanguageSchema.safeParse("xx").success, false);
-  assert.equal(CollectionListRequestSchema.safeParse({ limit: 101 }).success, false);
-  assert.equal(CollectionListRequestSchema.safeParse({ unknown: true }).success, false);
+  assert.equal(Either.isRight(Schema.decodeUnknownEither(CardLanguageSchema)("ph")), true);
+  assert.equal(Either.isRight(Schema.decodeUnknownEither(CardLanguageSchema)("xx")), false);
   assert.equal(
-    CollectionHoldingSchema.safeParse({
-      label: "Protected preview",
-      quantity: 4,
-      routePrintingId: "printing-1",
-      status: "protected",
-    }).success,
+    Either.isRight(Schema.decodeUnknownEither(CollectionListRequestSchema)({ limit: 101 })),
+    false,
+  );
+  assert.equal(
+    Either.isRight(Schema.decodeUnknownEither(CollectionListRequestSchema)({ unknown: true })),
+    false,
+  );
+  assert.equal(
+    Either.isRight(
+      Schema.decodeUnknownEither(CollectionHoldingSchema)({
+        label: "Protected preview",
+        quantity: 4,
+        routePrintingId: "printing-1",
+        status: "protected",
+      }),
+    ),
     true,
   );
 });
@@ -65,19 +117,36 @@ void test("Scryfall set lists preserve the stable family fields and reject pagin
     uri: "https://api.scryfall.com/sets/set-tst",
   };
 
-  assert.deepEqual(ScryfallSetDownloadSchema.parse(set), set);
-  assert.deepEqual(ScryfallSetListSchema.parse({ data: [set], has_more: false, object: "list" }), {
-    data: [set],
-    has_more: false,
-    object: "list",
-  });
+  assert.deepEqual(Schema.decodeUnknownSync(ScryfallSetDownloadSchema)(set), set);
+  assert.deepEqual(
+    Schema.decodeUnknownSync(ScryfallSetListSchema)({
+      data: [set],
+      has_more: false,
+      object: "list",
+    }),
+    {
+      data: [set],
+      has_more: false,
+      object: "list",
+    },
+  );
   assert.equal(
-    ScryfallSetListSchema.safeParse({ data: [set], has_more: true, object: "list" }).success,
+    Either.isRight(
+      Schema.decodeUnknownEither(ScryfallSetListSchema)({
+        data: [set],
+        has_more: true,
+        object: "list",
+      }),
+    ),
     false,
   );
   assert.equal(
-    ScryfallSetDownloadSchema.safeParse({ ...set, icon_svg_uri: "http://example.com/tst.svg" })
-      .success,
+    Either.isRight(
+      Schema.decodeUnknownEither(ScryfallSetDownloadSchema)({
+        ...set,
+        icon_svg_uri: "http://example.com/tst.svg",
+      }),
+    ),
     false,
   );
 });
@@ -89,23 +158,32 @@ void test("catalog releases require an HTTPS archive and timestamp", () => {
     updatedAt: "2026-07-31T09:11:02.266+00:00",
   };
 
-  assert.deepEqual(CatalogReleaseSchema.parse(release), release);
+  assert.deepEqual(Schema.decodeUnknownSync(CatalogReleaseSchema)(release), release);
   assert.equal(
-    CatalogReleaseSchema.safeParse({ ...release, downloadUrl: "http://example.com/cards.gz" })
-      .success,
+    Either.isRight(
+      Schema.decodeUnknownEither(CatalogReleaseSchema)({
+        ...release,
+        downloadUrl: "http://example.com/cards.gz",
+      }),
+    ),
     false,
   );
 });
 
 void test("Scryfall cards reject unsupported rarities during ingestion", () => {
   assert.equal(
-    ScryfallCardDownloadSchema.safeParse({ ...scryfallCard(), rarity: "unknown" }).success,
+    Either.isRight(
+      Schema.decodeUnknownEither(ScryfallCardDownloadSchema)({
+        ...scryfallCard(),
+        rarity: "unknown",
+      }),
+    ),
     false,
   );
 });
 
 void test("produced mana accepts Scryfall extras but normalizes only supported mana types", () => {
-  const selected = ScryfallCardDownloadSchema.parse({
+  const selected = Schema.decodeUnknownSync(ScryfallCardDownloadSchema)({
     ...scryfallCard(),
     produced_mana: ["2", "W", "U", "B", "R", "G", "C", "T"],
   });
@@ -123,7 +201,12 @@ void test("produced mana accepts Scryfall extras but normalizes only supported m
   );
   assert.deepEqual(normalizeScryfallCardDetail(scryfallCard()).card.producedMana, []);
   assert.equal(
-    ScryfallCardDownloadSchema.safeParse({ ...selected, produced_mana: ["invalid"] }).success,
+    Either.isRight(
+      Schema.decodeUnknownEither(ScryfallCardDownloadSchema)({
+        ...selected,
+        produced_mana: ["invalid"],
+      }),
+    ),
     false,
   );
 });
@@ -320,27 +403,30 @@ void test("a printing without an Oracle ID remains a standalone card", () => {
   assert.equal(detail.card.id, "standalone-token");
   assert.equal(detail.card.hasSharedIdentity, false);
   assert.deepEqual(detail.siblingPrintings, []);
-  assert.equal(CatalogCardDetailSchema.safeParse(detail).success, true);
+  assert.equal(Either.isRight(Schema.decodeUnknownEither(CatalogCardDetailSchema)(detail)), true);
   assert.equal(
-    CatalogCardDetailSchema.safeParse({
-      ...detail,
-      siblingPrintings: [
-        {
-          collectorNumber: "2",
-          id: "another-token",
-          isDigital: false,
-          isPromo: false,
-          rarity: "common",
-          setCode: "tst",
-          setName: "Test Set",
-        },
-      ],
-    }).success,
+    Either.isRight(
+      Schema.decodeUnknownEither(CatalogCardDetailSchema)({
+        ...detail,
+        siblingPrintings: [
+          {
+            collectorNumber: "2",
+            id: "another-token",
+            isDigital: false,
+            isPromo: false,
+            rarity: "common",
+            setCode: "tst",
+            setName: "Test Set",
+          },
+        ],
+      }),
+    ),
     false,
   );
 });
 
 void test("Scryfall legalities map boundary spelling and preserve unknown formats", () => {
+  assert.throws(() => scryfallCard({ legalities: { "": "legal" } }));
   const detail = normalizeScryfallCardDetail(
     scryfallCard({
       legalities: {

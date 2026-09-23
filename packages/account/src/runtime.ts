@@ -1,65 +1,73 @@
-import * as z from "zod";
-import type { JSONType } from "zod";
+import { UuidSchema, type JsonValue, StrictStruct, UuidV4Schema } from "@mooligan/domain/schema";
+import { Schema } from "effect";
 
-export const WorkspaceBootstrapSchema = z.strictObject({
-  clientId: z.uuidv4(),
-  workspaceId: z.uuid(),
+export const WorkspaceBootstrapSchema = StrictStruct({
+  clientId: UuidV4Schema,
+  workspaceId: UuidSchema,
 });
-export type WorkspaceBootstrap = z.infer<typeof WorkspaceBootstrapSchema>;
+export type WorkspaceBootstrap = typeof WorkspaceBootstrapSchema.Type;
 
-export const WorkspaceSummarySchema = z.strictObject({
-  accountAssociation: z.enum(["account", "unbound"]),
-  active: z.boolean(),
-  label: z.string().trim().min(1).max(80),
-  workspaceId: z.uuid(),
+export const WorkspaceSummarySchema = StrictStruct({
+  accountAssociation: Schema.Literal("account", "unbound"),
+  active: Schema.Boolean,
+  label: Schema.Trim.pipe(Schema.minLength(1), Schema.maxLength(80)),
+  workspaceId: UuidSchema,
 });
-export type WorkspaceSummary = z.infer<typeof WorkspaceSummarySchema>;
+export type WorkspaceSummary = typeof WorkspaceSummarySchema.Type;
 
-export const WorkspaceSyncSessionSchema = z.strictObject({
-  accountWorkspaceId: z.uuid(),
-  credential: z.string().min(1).max(8_192).regex(/^\S+$/u),
-  expiresAt: z.number().int().positive(),
+/** A bearer credential: bounded and free of whitespace. */
+export const SyncCredentialSchema = Schema.String.pipe(
+  Schema.minLength(1),
+  Schema.maxLength(8_192),
+  Schema.pattern(/^\S+$/u),
+);
+
+export const WorkspaceSyncSessionSchema = StrictStruct({
+  accountWorkspaceId: UuidSchema,
+  credential: SyncCredentialSchema,
+  expiresAt: Schema.Int.pipe(Schema.positive()),
 });
-export type WorkspaceSyncSession = z.infer<typeof WorkspaceSyncSessionSchema>;
+export type WorkspaceSyncSession = typeof WorkspaceSyncSessionSchema.Type;
 
-export const WorkspaceSyncIssueSchema = z.enum([
+export const WorkspaceSyncIssueSchema = Schema.Literal(
   "account-service-unavailable",
   "client-upgrade-required",
   "session-unavailable",
   "workspace-unavailable",
-]);
-export type WorkspaceSyncIssue = z.infer<typeof WorkspaceSyncIssueSchema>;
+);
+export type WorkspaceSyncIssue = typeof WorkspaceSyncIssueSchema.Type;
 
-export const WorkspaceRuntimeSchema = WorkspaceBootstrapSchema.extend({
-  sync: WorkspaceSyncSessionSchema.nullable(),
-  syncIssue: WorkspaceSyncIssueSchema.nullable(),
-  workspaces: z.array(WorkspaceSummarySchema).min(1),
-}).superRefine((runtime, context) => {
-  const active = runtime.workspaces.filter(({ active }) => active);
-  if (active.length !== 1 || active[0]?.workspaceId !== runtime.workspaceId) {
-    context.addIssue({
-      code: "custom",
-      message: "The active workspace does not match the runtime workspace.",
-      path: ["workspaces"],
-    });
-  }
-  if (runtime.sync && runtime.sync.accountWorkspaceId !== runtime.workspaceId) {
-    context.addIssue({
-      code: "custom",
-      message: "The sync session does not match the runtime workspace.",
-      path: ["sync", "accountWorkspaceId"],
-    });
-  }
-});
-export type WorkspaceRuntime = z.infer<typeof WorkspaceRuntimeSchema>;
+export const WorkspaceRuntimeSchema = StrictStruct({
+  ...WorkspaceBootstrapSchema.fields,
+  sync: Schema.NullOr(WorkspaceSyncSessionSchema),
+  syncIssue: Schema.NullOr(WorkspaceSyncIssueSchema),
+  workspaces: Schema.Array(WorkspaceSummarySchema).pipe(Schema.minItems(1)),
+}).pipe(
+  Schema.filter((runtime) => {
+    const issues: Schema.FilterIssue[] = [];
+    const active = runtime.workspaces.filter(({ active }) => active);
+    if (active.length !== 1 || active[0]?.workspaceId !== runtime.workspaceId) {
+      issues.push({
+        message: "The active workspace does not match the runtime workspace.",
+        path: ["workspaces"],
+      });
+    }
+    if (runtime.sync && runtime.sync.accountWorkspaceId !== runtime.workspaceId) {
+      issues.push({
+        message: "The sync session does not match the runtime workspace.",
+        path: ["sync", "accountWorkspaceId"],
+      });
+    }
+    return issues;
+  }),
+);
+export type WorkspaceRuntime = typeof WorkspaceRuntimeSchema.Type;
 
-export function validateWorkspaceBootstrap(value: JSONType): WorkspaceBootstrap {
-  return WorkspaceBootstrapSchema.parse(value);
-}
+export const validateWorkspaceBootstrap: (value: JsonValue) => WorkspaceBootstrap =
+  Schema.decodeUnknownSync(WorkspaceBootstrapSchema);
 
-export function validateWorkspaceRuntime(value: JSONType): WorkspaceRuntime {
-  return WorkspaceRuntimeSchema.parse(value);
-}
+export const validateWorkspaceRuntime: (value: JsonValue) => WorkspaceRuntime =
+  Schema.decodeUnknownSync(WorkspaceRuntimeSchema);
 
 export type AuthStatus =
   | "signed-out"

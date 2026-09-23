@@ -1,11 +1,10 @@
-import type { Finish } from "@mooligan/domain/catalog";
+import { FinishSchema, type Finish } from "@mooligan/domain/catalog";
 import type { CatalogListPage, CatalogListRequest } from "@mooligan/domain/catalog-search";
 import { deckSectionLabels, deckSections, type DeckSection } from "@mooligan/domain/decks";
 import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
 import { Schema } from "effect";
 
 import { NewDeckEntrySchema, type DeckEntry, type NewDeckEntry } from "../deck-contract.ts";
-import { FinishSchema } from "../primitives.ts";
 
 const decodeNewEntry = Schema.decodeSync(NewDeckEntrySchema);
 const isFinish = Schema.is(FinishSchema);

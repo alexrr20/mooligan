@@ -7,7 +7,7 @@ import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
 import { gzipSync } from "node:zlib";
 import type { SpoilerVisibilitySnapshot } from "@mooligan/domain/spoilers";
-import type { JSONType } from "zod";
+import type { JsonValue } from "@mooligan/domain/schema";
 
 import { openPriceDatabase } from "../electron/prices/database.ts";
 import { readPrintingPrices, readPriceSnapshot } from "@mooligan/catalog/prices";
@@ -37,7 +37,7 @@ const cardPrices = {
   },
 };
 
-function feed(data: JSONType, releaseDate = date) {
+function feed(data: JsonValue, releaseDate = date) {
   return Readable.from([
     gzipSync(JSON.stringify({ meta: { date: releaseDate, version: "5.3.0" }, data })),
   ]);
@@ -96,6 +96,26 @@ void test("daily prices persist, deduplicate faces, preserve currencies and repl
       /older/,
     );
     assert.deepEqual(readPriceSnapshot(reader), snapshot);
+
+    for (const paper of [
+      { cardmarket: { currency: "EUR", retail: { normal: { [date]: 1, "2026-02-30": 2 } } } },
+      {
+        ...cardPrices.paper,
+        "invalid market": { currency: "EUR", retail: { normal: { [date]: 2 } } },
+      },
+    ]) {
+      await rm(staging);
+      await assert.rejects(
+        importPrices(
+          path,
+          staging,
+          async () => feed({ [uuidA]: { paper } }),
+          () => {},
+          now,
+        ),
+      );
+      assert.deepEqual(readPrintingPrices(reader, printingId), saved);
+    }
 
     await rm(staging);
     await assert.rejects(

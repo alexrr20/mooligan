@@ -16,8 +16,7 @@
     "@livestore/livestore": "catalog:",
     "@mooligan/domain": "workspace:*",
     "effect": "catalog:",
-    "uuid": "catalog:",
-    "zod": "catalog:"
+    "uuid": "catalog:"
   },
   "devDependencies": {
     "@livestore/adapter-web": "catalog:",

@@ -28,8 +28,9 @@ import {
   type SpoilerRevealSummaries,
   type SpoilerVisibilitySnapshot,
 } from "@mooligan/domain/spoilers";
-import * as z from "zod";
-import type { JSONType } from "zod";
+import { IsoDateSchema, type JsonValue } from "@mooligan/domain/schema";
+import { Option, Schema } from "effect";
+import type { Mutable } from "effect/Types";
 
 import { CatalogReleaseSummaryRowSchema, toCatalogReleaseSummary } from "@mooligan/catalog/release";
 import {
@@ -41,123 +42,95 @@ import {
 import { compileScryfallQuery } from "@mooligan/catalog/scryfall-query";
 import { DeckCostRequestSchema } from "@mooligan/workspace/transport";
 
-const catalogPrintingIdSchema = z.string().min(1).max(128);
+const catalogPrintingIdSchema = Schema.String.pipe(Schema.minLength(1), Schema.maxLength(128));
 
-export const CatalogColorPrintingIdsSchema = z.array(catalogPrintingIdSchema).max(100_000);
+export const CatalogColorPrintingIdsSchema = Schema.Array(catalogPrintingIdSchema).pipe(
+  Schema.maxItems(100_000),
+);
 
-const CatalogQueryOperationSchema = z.discriminatedUnion("type", [
-  z.object({
+const CatalogQueryOperationSchema = Schema.Union(
+  Schema.Struct({
     request: DeckCostRequestSchema,
-    type: z.literal("deck-cost"),
+    type: Schema.Literal("deck-cost"),
     visibility: SpoilerVisibilitySnapshotSchema,
   }),
-  z.object({
+  Schema.Struct({
     printingIds: CatalogColorPrintingIdsSchema,
-    type: z.literal("colors"),
+    type: Schema.Literal("colors"),
     visibility: SpoilerVisibilitySnapshotSchema,
   }),
-  z.object({
+  Schema.Struct({
     printingId: catalogPrintingIdSchema,
-    type: z.literal("detail"),
+    type: Schema.Literal("detail"),
     visibility: SpoilerVisibilitySnapshotSchema,
   }),
-  z.object({
-    image: CatalogImageDescriptorSchema.extend({ printingId: catalogPrintingIdSchema }),
-    type: z.literal("image-source"),
+  Schema.Struct({
+    image: Schema.Struct({
+      ...CatalogImageDescriptorSchema.fields,
+      printingId: catalogPrintingIdSchema,
+    }),
+    type: Schema.Literal("image-source"),
     visibility: SpoilerVisibilitySnapshotSchema,
   }),
-  z.object({
+  Schema.Struct({
     request: CatalogListRequestSchema,
-    type: z.literal("list"),
+    type: Schema.Literal("list"),
     visibility: SpoilerVisibilitySnapshotSchema,
   }),
-  z.object({
+  Schema.Struct({
     request: CollectionListRequestSchema,
-    type: z.literal("collection-list"),
+    type: Schema.Literal("collection-list"),
     visibility: SpoilerVisibilitySnapshotSchema,
   }),
-  z.object({
+  Schema.Struct({
     request: CatalogUpcomingPrintingRequestSchema,
-    type: z.literal("upcoming-printings"),
+    type: Schema.Literal("upcoming-printings"),
     visibility: SpoilerVisibilitySnapshotSchema,
   }),
-  z.object({
-    rootSetIds: z.array(catalogPrintingIdSchema),
-    printingIds: z.array(catalogPrintingIdSchema),
-    type: z.literal("spoiler-reveals"),
+  Schema.Struct({
+    rootSetIds: Schema.Array(catalogPrintingIdSchema),
+    printingIds: Schema.Array(catalogPrintingIdSchema),
+    type: Schema.Literal("spoiler-reveals"),
   }),
-  z.object({ symbol: CatalogSetSymbolDescriptorSchema, type: z.literal("set-symbol-source") }),
-  z.object({ targetId: catalogPrintingIdSchema, type: z.literal("root-set") }),
-  z.object({ type: z.literal("upcoming"), visibility: SpoilerVisibilitySnapshotSchema }),
-]);
-export type CatalogQueryOperation = z.infer<typeof CatalogQueryOperationSchema>;
+  Schema.Struct({
+    symbol: CatalogSetSymbolDescriptorSchema,
+    type: Schema.Literal("set-symbol-source"),
+  }),
+  Schema.Struct({ targetId: catalogPrintingIdSchema, type: Schema.Literal("root-set") }),
+  Schema.Struct({ type: Schema.Literal("upcoming"), visibility: SpoilerVisibilitySnapshotSchema }),
+);
+export type CatalogQueryOperation = typeof CatalogQueryOperationSchema.Type;
 
-const CatalogQueryWorkerRequestSchema = z.object({
-  id: z.number().int().positive(),
+const workerRequestIdSchema = Schema.Int.pipe(Schema.positive());
+const CatalogQueryWorkerRequestSchema = Schema.Struct({
+  id: workerRequestIdSchema,
   operation: CatalogQueryOperationSchema,
 });
-export type CatalogQueryWorkerRequest = z.infer<typeof CatalogQueryWorkerRequestSchema>;
+export type CatalogQueryWorkerRequest = typeof CatalogQueryWorkerRequestSchema.Type;
 
-const CatalogQueryWorkerResponseSchema = z.union([
-  z.object({
-    id: z.number().int().positive(),
-    operation: z.literal("deck-cost"),
-    result: DeckCostSchema,
-  }),
-  z.object({
-    id: z.number().int().positive(),
-    operation: z.literal("colors"),
-    result: z.array(ColorSchema).nullable(),
-  }),
-  z.object({
-    id: z.number().int().positive(),
-    operation: z.literal("detail"),
-    result: CatalogPrintingResultSchema.nullable(),
-  }),
-  z.object({
-    id: z.number().int().positive(),
-    operation: z.literal("image-source"),
-    result: z.string().min(1).nullable(),
-  }),
-  z.object({
-    id: z.number().int().positive(),
-    operation: z.literal("list"),
-    result: CatalogListPageSchema,
-  }),
-  z.object({
-    id: z.number().int().positive(),
-    operation: z.literal("collection-list"),
-    result: CollectionListPageSchema,
-  }),
-  z.object({
-    id: z.number().int().positive(),
-    operation: z.literal("upcoming-printings"),
-    result: CatalogUpcomingPrintingPageSchema,
-  }),
-  z.object({
-    id: z.number().int().positive(),
-    operation: z.literal("root-set"),
-    result: catalogPrintingIdSchema.nullable(),
-  }),
-  z.object({
-    id: z.number().int().positive(),
-    operation: z.literal("set-symbol-source"),
-    result: z.string().min(1).nullable(),
-  }),
-  z.object({
-    id: z.number().int().positive(),
-    operation: z.literal("spoiler-reveals"),
-    result: SpoilerRevealSummariesSchema,
-  }),
-  z.object({
-    id: z.number().int().positive(),
-    operation: z.literal("upcoming"),
-    result: z.array(CatalogReleaseSummarySchema),
-  }),
-  z.object({
-    error: z.string().min(1),
-    id: z.number().int().positive(),
-    operation: z.enum([
+function catalogQueryResultSchema<
+  Operation extends CatalogQueryOperation["type"],
+  Result extends Schema.Schema.Any,
+>(operation: Operation, result: Result) {
+  return Schema.Struct({ id: workerRequestIdSchema, operation: Schema.Literal(operation), result });
+}
+
+const CatalogQueryWorkerResponseSchema = Schema.Union(
+  catalogQueryResultSchema("deck-cost", DeckCostSchema),
+  catalogQueryResultSchema("colors", Schema.NullOr(Schema.Array(ColorSchema))),
+  catalogQueryResultSchema("detail", Schema.NullOr(CatalogPrintingResultSchema)),
+  catalogQueryResultSchema("image-source", Schema.NullOr(Schema.NonEmptyString)),
+  catalogQueryResultSchema("list", CatalogListPageSchema),
+  catalogQueryResultSchema("collection-list", CollectionListPageSchema),
+  catalogQueryResultSchema("upcoming-printings", CatalogUpcomingPrintingPageSchema),
+  catalogQueryResultSchema("root-set", Schema.NullOr(catalogPrintingIdSchema)),
+  catalogQueryResultSchema("set-symbol-source", Schema.NullOr(Schema.NonEmptyString)),
+  catalogQueryResultSchema("spoiler-reveals", SpoilerRevealSummariesSchema),
+  catalogQueryResultSchema("upcoming", Schema.Array(CatalogReleaseSummarySchema)),
+  Schema.Struct({
+    error: Schema.NonEmptyString,
+    id: workerRequestIdSchema,
+    operation: Schema.Literal(
       "deck-cost",
       "colors",
       "detail",
@@ -169,22 +142,24 @@ const CatalogQueryWorkerResponseSchema = z.union([
       "spoiler-reveals",
       "upcoming",
       "upcoming-printings",
-    ]),
+    ),
   }),
-]);
-export type CatalogQueryWorkerResponse = z.infer<typeof CatalogQueryWorkerResponseSchema>;
+);
+export type CatalogQueryWorkerResponse = typeof CatalogQueryWorkerResponseSchema.Type;
 
-export function parseCatalogQueryWorkerRequest(value: JSONType) {
-  const request = CatalogQueryWorkerRequestSchema.safeParse(value);
-  return request.success ? request.data : null;
+const decodeWorkerRequest = Schema.decodeUnknownOption(CatalogQueryWorkerRequestSchema);
+const decodeWorkerResponse = Schema.decodeUnknownOption(CatalogQueryWorkerResponseSchema);
+
+export function parseCatalogQueryWorkerRequest(value: JsonValue) {
+  return Option.getOrNull(decodeWorkerRequest(value));
 }
 
 export function parseCatalogQueryWorkerResponse(
-  value: JSONType,
+  value: JsonValue,
   expectedOperation: CatalogQueryOperation["type"],
 ) {
-  const response = CatalogQueryWorkerResponseSchema.safeParse(value);
-  return response.success && response.data.operation === expectedOperation ? response.data : null;
+  const response = Option.getOrNull(decodeWorkerResponse(value));
+  return response?.operation === expectedOperation ? response : null;
 }
 
 const cardColumns = `cards.id,
@@ -379,31 +354,29 @@ export function createCatalogQuery(database: DatabaseSync) {
       : uniqueCards
         ? browseUniqueCards
         : browse;
-    const rows = z
-      .array(CatalogCardSummaryRowSchema)
-      .parse(
-        compiledQuery
+    const rows = decodeCatalogCardSummaryRows(
+      compiledQuery
+        ? statement.all(
+            ...compiledQuery.parameters,
+            ...filterArguments,
+            ...visibilityArguments,
+            ...(uniqueCards
+              ? [...compiledQuery.parameters, ...filterArguments, ...visibilityArguments]
+              : []),
+            limit + 1,
+            offset,
+          )
+        : uniqueCards
           ? statement.all(
-              ...compiledQuery.parameters,
               ...filterArguments,
               ...visibilityArguments,
-              ...(uniqueCards
-                ? [...compiledQuery.parameters, ...filterArguments, ...visibilityArguments]
-                : []),
+              ...filterArguments,
+              ...visibilityArguments,
               limit + 1,
               offset,
             )
-          : uniqueCards
-            ? statement.all(
-                ...filterArguments,
-                ...visibilityArguments,
-                ...filterArguments,
-                ...visibilityArguments,
-                limit + 1,
-                offset,
-              )
-            : statement.all(...filterArguments, ...visibilityArguments, limit + 1, offset),
-      );
+          : statement.all(...filterArguments, ...visibilityArguments, limit + 1, offset),
+    );
     const hasMore = rows.length > limit;
     const cards = rows.slice(0, limit).map(toCatalogCardSummary);
     const total =
@@ -411,7 +384,7 @@ export function createCatalogQuery(database: DatabaseSync) {
         ? hasMore
           ? null
           : offset + cards.length
-        : CatalogTotalRowSchema.parse(
+        : decodeCatalogTotalRow(
             uniqueCards
               ? includeArtSeries && visibility.policy === "show"
                 ? fullUniqueCardTotal.get()
@@ -451,10 +424,9 @@ export function createCatalogUpcomingQuery(database: DatabaseSync) {
   );
 
   return (visibility: SpoilerVisibilitySnapshot): CatalogReleaseSummary[] => {
-    return z
-      .array(CatalogReleaseSummaryRowSchema)
-      .parse(selectUpcoming.all(visibility.currentDate))
-      .map(toCatalogReleaseSummary);
+    return decodeCatalogReleaseSummaryRows(selectUpcoming.all(visibility.currentDate)).map(
+      toCatalogReleaseSummary,
+    );
   };
 }
 
@@ -508,17 +480,15 @@ export function createCatalogUpcomingPrintingsQuery(database: DatabaseSync) {
   ): CatalogUpcomingPrintingPage => {
     const limit = request.limit ?? 100;
     const offset = request.offset ?? 0;
-    const rows = z
-      .array(CatalogUpcomingPrintingRowSchema)
-      .parse(
-        selectUpcoming.all(
-          ...catalogVisibilityArguments(visibility),
-          visibility.currentDate,
-          limit + 1,
-          offset,
-        ),
-      );
-    const total = CatalogTotalRowSchema.parse(countUpcoming.get(visibility.currentDate)).total;
+    const rows = decodeCatalogUpcomingPrintingRows(
+      selectUpcoming.all(
+        ...catalogVisibilityArguments(visibility),
+        visibility.currentDate,
+        limit + 1,
+        offset,
+      ),
+    );
+    const total = decodeCatalogTotalRow(countUpcoming.get(visibility.currentDate)).total;
 
     return {
       hasMore: rows.length > limit,
@@ -545,10 +515,8 @@ export function createCatalogRootSetQuery(database: DatabaseSync) {
   );
 
   return (targetId: string): string | null => {
-    const row = z
-      .object({ rootSetId: catalogPrintingIdSchema })
-      .safeParse(selectRoot.get(targetId, targetId));
-    return row.success ? row.data.rootSetId : null;
+    const row = decodeCatalogRootSetRow(selectRoot.get(targetId, targetId));
+    return Option.isSome(row) ? row.value.rootSetId : null;
   };
 }
 
@@ -579,96 +547,128 @@ export function createCatalogSpoilerRevealSummariesQuery(database: DatabaseSync)
     printingIds: readonly string[],
     rootSetIds: readonly string[],
   ): SpoilerRevealSummaries => ({
-    printings: z
-      .array(CatalogRevealSummaryRowSchema)
-      .parse(selectPrintings.all(JSON.stringify(printingIds)))
-      .map((row) => toRevealSummary(row, "printing")),
-    releases: z
-      .array(CatalogRevealSummaryRowSchema)
-      .parse(selectReleases.all(JSON.stringify(rootSetIds)))
-      .map((row) => toRevealSummary(row, "release")),
+    printings: decodeCatalogRevealSummaryRows(selectPrintings.all(JSON.stringify(printingIds))).map(
+      (row) => toRevealSummary(row, "printing"),
+    ),
+    releases: decodeCatalogRevealSummaryRows(selectReleases.all(JSON.stringify(rootSetIds))).map(
+      (row) => toRevealSummary(row, "release"),
+    ),
   });
 }
 
-const CatalogCardSummaryRowSchema = CatalogCardSummarySchema.omit({
-  gridImage: true,
-  image: true,
-}).extend({
-  hasGridImage: z.union([z.literal(0), z.literal(1)]),
-  hasImage: z.union([z.literal(0), z.literal(1)]),
-  isDigital: z.union([z.literal(0), z.literal(1)]),
-  releasedOn: z.iso.date().nullable(),
+const sqliteFlagSchema = Schema.Literal(0, 1);
+const CatalogCardSummaryRowSchema = Schema.Struct({
+  ...CatalogCardSummarySchema.omit("gridImage", "image").fields,
+  hasGridImage: sqliteFlagSchema,
+  hasImage: sqliteFlagSchema,
+  isDigital: sqliteFlagSchema,
+  releasedOn: Schema.NullOr(IsoDateSchema),
 });
-type CatalogCardSummaryRow = z.infer<typeof CatalogCardSummaryRowSchema>;
+type CatalogCardSummaryRow = typeof CatalogCardSummaryRowSchema.Type;
+const decodeCatalogCardSummaryRows = Schema.decodeUnknownSync(
+  Schema.Array(CatalogCardSummaryRowSchema),
+);
 
-const CatalogTotalRowSchema = z.object({ total: z.number().int().nonnegative() });
-const CatalogUpcomingPrintingRowCommonSchema = z.object({
+const decodeCatalogTotalRow = Schema.decodeUnknownSync(
+  Schema.Struct({ total: Schema.NonNegativeInt }),
+);
+const decodeCatalogReleaseSummaryRows = Schema.decodeUnknownSync(
+  Schema.Array(CatalogReleaseSummaryRowSchema),
+);
+const decodeCatalogRootSetRow = Schema.decodeUnknownOption(
+  Schema.Struct({ rootSetId: catalogPrintingIdSchema }),
+);
+const catalogUpcomingPrintingRowCommonFields = {
   id: catalogPrintingIdSchema,
-  nextReleaseOn: z.iso.date(),
-  releaseCode: z.string().min(1),
-  releaseName: z.string().min(1),
-  releasedOn: z.iso.date(),
+  nextReleaseOn: IsoDateSchema,
+  releaseCode: Schema.NonEmptyString,
+  releaseName: Schema.NonEmptyString,
+  releasedOn: IsoDateSchema,
   rootSetId: catalogPrintingIdSchema,
-});
-const CatalogUpcomingPrintingRowSchema = z.discriminatedUnion("isVisible", [
-  CatalogUpcomingPrintingRowCommonSchema.extend({
-    collectorNumber: z.string(),
-    hasGridImage: z.union([z.literal(0), z.literal(1)]),
-    hasImage: z.union([z.literal(0), z.literal(1)]),
-    isDigital: z.union([z.literal(0), z.literal(1)]),
-    isVisible: z.literal(1),
-    name: z.string(),
-    rarity: z.string(),
-    setCode: z.string(),
-    setName: z.string(),
-    typeLine: z.string(),
+};
+const CatalogUpcomingPrintingRowSchema = Schema.Union(
+  Schema.Struct({
+    ...catalogUpcomingPrintingRowCommonFields,
+    collectorNumber: Schema.String,
+    hasGridImage: sqliteFlagSchema,
+    hasImage: sqliteFlagSchema,
+    isDigital: sqliteFlagSchema,
+    isVisible: Schema.Literal(1),
+    name: Schema.String,
+    rarity: Schema.String,
+    setCode: Schema.String,
+    setName: Schema.String,
+    typeLine: Schema.String,
   }),
-  CatalogUpcomingPrintingRowCommonSchema.extend({
-    collectorNumber: z.null(),
-    hasGridImage: z.literal(0),
-    hasImage: z.literal(0),
-    isDigital: z.null(),
-    isVisible: z.literal(0),
-    name: z.null(),
-    rarity: z.null(),
-    setCode: z.null(),
-    setName: z.null(),
-    typeLine: z.null(),
+  Schema.Struct({
+    ...catalogUpcomingPrintingRowCommonFields,
+    collectorNumber: Schema.Null,
+    hasGridImage: Schema.Literal(0),
+    hasImage: Schema.Literal(0),
+    isDigital: Schema.Null,
+    isVisible: Schema.Literal(0),
+    name: Schema.Null,
+    rarity: Schema.Null,
+    setCode: Schema.Null,
+    setName: Schema.Null,
+    typeLine: Schema.Null,
   }),
-]);
-type CatalogUpcomingPrintingRow = z.infer<typeof CatalogUpcomingPrintingRowSchema>;
-const CatalogRevealSummaryRowSchema = z.object({
-  detail: z.string().min(1).nullable(),
-  label: z.string().min(1),
-  rootSetId: catalogPrintingIdSchema.nullish(),
+);
+type CatalogUpcomingPrintingRow = typeof CatalogUpcomingPrintingRowSchema.Type;
+const decodeCatalogUpcomingPrintingRows = Schema.decodeUnknownSync(
+  Schema.Array(CatalogUpcomingPrintingRowSchema),
+);
+const CatalogRevealSummaryRowSchema = Schema.Struct({
+  detail: Schema.NullOr(Schema.NonEmptyString),
+  label: Schema.NonEmptyString,
+  rootSetId: Schema.optional(Schema.NullOr(catalogPrintingIdSchema)),
   targetId: catalogPrintingIdSchema,
 });
-type CatalogRevealSummaryRow = z.infer<typeof CatalogRevealSummaryRowSchema>;
+type CatalogRevealSummaryRow = typeof CatalogRevealSummaryRowSchema.Type;
+const decodeCatalogRevealSummaryRows = Schema.decodeUnknownSync(
+  Schema.Array(CatalogRevealSummaryRowSchema),
+);
+const decodeCatalogListRequest = Schema.decodeUnknownSync(CatalogListRequestSchema);
+const decodeCatalogUpcomingPrintingRequest = Schema.decodeUnknownSync(
+  CatalogUpcomingPrintingRequestSchema,
+);
+const decodeCatalogColorRows = Schema.decodeUnknownSync(
+  Schema.Array(Schema.Struct({ colors: Schema.NullOr(Schema.String) })),
+);
+const decodeColorIdentity = Schema.decodeUnknownSync(Schema.parseJson(Schema.Array(ColorSchema)));
 
 function toRevealSummary(
   row: CatalogRevealSummaryRow,
   scope: "printing" | "release",
 ): SpoilerRevealSummary {
-  const summary: SpoilerRevealSummary = { label: row.label, scope, targetId: row.targetId };
+  const summary: Mutable<SpoilerRevealSummary> = {
+    label: row.label,
+    scope,
+    targetId: row.targetId,
+  };
   if (row.detail) summary.detail = row.detail;
   if (scope === "printing" && row.rootSetId) summary.rootSetId = row.rootSetId;
   return summary;
 }
 
 function toCatalogCardSummary(row: CatalogCardSummaryRow): CatalogCardSummary {
-  const { hasGridImage, hasImage, isDigital, releasedOn: _, ...card } = row;
-
   return {
-    ...card,
-    isDigital: isDigital === 1,
-    gridImage: hasGridImage
+    collectorNumber: row.collectorNumber,
+    id: row.id,
+    isDigital: row.isDigital === 1,
+    name: row.name,
+    rarity: row.rarity,
+    setCode: row.setCode,
+    setName: row.setName,
+    typeLine: row.typeLine,
+    gridImage: row.hasGridImage
       ? {
           faceIndex: 0,
           printingId: row.id,
           size: "grid",
         }
       : null,
-    image: hasImage
+    image: row.hasImage
       ? {
           faceIndex: 0,
           printingId: row.id,
@@ -704,19 +704,19 @@ function toCatalogUpcomingPrinting(row: CatalogUpcomingPrintingRow): CatalogUpco
 }
 
 export function validateCatalogListRequest(
-  value: CatalogListRequest | JSONType | undefined,
+  value: CatalogListRequest | JsonValue | undefined,
 ): CatalogListRequest {
   if (value === undefined) {
     return {};
   }
 
-  return CatalogListRequestSchema.parse(value);
+  return decodeCatalogListRequest(value);
 }
 
 export function validateCatalogUpcomingPrintingRequest(
-  value: CatalogUpcomingPrintingRequest | JSONType | undefined,
+  value: CatalogUpcomingPrintingRequest | JsonValue | undefined,
 ): CatalogUpcomingPrintingRequest {
-  return CatalogUpcomingPrintingRequestSchema.parse(value ?? {});
+  return decodeCatalogUpcomingPrintingRequest(value ?? {});
 }
 
 export function createCatalogColorsQuery(database: DatabaseSync) {
@@ -728,12 +728,10 @@ export function createCatalogColorsQuery(database: DatabaseSync) {
      LEFT JOIN cards ON cards.id = requested.value`,
   );
   return (printingIds: readonly string[], visibility: SpoilerVisibilitySnapshot) => {
-    const rows = z
-      .array(z.object({ colors: z.string().nullable() }))
-      .parse(select.all(...catalogVisibilityArguments(visibility), JSON.stringify(printingIds)));
+    const rows = decodeCatalogColorRows(
+      select.all(...catalogVisibilityArguments(visibility), JSON.stringify(printingIds)),
+    );
     if (!rows.length || rows.some(({ colors }) => colors === null)) return null;
-    return [
-      ...new Set(rows.flatMap(({ colors }) => z.array(ColorSchema).parse(JSON.parse(colors!)))),
-    ];
+    return [...new Set(rows.flatMap(({ colors }) => decodeColorIdentity(colors!)))];
   };
 }

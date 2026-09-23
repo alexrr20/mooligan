@@ -3,7 +3,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { app, BrowserWindow, protocol, safeStorage, session, shell } from "electron";
-import * as z from "zod";
+import { JsonValueSchema } from "@mooligan/domain/schema";
+import { Option, Schema } from "effect";
 
 import { registerAuthIpc } from "./auth/ipc";
 import { DesktopAuth, resolveAuthOrigin } from "./auth/service";
@@ -50,8 +51,8 @@ const authStartup = registerAuthColdStart({
   },
   onSecondInstance(listener) {
     app.on("second-instance", (event, commandLine, workingDirectory, additionalData) => {
-      const data = z.json().safeParse(additionalData);
-      listener(event, commandLine, workingDirectory, data.success ? data.data : null);
+      const data = Schema.decodeUnknownOption(JsonValueSchema)(additionalData);
+      listener(event, commandLine, workingDirectory, Option.getOrNull(data));
     });
   },
   requestSingleInstanceLock: (additionalData) => app.requestSingleInstanceLock(additionalData),

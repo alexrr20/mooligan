@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { Schema } from "effect";
+import { Either, Schema } from "effect";
 
 import { CollectionLotSchema, type CollectionLot } from "../src/collection-contract.ts";
 import { DeckEntrySchema, DeckMetadataSchema } from "../src/deck-contract.ts";
 import { IdentifierSchema, TimestampSchema } from "../src/primitives.ts";
 import { TagTemplateSchema } from "../src/tag-contract.ts";
-import { CollectionLotTransportSchema, DeckCostRequestSchema } from "../src/transport.ts";
+import { CollectionProjectionSnapshotSchema, DeckCostRequestSchema } from "../src/transport.ts";
 
 const entry = {
   finish: "foil",
@@ -61,16 +61,39 @@ void test("persisted text, identifiers, and timestamps accept only canonical val
 });
 
 void test("transport contracts validate persisted models with their Effect definitions", () => {
-  assert.equal(CollectionLotTransportSchema.safeParse(lot).success, true);
+  const snapshot = {
+    lots: [lot],
+    revision: 1,
+    sessionId: "6f1c3f4e-2b1a-4c3d-8e9f-0a1b2c3d4e5f",
+    workspaceId: "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b",
+  };
+  const decodeSnapshot = Schema.decodeUnknownEither(CollectionProjectionSnapshotSchema);
+  assert.equal(Either.isRight(decodeSnapshot(snapshot)), true);
   assert.equal(Schema.is(CollectionLotSchema)(lot), true);
-  assert.equal(CollectionLotTransportSchema.safeParse({ ...lot, notes: undefined }).success, false);
-  assert.equal(CollectionLotTransportSchema.safeParse({ ...lot, extra: true }).success, false);
-
-  const request = { currency: "EUR", entries: [entry], providers: ["cardmarket"], rates: null };
-  assert.equal(DeckCostRequestSchema.safeParse(request).success, true);
   assert.equal(
-    DeckCostRequestSchema.safeParse({ ...request, entries: [{ ...entry, quantity: -1 }] }).success,
+    Either.isRight(decodeSnapshot({ ...snapshot, lots: [{ ...lot, notes: undefined }] })),
     false,
   );
-  assert.equal(DeckCostRequestSchema.safeParse({ ...request, providers: ["ebay"] }).success, false);
+  assert.equal(
+    Either.isRight(decodeSnapshot({ ...snapshot, lots: [{ ...lot, extra: true }] })),
+    false,
+  );
+
+  const request = { currency: "EUR", entries: [entry], providers: ["cardmarket"], rates: null };
+  assert.equal(Either.isRight(Schema.decodeUnknownEither(DeckCostRequestSchema)(request)), true);
+  assert.equal(
+    Either.isRight(
+      Schema.decodeUnknownEither(DeckCostRequestSchema)({
+        ...request,
+        entries: [{ ...entry, quantity: -1 }],
+      }),
+    ),
+    false,
+  );
+  assert.equal(
+    Either.isRight(
+      Schema.decodeUnknownEither(DeckCostRequestSchema)({ ...request, providers: ["ebay"] }),
+    ),
+    false,
+  );
 });

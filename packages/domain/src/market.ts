@@ -1,6 +1,7 @@
-import * as z from "zod";
+import { Schema } from "effect";
 
-import { FinishSchema } from "./catalog.ts";
+import { type Finish, FinishSchema } from "./catalog.ts";
+import { IsoDateSchema, IsoDateTimeSchema } from "./schema.ts";
 
 /** Markets whose prices a Workspace can enable. */
 export const priceProviders = [
@@ -23,56 +24,58 @@ export const priceProviderLabels = {
 export const priceCurrencies = ["EUR", "USD", "GBP", "CAD", "AUD", "JPY", "CHF"] as const;
 export type PriceCurrency = (typeof priceCurrencies)[number];
 
-export const MoneySchema = z.object({
-  amountMinor: z.number().int(),
-  currency: z.string().regex(/^[A-Z]{3}$/),
-});
-export type Money = z.infer<typeof MoneySchema>;
+const CurrencyCodeSchema = Schema.String.pipe(Schema.pattern(/^[A-Z]{3}$/));
 
-export const MarketPriceSchema = z.object({
-  supplier: z.literal("mtgjson"),
-  market: z.string().regex(/^[a-z0-9_-]+$/),
-  kind: z.enum(["retail", "buylist"]),
-  finish: FinishSchema.exclude(["glossy"]),
-  money: MoneySchema.extend({ amountMinor: z.number().int().nonnegative().safe() }),
-  priceDate: z.iso.date(),
+export const MoneySchema = Schema.Struct({
+  amountMinor: Schema.Int,
+  currency: CurrencyCodeSchema,
 });
-export type MarketPrice = z.infer<typeof MarketPriceSchema>;
+export type Money = typeof MoneySchema.Type;
 
-export const PriceSnapshotSchema = z.object({
-  date: z.iso.date(),
-  fetchedAt: z.iso.datetime(),
-  priceCount: z.number().int().positive(),
-  unmappedCount: z.number().int().nonnegative(),
-  ambiguousCount: z.number().int().nonnegative(),
+export const MarketPriceSchema = Schema.Struct({
+  supplier: Schema.Literal("mtgjson"),
+  market: Schema.String.pipe(Schema.pattern(/^[a-z0-9_-]+$/)),
+  kind: Schema.Literal("retail", "buylist"),
+  finish: FinishSchema.pipe(
+    Schema.filter((finish): finish is Exclude<Finish, "glossy"> => finish !== "glossy"),
+  ),
+  money: Schema.Struct({ ...MoneySchema.fields, amountMinor: Schema.NonNegativeInt }),
+  priceDate: IsoDateSchema,
 });
-export type PriceSnapshot = z.infer<typeof PriceSnapshotSchema>;
+export type MarketPrice = typeof MarketPriceSchema.Type;
 
-export const PricePhaseSchema = z.enum(["idle", "prices", "identifiers", "installing"]);
-export const PriceStatusSchema = z.object({
-  snapshot: PriceSnapshotSchema.nullable(),
+export const PriceSnapshotSchema = Schema.Struct({
+  date: IsoDateSchema,
+  fetchedAt: IsoDateTimeSchema,
+  priceCount: Schema.Int.pipe(Schema.positive()),
+  unmappedCount: Schema.NonNegativeInt,
+  ambiguousCount: Schema.NonNegativeInt,
+});
+export type PriceSnapshot = typeof PriceSnapshotSchema.Type;
+
+export const PricePhaseSchema = Schema.Literal("idle", "prices", "identifiers", "installing");
+export const PriceStatusSchema = Schema.Struct({
+  snapshot: Schema.NullOr(PriceSnapshotSchema),
   phase: PricePhaseSchema,
-  error: z.string().nullable(),
+  error: Schema.NullOr(Schema.String),
 });
-export type PriceStatus = z.infer<typeof PriceStatusSchema>;
+export type PriceStatus = typeof PriceStatusSchema.Type;
 
-export const PrintingPricesSchema = z.object({
-  prices: z.array(MarketPriceSchema),
-  snapshot: PriceSnapshotSchema.nullable(),
+export const PrintingPricesSchema = Schema.Struct({
+  prices: Schema.Array(MarketPriceSchema),
+  snapshot: Schema.NullOr(PriceSnapshotSchema),
 });
-export type PrintingPrices = z.infer<typeof PrintingPricesSchema>;
+export type PrintingPrices = typeof PrintingPricesSchema.Type;
 
-export const ExchangeRatesSchema = z.object({
-  fetchedAt: z.iso.datetime(),
-  rates: z
-    .array(
-      z.object({
-        date: z.iso.date(),
-        base: z.literal("EUR"),
-        quote: z.string().regex(/^[A-Z]{3}$/),
-        rate: z.number().positive().finite(),
-      }),
-    )
-    .min(1),
+export const ExchangeRatesSchema = Schema.Struct({
+  fetchedAt: IsoDateTimeSchema,
+  rates: Schema.Array(
+    Schema.Struct({
+      date: IsoDateSchema,
+      base: Schema.Literal("EUR"),
+      quote: CurrencyCodeSchema,
+      rate: Schema.Finite.pipe(Schema.positive()),
+    }),
+  ).pipe(Schema.minItems(1)),
 });
-export type ExchangeRates = z.infer<typeof ExchangeRatesSchema>;
+export type ExchangeRates = typeof ExchangeRatesSchema.Type;

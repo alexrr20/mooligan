@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { Either, Schema } from "effect";
 
 import {
   CatalogImageDescriptorSchema,
@@ -94,12 +95,12 @@ export function parseCatalogImageUrl(value: string): CatalogImageDescriptor | nu
     return null;
   }
 
-  const parsed = CatalogImageDescriptorSchema.safeParse({
+  const parsed = Schema.decodeUnknownEither(CatalogImageDescriptorSchema)({
     faceIndex: Number(parts[1]),
     printingId,
     size: parts[2],
   });
-  return parsed.success ? parsed.data : null;
+  return Either.isRight(parsed) ? parsed.right : null;
 }
 
 function unavailableResponse(status: number) {
