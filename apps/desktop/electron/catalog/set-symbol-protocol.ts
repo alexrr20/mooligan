@@ -1,3 +1,4 @@
+import { Either, Schema } from "effect";
 import {
   CatalogSetSymbolDescriptorSchema,
   type CatalogSetSymbolDescriptor,
@@ -75,8 +76,8 @@ export function parseCatalogSetSymbolUrl(value: string): CatalogSetSymbolDescrip
   } catch {
     return null;
   }
-  const parsed = CatalogSetSymbolDescriptorSchema.safeParse({ setId });
-  return parsed.success ? parsed.data : null;
+  const parsed = Schema.decodeUnknownEither(CatalogSetSymbolDescriptorSchema)({ setId });
+  return Either.isRight(parsed) ? parsed.right : null;
 }
 
 function unavailableResponse(status: number) {

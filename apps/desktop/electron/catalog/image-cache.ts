@@ -11,7 +11,7 @@ import {
   type FileHandle,
 } from "node:fs/promises";
 import { extname, join } from "node:path";
-import * as z from "zod";
+import { Either, Schema } from "effect";
 
 import { isFileNotFound } from "./files.ts";
 
@@ -31,7 +31,7 @@ const imageContentTypes = {
 } as const;
 
 type CatalogImageExtension = keyof typeof imageContentTypes;
-const CatalogImageExtensionSchema = z.enum(["jpeg", "jpg", "png", "webp"]);
+const CatalogImageExtensionSchema = Schema.Literal("jpeg", "jpg", "png", "webp");
 
 export type CatalogImageContentType = (typeof imageContentTypes)[CatalogImageExtension];
 
@@ -176,13 +176,13 @@ function describeSource(sourceUrl: string): CatalogImageSource {
     throw new TypeError("Unsupported catalog image origin");
   }
 
-  const extension = CatalogImageExtensionSchema.safeParse(
+  const extension = Schema.decodeUnknownEither(CatalogImageExtensionSchema)(
     extname(url.pathname).slice(1).toLowerCase(),
   );
-  if (!extension.success) {
+  if (Either.isLeft(extension)) {
     throw new TypeError("Unsupported catalog image extension");
   }
-  const contentType = imageContentTypes[extension.data];
+  const contentType = imageContentTypes[extension.right];
 
   const canonicalUrl = url.href;
   const key = createHash("sha256").update(canonicalUrl).digest("hex");
@@ -190,7 +190,7 @@ function describeSource(sourceUrl: string): CatalogImageSource {
   return {
     canonicalUrl,
     contentType,
-    fileName: `${key}.${extension.data}`,
+    fileName: `${key}.${extension.right}`,
   };
 }
 

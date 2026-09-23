@@ -1,59 +1,61 @@
 import type { CatalogDatabase as DatabaseSync } from "./database.ts";
 
 import type { CollectionLot } from "@mooligan/workspace/collection-contract";
-import {
-  CollectionLotIdTransportSchema,
-  CollectionLotTransportSchema,
-} from "@mooligan/workspace/transport";
-import * as z from "zod";
-import type { JSONType } from "zod";
-const CollectionProjectionWorkerOperationSchema = z.discriminatedUnion("type", [
-  z.strictObject({
-    lots: z.array(CollectionLotTransportSchema).max(100_000),
-    type: z.literal("collection-projection-replace"),
+import { type JsonValue, StrictStruct } from "@mooligan/domain/schema";
+import { CollectionLotSchema } from "@mooligan/workspace/collection-contract";
+import { IdentifierSchema } from "@mooligan/workspace/primitives";
+import { Option, Schema } from "effect";
+const CollectionProjectionWorkerOperationSchema = Schema.Union(
+  StrictStruct({
+    lots: Schema.Array(CollectionLotSchema).pipe(Schema.maxItems(100_000)),
+    type: Schema.Literal("collection-projection-replace"),
   }),
-  z.strictObject({
-    deletedLotIds: z.array(CollectionLotIdTransportSchema).max(1_000),
-    type: z.literal("collection-projection-apply"),
-    upserts: z.array(CollectionLotTransportSchema).max(1_000),
+  StrictStruct({
+    deletedLotIds: Schema.Array(IdentifierSchema).pipe(Schema.maxItems(1_000)),
+    type: Schema.Literal("collection-projection-apply"),
+    upserts: Schema.Array(CollectionLotSchema).pipe(Schema.maxItems(1_000)),
   }),
-]);
-export type CollectionProjectionWorkerOperation = z.infer<
-  typeof CollectionProjectionWorkerOperationSchema
->;
+);
+export type CollectionProjectionWorkerOperation =
+  typeof CollectionProjectionWorkerOperationSchema.Type;
 
-const CollectionProjectionWorkerRequestSchema = z.strictObject({
-  id: z.number().int().positive(),
+const workerRequestIdSchema = Schema.Int.pipe(Schema.positive());
+const CollectionProjectionWorkerRequestSchema = StrictStruct({
+  id: workerRequestIdSchema,
   operation: CollectionProjectionWorkerOperationSchema,
 });
-export type CollectionProjectionWorkerRequest = z.infer<
-  typeof CollectionProjectionWorkerRequestSchema
->;
+export type CollectionProjectionWorkerRequest = typeof CollectionProjectionWorkerRequestSchema.Type;
 
-const CollectionProjectionWorkerResponseSchema = z.union([
-  z.strictObject({
-    id: z.number().int().positive(),
-    operation: z.enum(["collection-projection-replace", "collection-projection-apply"]),
-    status: z.literal("applied"),
+const collectionProjectionOperationTypeSchema = Schema.Literal(
+  "collection-projection-replace",
+  "collection-projection-apply",
+);
+const CollectionProjectionWorkerResponseSchema = Schema.Union(
+  StrictStruct({
+    id: workerRequestIdSchema,
+    operation: collectionProjectionOperationTypeSchema,
+    status: Schema.Literal("applied"),
   }),
-  z.strictObject({
-    error: z.string().min(1),
-    id: z.number().int().positive(),
-    operation: z.enum(["collection-projection-replace", "collection-projection-apply"]),
+  StrictStruct({
+    error: Schema.NonEmptyString,
+    id: workerRequestIdSchema,
+    operation: collectionProjectionOperationTypeSchema,
   }),
-]);
+);
 
-export function parseCollectionProjectionWorkerRequest(value: JSONType) {
-  const result = CollectionProjectionWorkerRequestSchema.safeParse(value);
-  return result.success ? result.data : null;
+const decodeWorkerRequest = Schema.decodeUnknownOption(CollectionProjectionWorkerRequestSchema);
+const decodeWorkerResponse = Schema.decodeUnknownOption(CollectionProjectionWorkerResponseSchema);
+
+export function parseCollectionProjectionWorkerRequest(value: JsonValue) {
+  return Option.getOrNull(decodeWorkerRequest(value));
 }
 
 export function parseCollectionProjectionWorkerResponse(
-  value: JSONType,
+  value: JsonValue,
   expectedOperation: CollectionProjectionWorkerOperation["type"],
 ) {
-  const result = CollectionProjectionWorkerResponseSchema.safeParse(value);
-  return result.success && result.data.operation === expectedOperation ? result.data : null;
+  const response = Option.getOrNull(decodeWorkerResponse(value));
+  return response?.operation === expectedOperation ? response : null;
 }
 
 export function createCollectionProjection(database: DatabaseSync) {

@@ -1,3 +1,4 @@
+import { Schema } from "effect";
 import {
   CatalogReleaseSchema,
   ScryfallBulkDataSchema,
@@ -27,7 +28,7 @@ export async function readCatalogRelease(database: D1Database): Promise<CatalogR
     return null;
   }
 
-  return CatalogReleaseSchema.parse({
+  return Schema.decodeUnknownSync(CatalogReleaseSchema)({
     compressedSize: row.compressed_size,
     downloadUrl: row.download_url,
     updatedAt: row.updated_at,
@@ -49,7 +50,7 @@ export async function refreshCatalogRelease(
     throw new Error(`Scryfall returned HTTP ${response.status}.`);
   }
 
-  const source = ScryfallBulkDataSchema.parse(await response.json());
+  const source = Schema.decodeUnknownSync(ScryfallBulkDataSchema)(await response.json());
   const current = await database
     .prepare("SELECT updated_at FROM catalog_release WHERE singleton = 1")
     .first<{ updated_at: string }>();

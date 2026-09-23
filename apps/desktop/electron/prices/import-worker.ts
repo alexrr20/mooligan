@@ -2,11 +2,13 @@ import { rm } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { parentPort, workerData } from "node:worker_threads";
 
-import * as z from "zod";
+import { Schema } from "effect";
 
 import { importPrices } from "./import.ts";
 
-const { path } = z.object({ path: z.string().min(1) }).parse(workerData);
+const { path } = Schema.decodeUnknownSync(Schema.Struct({ path: Schema.NonEmptyString }))(
+  workerData,
+);
 const stagingPath = `${path}.incoming`;
 try {
   await rm(stagingPath, { force: true });

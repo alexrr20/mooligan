@@ -1,4 +1,3 @@
-import { finishes } from "@mooligan/domain/catalog";
 import { Schema } from "effect";
 
 /** Opaque identifiers are stored exactly as issued and are never trimmed. */
@@ -20,5 +19,3 @@ export const TimestampSchema = Schema.String.pipe(
 export function trimmedTextSchema(maxLength: number) {
   return Schema.String.pipe(Schema.trimmed(), Schema.minLength(1), Schema.maxLength(maxLength));
 }
-
-export const FinishSchema = Schema.Literal(...finishes);

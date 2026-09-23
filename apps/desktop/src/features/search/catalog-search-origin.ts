@@ -1,5 +1,5 @@
 import type { HistoryState } from "@tanstack/react-router";
-import type { JSONType } from "zod";
+import type { JsonValue } from "@mooligan/domain/schema";
 
 import {
   isCatalogSearchState,
@@ -18,8 +18,8 @@ export type CatalogSearchHistoryState = HistoryState &
     catalogSearchOrigin?: CatalogSearchOrigin;
   }>;
 
-type CatalogSearchHistoryInput = HistoryState | Readonly<Record<string, JSONType>>;
-type CatalogSearchNavigationValue = CatalogSearchHistoryInput | CatalogSearchOrigin | JSONType;
+type CatalogSearchHistoryInput = HistoryState | Readonly<Record<string, JsonValue>>;
+type CatalogSearchNavigationValue = CatalogSearchHistoryInput | CatalogSearchOrigin | JsonValue;
 export type CatalogSearchHistoryStateUpdater = (
   current: CatalogSearchHistoryInput,
 ) => CatalogSearchHistoryState;
@@ -29,7 +29,7 @@ export function createCatalogSearchOrigin(search: CatalogSearchState): CatalogSe
 }
 
 export function validateCatalogSearchOrigin(
-  value: CatalogSearchOrigin | JSONType,
+  value: CatalogSearchOrigin | JsonValue,
 ): CatalogSearchOrigin | null {
   if (!isJsonObject(value)) return null;
 
@@ -54,7 +54,7 @@ export function withCatalogSearchOrigin(
 }
 
 export function readCatalogSearchOrigin(
-  state: HistoryState | JSONType,
+  state: HistoryState | JsonValue,
 ): CatalogSearchOrigin | null {
   if (!isJsonObject(state) || state.catalogSearchOrigin === undefined) return null;
   return validateCatalogSearchOrigin(state.catalogSearchOrigin);
@@ -62,6 +62,6 @@ export function readCatalogSearchOrigin(
 
 function isJsonObject(
   value: CatalogSearchNavigationValue,
-): value is Readonly<Record<string, JSONType>> {
+): value is Readonly<Record<string, JsonValue>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

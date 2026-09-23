@@ -3,7 +3,7 @@ import {
   PriceSnapshotSchema,
   type PrintingPrices,
 } from "@mooligan/domain/market";
-import * as z from "zod";
+import { Schema } from "effect";
 
 import type { CatalogDatabase as DatabaseSync } from "./database.ts";
 export function initializePriceDatabase(database: DatabaseSync) {
@@ -27,15 +27,21 @@ export function initializePriceDatabase(database: DatabaseSync) {
     CREATE TABLE IF NOT EXISTS price_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT;
   `);
 }
+const decodePriceMetadataRow = Schema.decodeUnknownSync(Schema.Struct({ value: Schema.String }));
+
 export function readPriceMetadata(database: DatabaseSync, key: string) {
   const row = database.prepare("SELECT value FROM price_meta WHERE key = ?").get(key);
-  return row ? z.object({ value: z.string() }).parse(row).value : null;
+  return row ? decodePriceMetadataRow(row).value : null;
 }
+
+const decodePriceSnapshot = Schema.decodeUnknownSync(Schema.parseJson(PriceSnapshotSchema));
 
 export function readPriceSnapshot(database: DatabaseSync) {
   const value = readPriceMetadata(database, "snapshot");
-  return value ? PriceSnapshotSchema.parse(JSON.parse(value)) : null;
+  return value ? decodePriceSnapshot(value) : null;
 }
+
+const decodeMarketPrice = Schema.decodeUnknownSync(MarketPriceSchema);
 
 export function readPrintingPrices(database: DatabaseSync, printingId: string): PrintingPrices {
   // A single read transaction keeps the rows and their snapshot metadata consistent.
@@ -49,7 +55,7 @@ export function readPrintingPrices(database: DatabaseSync, printingId: string): 
     `)
       .all(printingId)
       .map((row) =>
-        MarketPriceSchema.parse({
+        decodeMarketPrice({
           ...row,
           money: { amountMinor: row.amountMinor, currency: row.currency },
         }),

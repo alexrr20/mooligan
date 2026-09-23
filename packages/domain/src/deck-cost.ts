@@ -1,17 +1,19 @@
-import * as z from "zod";
+import { Schema } from "effect";
 
 import { MoneySchema } from "./market.ts";
+import { IsoDateSchema } from "./schema.ts";
 
-const DeckCostTotalSchema = z.object({
-  amount: z.number().finite().nonnegative(),
-  pricedQuantity: z.number().int().nonnegative(),
-  priceDate: z.iso.date().nullable(),
-  rateDate: z.iso.date().nullable(),
-  missingRates: z.boolean(),
+const DeckCostTotalSchema = Schema.Struct({
+  amount: Schema.Finite.pipe(Schema.nonNegative()),
+  pricedQuantity: Schema.NonNegativeInt,
+  priceDate: Schema.NullOr(IsoDateSchema),
+  rateDate: Schema.NullOr(IsoDateSchema),
+  missingRates: Schema.Boolean,
 });
-export const DeckCostSchema = MoneySchema.pick({ currency: true }).extend({
-  quantity: z.number().int().nonnegative(),
+export const DeckCostSchema = Schema.Struct({
+  ...MoneySchema.pick("currency").fields,
+  quantity: Schema.NonNegativeInt,
   current: DeckCostTotalSchema,
   cheapest: DeckCostTotalSchema,
 });
-export type DeckCost = z.infer<typeof DeckCostSchema>;
+export type DeckCost = typeof DeckCostSchema.Type;

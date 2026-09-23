@@ -2,12 +2,15 @@ import { expo } from "@better-auth/expo";
 import { electron } from "@better-auth/electron";
 import { betterAuth } from "better-auth";
 import { v7 as uuidv7 } from "uuid";
-import * as z from "zod";
+import { Option, Schema } from "effect";
 
-const TrustedOriginsSchema = z
-  .array(z.string())
-  .length(2)
-  .refine((origins) => new Set(origins).size === origins.length);
+const isEncodedOrigins = Schema.is(Schema.String);
+const decodeTrustedOrigins = Schema.decodeUnknownOption(
+  Schema.Array(Schema.String).pipe(
+    Schema.itemsCount(2),
+    Schema.filter((origins) => new Set(origins).size === origins.length),
+  ),
+);
 
 export function createAuth(environment: Env) {
   const baseURL = authOrigin(environment.BETTER_AUTH_URL);
@@ -67,22 +70,21 @@ function authOrigin(value: string) {
 }
 
 function trustedOrigins(value: string | readonly string[], baseURL: string) {
-  const encoded = z.string().safeParse(value);
   let parsed = value;
 
-  if (encoded.success) {
+  if (isEncodedOrigins(value)) {
     try {
-      parsed = JSON.parse(encoded.data);
+      parsed = JSON.parse(value);
     } catch {
       throw new Error("BETTER_AUTH_TRUSTED_ORIGINS must be a JSON array.");
     }
   }
 
-  const origins = TrustedOriginsSchema.safeParse(parsed);
+  const origins = decodeTrustedOrigins(parsed);
   if (
-    !origins.success ||
-    !origins.data.includes(baseURL) ||
-    !origins.data.includes("com.mooligan.app:/")
+    Option.isNone(origins) ||
+    !origins.value.includes(baseURL) ||
+    !origins.value.includes("com.mooligan.app:/")
   ) {
     throw new Error("BETTER_AUTH_TRUSTED_ORIGINS must contain only Mooligan's exact origins.");
   }

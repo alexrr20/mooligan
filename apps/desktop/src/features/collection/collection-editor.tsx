@@ -1,3 +1,4 @@
+import { Either, Schema } from "effect";
 import type { CatalogCardDetail } from "@mooligan/domain/catalog-detail";
 import {
   CardLanguageSchema,
@@ -352,8 +353,8 @@ export function AddToCollectionButton({
 }
 
 function knownLanguage(value: string | undefined): CardLanguage | undefined {
-  const parsed = CardLanguageSchema.safeParse(value);
-  return parsed.success ? parsed.data : undefined;
+  const parsed = Schema.decodeUnknownEither(CardLanguageSchema)(value);
+  return Either.isRight(parsed) ? parsed.right : undefined;
 }
 
 export function cleanCollectionError(cause: unknown) {

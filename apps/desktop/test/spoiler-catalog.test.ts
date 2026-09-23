@@ -11,7 +11,7 @@ import {
   type ScryfallSetDownload,
 } from "@mooligan/domain/catalog-download";
 import type { SpoilerVisibilitySnapshot } from "@mooligan/domain/spoilers";
-import * as z from "zod";
+import { Schema } from "effect";
 
 import {
   createCatalogDetailQuery,
@@ -225,9 +225,9 @@ void test("catalog reads enforce spoiler visibility before any card data crosses
         status: "protected",
       });
 
-      const storedSecret = z
-        .object({ json: z.string() })
-        .parse(database.prepare("SELECT json FROM cards WHERE id = ?").get("secret-card"));
+      const storedSecret = Schema.decodeUnknownSync(Schema.Struct({ json: Schema.String }))(
+        database.prepare("SELECT json FROM cards WHERE id = ?").get("secret-card"),
+      );
       database.prepare("UPDATE cards SET json = '42' WHERE id = ?").run("secret-card");
       assert.equal(detail("secret-card", PROTECTED)?.status, "protected");
       database
@@ -354,7 +354,7 @@ void test("catalog reads enforce spoiler visibility before any card data crosses
 function set(overrides: Partial<ScryfallSetDownload>) {
   const code = overrides.code ?? "tst";
   const id = overrides.id ?? `set-${code}`;
-  return ScryfallSetDownloadSchema.parse({
+  return Schema.decodeUnknownSync(ScryfallSetDownloadSchema)({
     card_count: 1,
     code,
     digital: false,

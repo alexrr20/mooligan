@@ -1,3 +1,4 @@
+import { Either, Schema } from "effect";
 import { FinishSchema, finishLabels, finishes } from "@mooligan/domain/catalog";
 import {
   CardConditionSchema,
@@ -141,8 +142,8 @@ function CollectionPage() {
               ]}
               value={search.finish ?? ""}
               onChange={(finish) => {
-                const parsed = FinishSchema.safeParse(finish);
-                update({ finish: parsed.success ? parsed.data : undefined });
+                const parsed = Schema.decodeUnknownEither(FinishSchema)(finish);
+                update({ finish: Either.isRight(parsed) ? parsed.right : undefined });
               }}
             />
             <Filter
@@ -153,8 +154,8 @@ function CollectionPage() {
               ]}
               value={search.language ?? ""}
               onChange={(language) => {
-                const parsed = CardLanguageSchema.safeParse(language);
-                update({ language: parsed.success ? parsed.data : undefined });
+                const parsed = Schema.decodeUnknownEither(CardLanguageSchema)(language);
+                update({ language: Either.isRight(parsed) ? parsed.right : undefined });
               }}
             />
             <Filter
@@ -165,8 +166,8 @@ function CollectionPage() {
               ]}
               value={search.condition ?? ""}
               onChange={(condition) => {
-                const parsed = CardConditionSchema.safeParse(condition);
-                update({ condition: parsed.success ? parsed.data : undefined });
+                const parsed = Schema.decodeUnknownEither(CardConditionSchema)(condition);
+                update({ condition: Either.isRight(parsed) ? parsed.right : undefined });
               }}
             />
             <Filter
@@ -178,9 +179,10 @@ function CollectionPage() {
               ]}
               value={search.sort ?? "name"}
               onChange={(sort) => {
-                const parsed = CollectionSortSchema.safeParse(sort);
+                const parsed = Schema.decodeUnknownEither(CollectionSortSchema)(sort);
                 update({
-                  sort: parsed.success && parsed.data !== "name" ? parsed.data : undefined,
+                  sort:
+                    Either.isRight(parsed) && parsed.right !== "name" ? parsed.right : undefined,
                 });
               }}
             />

@@ -1,10 +1,9 @@
-import { cardConditions, cardLanguages } from "@mooligan/domain/collection";
+import { FinishSchema } from "@mooligan/domain/catalog";
+import { CardConditionSchema, CardLanguageSchema } from "@mooligan/domain/collection";
 import { Schema } from "effect";
 
-import { FinishSchema, IdentifierSchema, TimestampSchema } from "./primitives.ts";
+import { IdentifierSchema, TimestampSchema } from "./primitives.ts";
 
-export const CardLanguageSchema = Schema.Literal(...cardLanguages);
-export const CardConditionSchema = Schema.Literal(...cardConditions);
 export const CollectionQuantitySchema = Schema.Int.pipe(Schema.positive());
 
 export const CollectionMoneySchema = Schema.Struct({

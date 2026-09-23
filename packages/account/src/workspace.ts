@@ -1,4 +1,5 @@
-import * as z from "zod";
+import { UuidSchema, StrictStruct } from "@mooligan/domain/schema";
+import { Either, Schema } from "effect";
 import { workspaceEventSchemaVersion } from "@mooligan/workspace";
 
 import {
@@ -7,6 +8,7 @@ import {
   type WorkspaceRuntime,
   type WorkspaceSyncIssue,
   type WorkspaceSyncSession,
+  SyncCredentialSchema,
 } from "./runtime.ts";
 export type AccountWorkspaceApiPath =
   | "/api/workspace"
@@ -14,15 +16,26 @@ export type AccountWorkspaceApiPath =
   | "/api/workspace/sync-credential";
 import type { WorkspaceRegistry } from "./registry.ts";
 
-const PersonalWorkspaceSchema = z.strictObject({
-  createdAt: z.string().min(1).max(64),
-  workspaceId: z.uuid(),
-});
-const SyncCredentialResponseSchema = z.strictObject({
-  credential: z.string().min(1).max(8_192).regex(/^\S+$/u),
-  expiresAt: z.number().int().positive(),
-});
-const ErrorSchema = z.instanceof(Error).catch(new Error("The Account Workspace request failed."));
+const decodePersonalWorkspace = Schema.decodeUnknownSync(
+  StrictStruct({
+    createdAt: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64)),
+    workspaceId: UuidSchema,
+  }),
+);
+const decodeSyncCredentialResponse = Schema.decodeUnknownSync(
+  StrictStruct({
+    credential: SyncCredentialSchema,
+    expiresAt: Schema.Int.pipe(Schema.positive()),
+  }),
+);
+const decodeError = Schema.decodeUnknownSync(
+  Schema.instanceOf(Error).annotations({
+    decodingFallback: () => Either.right(new Error("The Account Workspace request failed.")),
+  }),
+);
+const decodeAppVersion = Schema.decodeSync(
+  Schema.Trim.pipe(Schema.minLength(1), Schema.maxLength(64)),
+);
 
 type RuntimeChanged = (workspaceChanged: boolean) => Promise<void> | void;
 
@@ -49,7 +62,7 @@ export class AccountWorkspace {
     appVersion = "0.0.0",
   ) {
     this.#auth = auth;
-    this.#appVersion = z.string().trim().min(1).max(64).parse(appVersion);
+    this.#appVersion = decodeAppVersion(appVersion);
     this.#registry = registry;
     this.#runtimeChanged = runtimeChanged;
     this.#now = now;
@@ -180,7 +193,7 @@ export class AccountWorkspace {
       await this.#issueCredential(workspace.workspaceId);
     } catch (error) {
       this.#sync = null;
-      this.#syncIssue = syncIssueForError(ErrorSchema.parse(error));
+      this.#syncIssue = syncIssueForError(decodeError(error));
     }
   }
 
@@ -192,7 +205,7 @@ export class AccountWorkspace {
       return null;
     }
     await requireSuccessfulResponse(response);
-    return PersonalWorkspaceSchema.parse(await response.json());
+    return decodePersonalWorkspace(await response.json());
   }
 
   async #bindLocalWorkspace(accountId: string) {
@@ -223,7 +236,7 @@ export class AccountWorkspace {
       }
 
       await requireSuccessfulResponse(response);
-      const bound = PersonalWorkspaceSchema.parse(await response.json());
+      const bound = decodePersonalWorkspace(await response.json());
       if (bound.workspaceId !== workspace.workspaceId) {
         throw new Error("The Account bound an unexpected Workspace.");
       }
@@ -246,7 +259,7 @@ export class AccountWorkspace {
         method: "POST",
       });
       await requireSuccessfulResponse(response);
-      const credential = SyncCredentialResponseSchema.parse(await response.json());
+      const credential = decodeSyncCredentialResponse(await response.json());
       this.#sync = {
         accountWorkspaceId: workspaceId,
         credential: credential.credential,

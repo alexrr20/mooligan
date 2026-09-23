@@ -14,7 +14,7 @@ import {
   type ScryfallSetDownload,
 } from "@mooligan/domain/catalog-download";
 import type { SpoilerVisibilitySnapshot } from "@mooligan/domain/spoilers";
-import * as z from "zod";
+import { Either, Schema } from "effect";
 
 import { recoverInterruptedReplacement } from "../electron/catalog/files.ts";
 import {
@@ -39,7 +39,7 @@ import {
   validateCatalogSearch,
 } from "../src/features/search/search-state.ts";
 
-const QueryPlanRowSchema = z.object({ detail: z.string() });
+const QueryPlanRowSchema = Schema.Struct({ detail: Schema.String });
 const SHOW_ALL: SpoilerVisibilitySnapshot = {
   currentDate: "2026-08-19",
   policy: "show",
@@ -51,7 +51,7 @@ const SHOW_ALL: SpoilerVisibilitySnapshot = {
 function scryfallSet(overrides: Partial<ScryfallSetDownload>) {
   const code = overrides.code ?? "tst";
   const id = overrides.id ?? `set-${code}`;
-  return ScryfallSetDownloadSchema.parse({
+  return Schema.decodeUnknownSync(ScryfallSetDownloadSchema)({
     card_count: 1,
     code,
     digital: false,
@@ -1136,8 +1136,8 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
           )
           .all("2026-08-19", "show", "[]", "[]")
           .some((row) => {
-            const plan = QueryPlanRowSchema.safeParse(row);
-            return plan.success && plan.data.detail.includes("cards_recent_order");
+            const plan = Schema.decodeUnknownEither(QueryPlanRowSchema)(row);
+            return Either.isRight(plan) && plan.right.detail.includes("cards_recent_order");
           }),
       );
       assert.ok(
@@ -1145,8 +1145,8 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
           .prepare("EXPLAIN QUERY PLAN SELECT json FROM cards WHERE oracle_id = ?")
           .all("oracle-1")
           .some((row) => {
-            const plan = QueryPlanRowSchema.safeParse(row);
-            return plan.success && plan.data.detail.includes("cards_oracle_id");
+            const plan = Schema.decodeUnknownEither(QueryPlanRowSchema)(row);
+            return Either.isRight(plan) && plan.right.detail.includes("cards_oracle_id");
           }),
       );
 

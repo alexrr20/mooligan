@@ -1,10 +1,12 @@
-import * as z from "zod";
-import type { JSONType } from "zod";
+import { type JsonValue, JsonValueSchema } from "@mooligan/domain/schema";
+import { Schema } from "effect";
 
-const CatalogRequestResponseSchema = z.discriminatedUnion("status", [
-  z.object({ status: z.literal("completed"), result: z.json() }),
-  z.object({ status: z.literal("cancelled") }),
-]);
+const decodeCatalogRequestResponse = Schema.decodeUnknownSync(
+  Schema.Union(
+    Schema.Struct({ status: Schema.Literal("completed"), result: JsonValueSchema }),
+    Schema.Struct({ status: Schema.Literal("cancelled") }),
+  ),
+);
 
 type CatalogRequestResponse<Result> =
   | { status: "completed"; result: Result }
@@ -27,8 +29,8 @@ export async function settleCatalogRequest<Result>(
   }
 }
 
-export function unwrapCatalogRequest(value: JSONType) {
-  const response = CatalogRequestResponseSchema.parse(value);
+export function unwrapCatalogRequest(value: JsonValue) {
+  const response = decodeCatalogRequestResponse(value);
   if (response.status === "cancelled") {
     // Electron's context bridge preserves Error messages, but does not clone DOMException.
     const error = new Error("Search cancelled.");

@@ -12,8 +12,8 @@ export type CatalogSearchState = {
   universe?: UniverseFilter;
 };
 
-type CatalogSearchInput = CatalogSearchState | JSONType;
-type JsonObject = Readonly<Record<string, JSONType>>;
+type CatalogSearchInput = CatalogSearchState | JsonValue;
+type JsonObject = Readonly<Record<string, JsonValue>>;
 
 export function reconcileCatalogSearchDraft(
   draft: string,
@@ -59,8 +59,8 @@ function isJsonObject(value: CatalogSearchInput): value is CatalogSearchInput & 
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isString(value: JSONType | undefined): value is string {
+function isString(value: JsonValue | undefined): value is string {
   return typeof value === "string";
 }
 
-import type { JSONType } from "zod";
+import type { JsonValue } from "@mooligan/domain/schema";
