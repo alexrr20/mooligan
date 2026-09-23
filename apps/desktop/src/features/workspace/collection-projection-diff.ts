@@ -1,4 +1,5 @@
-import type { CollectionLot, CollectionProjectionDelta } from "@mooligan/domain/collection";
+import type { CollectionLot } from "@mooligan/workspace/collection-contract";
+import type { CollectionProjectionDelta } from "@mooligan/workspace/transport";
 
 export function diffCollectionLots(
   previous: readonly CollectionLot[],

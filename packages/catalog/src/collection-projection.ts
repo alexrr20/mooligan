@@ -1,5 +1,5 @@
 import type { CatalogDatabase as DatabaseSync } from "./database.ts";
-import type { CollectionLot } from "@mooligan/domain/collection";
+import type { CollectionLot } from "@mooligan/workspace/collection-contract";
 
 export function createCollectionProjection(database: DatabaseSync) {
   database.exec(`
@@ -42,14 +42,17 @@ export function createCollectionProjection(database: DatabaseSync) {
   return {
     apply(
       this: void,
-      { deletedLotIds, upserts }: { deletedLotIds: string[]; upserts: CollectionLot[] },
+      {
+        deletedLotIds,
+        upserts,
+      }: { deletedLotIds: readonly string[]; upserts: readonly CollectionLot[] },
     ) {
       transact(database, () => {
         for (const lotId of deletedLotIds) remove.run(lotId);
         for (const lot of upserts) insert.run(...collectionLotArguments(lot));
       });
     },
-    replace(this: void, lots: CollectionLot[]) {
+    replace(this: void, lots: readonly CollectionLot[]) {
       transact(database, () => {
         clear.run();
         for (const lot of lots) insert.run(...collectionLotArguments(lot));

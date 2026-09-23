@@ -1,9 +1,10 @@
+import { UuidSchema } from "@mooligan/domain/schema";
 import {
   CollectionProjectionDeltaSchema,
   CollectionProjectionSnapshotSchema,
-} from "@mooligan/domain/collection";
+} from "@mooligan/workspace/transport";
 import { ipcMain } from "electron";
-import * as z from "zod";
+import { Schema } from "effect";
 
 import { assertTrustedSender } from "../ipc-security";
 import type { CollectionProjection } from "./projection";
@@ -11,14 +12,14 @@ import type { CollectionProjection } from "./projection";
 export function registerCollectionProjectionIpc(projection: CollectionProjection) {
   ipcMain.handle("workspace-projection:collection-connect", (event, value) => {
     assertTrustedSender(event);
-    return projection.connect(event.sender.id, z.uuid().parse(value));
+    return projection.connect(event.sender.id, Schema.decodeUnknownSync(UuidSchema)(value));
   });
   ipcMain.handle("workspace-projection:collection-replace", async (event, value) => {
     assertTrustedSender(event);
     try {
       return await projection.replace(
         event.sender.id,
-        CollectionProjectionSnapshotSchema.parse(value),
+        Schema.decodeUnknownSync(CollectionProjectionSnapshotSchema)(value),
       );
     } catch (error) {
       projection.rejectInvalidUpdate(event.sender.id);
@@ -28,7 +29,10 @@ export function registerCollectionProjectionIpc(projection: CollectionProjection
   ipcMain.handle("workspace-projection:collection-apply", async (event, value) => {
     assertTrustedSender(event);
     try {
-      return await projection.apply(event.sender.id, CollectionProjectionDeltaSchema.parse(value));
+      return await projection.apply(
+        event.sender.id,
+        Schema.decodeUnknownSync(CollectionProjectionDeltaSchema)(value),
+      );
     } catch (error) {
       projection.rejectInvalidUpdate(event.sender.id);
       throw error;

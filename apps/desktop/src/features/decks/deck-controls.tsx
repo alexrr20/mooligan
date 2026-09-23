@@ -1,4 +1,4 @@
-import { deckSections } from "@mooligan/domain/decks";
+import { deckSectionLabels, deckSections } from "@mooligan/domain/decks";
 import * as stylex from "@stylexjs/stylex";
 import type { ReactNode } from "react";
 
@@ -17,9 +17,9 @@ import {
   SelectValue,
 } from "../../components/ui/select";
 
-export const deckSectionOptions = deckSections.map((section) => ({
-  ...section,
-  label: section.value === "commander" ? "Main deck · Commander" : section.label,
+export const deckSectionOptions = deckSections.map((value) => ({
+  value,
+  label: value === "commander" ? "Main deck · Commander" : deckSectionLabels[value],
 }));
 
 export function DeckSelect<T extends string>({

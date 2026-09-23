@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import * as z from "zod";
+import { StrictStruct } from "@mooligan/domain/schema";
+import { Either, Schema } from "effect";
 
 import { createAuth } from "./auth.js";
 import { readCatalogRelease, refreshCatalogRelease } from "./catalog-release.js";
@@ -18,6 +19,16 @@ import {
   WorkspaceBindingError,
   WorkspaceIdSchema,
 } from "./workspace.js";
+
+const decodeWorkspaceBinding = Schema.decodeUnknownEither(
+  StrictStruct({ bindingSecret: WorkspaceBindingSecretSchema, workspaceId: WorkspaceIdSchema }),
+);
+const decodeSyncClient = Schema.decodeUnknownEither(
+  StrictStruct({
+    appVersion: Schema.Trim.pipe(Schema.minLength(1), Schema.maxLength(64)),
+    eventSchemaVersion: Schema.NonNegativeInt,
+  }),
+);
 
 const api = new Hono<{ Bindings: Env }>();
 
@@ -54,11 +65,8 @@ api.post("/api/workspace/bind", async (context) => {
     return context.json({ error: "unauthorized" as const }, 401);
   }
 
-  const body = z
-    .object({ bindingSecret: WorkspaceBindingSecretSchema, workspaceId: WorkspaceIdSchema })
-    .strict()
-    .safeParse(await context.req.json().catch(() => undefined));
-  if (!body.success) {
+  const body = decodeWorkspaceBinding(await context.req.json().catch(() => undefined));
+  if (Either.isLeft(body)) {
     return context.json({ error: "invalid_workspace_binding" as const }, 400);
   }
 
@@ -67,8 +75,8 @@ api.post("/api/workspace/bind", async (context) => {
       await bindPersonalWorkspace(
         context.env.DB,
         userId,
-        body.data.workspaceId,
-        body.data.bindingSecret,
+        body.right.workspaceId,
+        body.right.bindingSecret,
       ),
     );
   } catch (error) {
@@ -93,16 +101,11 @@ api.post("/api/workspace/sync-credential", async (context) => {
     return context.json({ error: "workspace_not_found" as const }, 404);
   }
 
-  const client = z
-    .strictObject({
-      appVersion: z.string().trim().min(1).max(64),
-      eventSchemaVersion: z.number().int().nonnegative(),
-    })
-    .safeParse(await context.req.json().catch(() => undefined));
-  if (!client.success) {
+  const client = decodeSyncClient(await context.req.json().catch(() => undefined));
+  if (Either.isLeft(client)) {
     return context.json({ error: "invalid_sync_client" as const }, 400);
   }
-  if (client.data.eventSchemaVersion < minimumWorkspaceEventSchemaVersion) {
+  if (client.right.eventSchemaVersion < minimumWorkspaceEventSchemaVersion) {
     return context.json(
       {
         error: "client_upgrade_required" as const,
@@ -112,7 +115,7 @@ api.post("/api/workspace/sync-credential", async (context) => {
       426,
     );
   }
-  if (client.data.eventSchemaVersion > maximumWorkspaceEventSchemaVersion) {
+  if (client.right.eventSchemaVersion > maximumWorkspaceEventSchemaVersion) {
     return context.json(
       {
         error: "server_upgrade_required" as const,
@@ -128,8 +131,8 @@ api.post("/api/workspace/sync-credential", async (context) => {
       context.env,
       userId,
       workspace.workspaceId,
-      client.data.appVersion,
-      client.data.eventSchemaVersion,
+      client.right.appVersion,
+      client.right.eventSchemaVersion,
     ),
   );
 });

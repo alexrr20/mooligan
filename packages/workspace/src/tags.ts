@@ -1,15 +1,18 @@
 import { Events, queryDb, Schema, State } from "@livestore/livestore";
-import { tagNameKey } from "@mooligan/domain/tags";
+import {
+  CardTagSchema,
+  TagAssignmentSchema,
+  TagTemplateSchema,
+  tagNameKey,
+} from "./tag-contract.ts";
 
-import { cardTagSchema, tagAssignmentSchema, tagTemplateSchema } from "./tag-contract.ts";
-
-const { id: Identifier, name: Name, color: Color } = cardTagSchema.fields;
+const { id: Identifier, name: Name, color: Color } = CardTagSchema.fields;
 
 export const tagTables = {
   cardTags: State.SQLite.table({
     name: "card_tags",
     schema: Schema.Struct({
-      ...cardTagSchema.fields,
+      ...CardTagSchema.fields,
       id: Schema.String.pipe(State.SQLite.withPrimaryKey),
       nameKey: Schema.String,
       deleted: Schema.Boolean,
@@ -19,7 +22,7 @@ export const tagTables = {
     name: "tag_assignments",
     indexes: [{ name: "tag_assignments_tag", columns: ["tagId"] }],
     schema: Schema.Struct({
-      ...tagAssignmentSchema.fields,
+      ...TagAssignmentSchema.fields,
       id: Schema.String.pipe(State.SQLite.withPrimaryKey),
     }),
   }),
@@ -36,7 +39,7 @@ export const tagTables = {
 };
 
 export const tagEvents = {
-  cardTagCreated: Events.synced({ name: "v1.CardTagCreated", schema: cardTagSchema }),
+  cardTagCreated: Events.synced({ name: "v1.CardTagCreated", schema: CardTagSchema }),
   cardTagChanged: Events.synced({
     name: "v1.CardTagChanged",
     schema: Schema.Struct({
@@ -57,7 +60,7 @@ export const tagEvents = {
       assigned: Schema.Boolean,
     }),
   }),
-  tagTemplateSaved: Events.synced({ name: "v1.TagTemplateSaved", schema: tagTemplateSchema }),
+  tagTemplateSaved: Events.synced({ name: "v1.TagTemplateSaved", schema: TagTemplateSchema }),
   tagTemplateDeleted: Events.synced({
     name: "v1.TagTemplateDeleted",
     schema: Schema.Struct({ id: Identifier }),

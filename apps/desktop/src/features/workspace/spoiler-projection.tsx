@@ -4,7 +4,7 @@ import type {
   SpoilerProjectionDelta,
   SpoilerProjectionSnapshot,
 } from "@mooligan/domain/spoilers";
-import { spoilerDecisionsQuery, spoilerSettingsQuery } from "@mooligan/workspace/schema";
+import { spoilerDecisionsQuery, spoilerSettingsQuery } from "@mooligan/workspace/spoilers";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
@@ -58,10 +58,8 @@ export function SpoilerProjectionStartup({
           const delta: SpoilerProjectionDelta = {
             ...identity,
             decisions: changedDecisions(previous.decisions, projection.decisions),
+            ...(previous.policy !== projection.policy && { policy: projection.policy }),
           };
-          if (previous.policy !== projection.policy) {
-            delta.policy = projection.policy;
-          }
           result = await window.workspaceProjection.applySpoilerDelta(delta);
         } else {
           result = await window.workspaceProjection.replaceSpoilers({ ...identity, ...projection });

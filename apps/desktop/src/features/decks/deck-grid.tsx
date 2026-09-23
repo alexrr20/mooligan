@@ -1,5 +1,5 @@
 import { getCatalogFormatName, type CatalogImageDescriptor } from "@mooligan/domain/catalog-detail";
-import type { Deck } from "@mooligan/domain/decks";
+import type { Deck } from "@mooligan/workspace/deck-contract";
 import * as stylex from "@stylexjs/stylex";
 import { useQueries } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";

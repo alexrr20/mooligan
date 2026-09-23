@@ -5,21 +5,17 @@ import { makeInMemoryAdapter } from "@livestore/adapter-web";
 import { SyncBackend, validatePushPayload } from "@livestore/common";
 import { EventSequenceNumber } from "@livestore/common/schema";
 import { createStorePromise, type Store } from "@livestore/livestore";
+import { cardTagsQuery, tagTemplatesQuery } from "@mooligan/workspace/tags";
+import { collectionLotsQuery } from "@mooligan/workspace/collection";
+import { decksQuery, deckEntriesQuery } from "@mooligan/workspace/decks";
+import { events, workspaceSchema } from "@mooligan/workspace/schema";
+import { initialSpoilerResetId, spoilerDecisionsQuery } from "@mooligan/workspace/spoilers";
 import {
-  cardTagsQuery,
-  tagTemplatesQuery,
-  collectionLotsQuery,
-  decksQuery,
-  deckEntriesQuery,
-  events,
-  initialSpoilerResetId,
   priceProviderPreferencesQuery,
   priceCurrencyQuery,
   readPriceCurrency,
   readEnabledPriceProviders,
-  spoilerDecisionsQuery,
-  workspaceSchema,
-} from "@mooligan/workspace/schema";
+} from "@mooligan/workspace/price-preferences";
 import { Effect, Option, Queue, Scope, Stream, SubscriptionRef } from "effect";
 
 type WorkspaceStore = Store<typeof workspaceSchema>;

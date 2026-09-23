@@ -4,14 +4,8 @@ import { makeInMemoryAdapter } from "@livestore/adapter-web";
 import { createStorePromise } from "@livestore/livestore";
 import { Schema } from "effect";
 import { workspaceBackupSchema } from "@mooligan/workspace/backup";
-import {
-  cardTagsQuery,
-  tagAssignmentsQuery,
-  tagTemplatesQuery,
-  events,
-  workspaceSchema,
-  workspaceSyncedEventSchema,
-} from "@mooligan/workspace/schema";
+import { cardTagsQuery, tagAssignmentsQuery, tagTemplatesQuery } from "@mooligan/workspace/tags";
+import { events, workspaceSchema, workspaceSyncedEventSchema } from "@mooligan/workspace/schema";
 import { createDeckMutations } from "@mooligan/workspace/client/deck-mutations";
 import { createTagMutations } from "@mooligan/workspace/client/tag-mutations";
 import { cardIdentity, groupEntriesByTag, tagsForDeck } from "@mooligan/workspace/client/tag-state";
@@ -250,7 +244,7 @@ function printing(id: string): CatalogPrintingResult {
     status: "visible",
     visibility: { reason: "released" },
     detail: normalizeScryfallCardDetail(
-      ScryfallCardDownloadSchema.parse({
+      Schema.decodeUnknownSync(ScryfallCardDownloadSchema)({
         id,
         oracle_id: "shared-card",
         name: "Sol Ring",

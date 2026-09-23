@@ -1,11 +1,5 @@
 export {
-  collectionLotsQuery,
-  decksQuery,
-  deckEntriesQuery,
   events,
-  initialSpoilerResetId,
-  spoilerDecisionsQuery,
-  spoilerSettingsQuery,
   tables,
   workspaceEventSchemaVersion,
   workspaceSchema,
@@ -20,7 +14,5 @@ export {
   workspaceBackupSchema,
   workspaceBackupVersion,
   type WorkspaceBackup,
-  type WorkspaceBackupCollectionLot,
-  type WorkspaceBackupSpoilerDecision,
 } from "./backup.ts";
 export { workspaceIdForBindingSecret } from "./identity.ts";

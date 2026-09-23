@@ -5,8 +5,8 @@ import {
   workspaceBackupSchema,
   type WorkspaceBackup,
 } from "@mooligan/workspace/backup";
+import type { JsonValue } from "@mooligan/domain/schema";
 import { Schema } from "effect";
-import type { JSONType } from "zod";
 
 const decodeWorkspaceBackup = Schema.decodeUnknownSync(workspaceBackupSchema, {
   onExcessProperty: "error",
@@ -18,7 +18,7 @@ export function parseWorkspaceBackup(serialized: string): WorkspaceBackup {
     throw new TypeError("The workspace backup is invalid or too large.");
   }
 
-  let value: JSONType;
+  let value: JsonValue;
   try {
     value = JSON.parse(serialized);
   } catch {
@@ -28,7 +28,7 @@ export function parseWorkspaceBackup(serialized: string): WorkspaceBackup {
   return validateWorkspaceBackup(value);
 }
 
-export function validateWorkspaceBackup(value: JSONType | WorkspaceBackup): WorkspaceBackup {
+export function validateWorkspaceBackup(value: JsonValue | WorkspaceBackup): WorkspaceBackup {
   try {
     return decodeWorkspaceBackup(value);
   } catch {

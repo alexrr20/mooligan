@@ -1,19 +1,30 @@
 import type { Store } from "@livestore/livestore";
+import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
+import { Schema } from "effect";
+
 import {
   DeckEntrySchema,
   DeckMetadataSchema,
+  NewDeckEntrySchema,
+  deckSlotKey,
   type DeckEntry,
   type DeckMetadata,
-} from "@mooligan/domain/decks";
-import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
-import { deckEntriesQuery, decksQuery, events, workspaceSchema } from "@mooligan/workspace/schema";
-
-import { deckSlotKey, materializeDecks } from "@mooligan/workspace/client/deck-state";
-
+  type NewDeckEntry,
+} from "../deck-contract.ts";
+import { deckEntriesQuery, decksQuery } from "../decks.ts";
+import { events, workspaceSchema } from "../schema.ts";
+import { materializeDecks } from "./deck-state.ts";
 import { duplicateDeckTags } from "./tag-mutations.ts";
 
-type NewEntry = Omit<DeckEntry, "id">;
-type EntryChange = Partial<NewEntry>;
+const decodeMetadata = Schema.decodeSync(DeckMetadataSchema);
+const decodeMetadataChange = Schema.decodeSync(
+  Schema.partialWith(DeckMetadataSchema, { exact: true }),
+);
+const decodeEntry = Schema.decodeSync(DeckEntrySchema);
+const decodeNewEntry = Schema.decodeSync(NewDeckEntrySchema);
+const decodeEntryChange = Schema.decodeSync(
+  Schema.partialWith(NewDeckEntrySchema, { exact: true }),
+);
 
 export function createDeckMutations(
   store: Store<typeof workspaceSchema>,
@@ -27,8 +38,8 @@ export function createDeckMutations(
     return deck;
   }
 
-  function create(metadata: DeckMetadata, entries: readonly NewEntry[] = []) {
-    const parsed = DeckMetadataSchema.parse(metadata);
+  function create(metadata: DeckMetadata, entries: readonly NewDeckEntry[] = []) {
+    const parsed = decodeMetadata(normalizeMetadata(metadata));
     const prepared = prepareEntries(entries);
     const id = crypto.randomUUID();
     const updatedAt = new Date().toISOString();
@@ -39,18 +50,18 @@ export function createDeckMutations(
     return id;
   }
 
-  function addEntries(deckId: string, entries: readonly NewEntry[]) {
+  function addEntries(deckId: string, entries: readonly NewDeckEntry[]) {
     const prepared = prepareEntries(entries);
     const deck = readDeck(deckId);
     for (const entry of prepared) {
       const existing = deck.entries.find((item) => deckSlotKey(item) === deckSlotKey(entry));
-      DeckEntrySchema.parse({ ...entry, quantity: entry.quantity + (existing?.quantity ?? 0) });
+      decodeNewEntry({ ...entry, quantity: entry.quantity + (existing?.quantity ?? 0) });
     }
     const updatedAt = new Date().toISOString();
     store.commit(...prepared.map((entry) => events.deckEntryAdded({ deckId, entry, updatedAt })));
   }
 
-  async function validatePrinting(entry: NewEntry) {
+  async function validatePrinting(entry: NewDeckEntry) {
     const result = await readPrinting(entry.printingId);
     if (!result || result.status !== "visible")
       throw new Error("Choose a visible printing from the local catalog.");
@@ -63,7 +74,7 @@ export function createDeckMutations(
     addEntries,
     update(deckId: string, change: Partial<DeckMetadata>) {
       readDeck(deckId);
-      const parsed = DeckMetadataSchema.partial().parse(change);
+      const parsed = decodeMetadataChange(normalizeMetadata(change));
       store.commit(events.deckChanged({ ...parsed, deckId, updatedAt: new Date().toISOString() }));
     },
     duplicate(deckId: string) {
@@ -85,13 +96,13 @@ export function createDeckMutations(
       readDeck(deckId);
       store.commit(events.deckDeleted({ deckId, updatedAt: new Date().toISOString() }));
     },
-    async add(deckId: string, entry: NewEntry) {
-      const parsed = DeckEntrySchema.omit({ id: true }).parse(entry);
+    async add(deckId: string, entry: NewDeckEntry) {
+      const parsed = decodeNewEntry(entry);
       await validatePrinting(parsed);
       addEntries(deckId, [parsed]);
     },
-    async updateEntry(deckId: string, entryId: string, change: EntryChange) {
-      const parsed = DeckEntrySchema.omit({ id: true }).partial().parse(change);
+    async updateEntry(deckId: string, entryId: string, change: Partial<NewDeckEntry>) {
+      const parsed = decodeEntryChange(change);
       let entry = readDeck(deckId).entries.find(({ id }) => id === entryId);
       if (!entry) throw new Error("This deck card has been removed.");
       if (parsed.finish !== undefined || parsed.printingId !== undefined)
@@ -103,7 +114,7 @@ export function createDeckMutations(
       const target = deck.entries.find(
         (item) => item.id !== entryId && deckSlotKey(item) === deckSlotKey(next),
       );
-      DeckEntrySchema.parse({ ...next, quantity: next.quantity + (target?.quantity ?? 0) });
+      decodeEntry({ ...next, quantity: next.quantity + (target?.quantity ?? 0) });
       store.commit(
         events.deckEntryChanged({
           ...parsed,
@@ -122,17 +133,27 @@ export function createDeckMutations(
   };
 }
 
-function prepareEntries(entries: readonly NewEntry[]) {
+function prepareEntries(entries: readonly NewDeckEntry[]) {
   if (entries.length > 10_000) throw new Error("Import at most 10,000 deck cards at once.");
   const slots = new Map<string, DeckEntry>();
   for (const entry of entries) {
-    const parsed = DeckEntrySchema.parse({ ...entry, id: crypto.randomUUID() });
+    const parsed = decodeEntry({ ...entry, id: crypto.randomUUID() });
     const key = deckSlotKey(parsed);
     const existing = slots.get(key);
     slots.set(
       key,
-      DeckEntrySchema.parse({ ...parsed, quantity: parsed.quantity + (existing?.quantity ?? 0) }),
+      decodeEntry({ ...parsed, quantity: parsed.quantity + (existing?.quantity ?? 0) }),
     );
   }
   return [...slots.values()];
+}
+
+/** Deck text is trimmed once here, so stored names, formats, and labels are canonical. */
+function normalizeMetadata<Change extends Partial<DeckMetadata>>(change: Change): Change {
+  return {
+    ...change,
+    ...(change.name !== undefined && { name: change.name.trim() }),
+    ...(change.formatId !== undefined && { formatId: change.formatId.trim() }),
+    ...(change.tags !== undefined && { tags: change.tags.map((tag) => tag.trim()) }),
+  };
 }

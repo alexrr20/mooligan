@@ -2,12 +2,19 @@ import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 
 import type { Event } from "electron";
-import * as z from "zod";
-import type { JSONType } from "zod";
+import { type JsonValue, JsonValueSchema } from "@mooligan/domain/schema";
+import { Option, Schema } from "effect";
 
 import { AUTH_PROTOCOL, isAuthCallbackUrl } from "./service.ts";
 
 type AuthLaunchData = { authCallback?: string };
+
+const decodeLaunchData = Schema.decodeUnknownOption(
+  Schema.Struct({ authCallback: Schema.optional(JsonValueSchema) }),
+);
+const decodeElectronProcess = Schema.decodeUnknownSync(
+  Schema.Struct({ defaultApp: Schema.optional(Schema.Boolean) }),
+);
 
 export interface StartupApp {
   onOpenUrl(listener: (event: Event, url: string) => void): void;
@@ -16,7 +23,7 @@ export interface StartupApp {
       event: Event,
       commandLine: string[],
       workingDirectory: string,
-      additionalData: JSONType,
+      additionalData: JsonValue,
     ) => void,
   ): void;
   requestSingleInstanceLock(additionalData?: AuthLaunchData): boolean;
@@ -51,9 +58,9 @@ export function registerAuthColdStart(
   );
 
   app.onSecondInstance((_event, commandLine, _workingDirectory, additionalData) => {
-    const data = z.object({ authCallback: z.json().optional() }).safeParse(additionalData);
-    if (data.success && data.data.authCallback !== undefined) {
-      queue.add(data.data.authCallback);
+    const data = decodeLaunchData(additionalData);
+    if (Option.isSome(data) && data.value.authCallback !== undefined) {
+      queue.add(data.value.authCallback);
     }
     for (const argument of commandLine) {
       queue.add(argument);
@@ -74,7 +81,7 @@ class CallbackQueue {
   #onError: ((cause: unknown) => void) | undefined;
   #tail = Promise.resolve();
 
-  add(value: JSONType) {
+  add(value: JsonValue) {
     if (!isAuthCallbackUrl(value)) {
       return;
     }
@@ -122,7 +129,7 @@ class CallbackQueue {
 }
 
 function registerProtocolClient(app: StartupApp, argv: readonly string[]) {
-  const electronProcess = z.object({ defaultApp: z.boolean().optional() }).parse(process);
+  const electronProcess = decodeElectronProcess(process);
 
   if (electronProcess.defaultApp && argv[1]) {
     return app.setAsDefaultProtocolClient(AUTH_PROTOCOL, process.execPath, [resolve(argv[1])]);

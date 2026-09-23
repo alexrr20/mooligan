@@ -1,7 +1,7 @@
 import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getCatalogFormatName, type CatalogImageDescriptor } from "@mooligan/domain/catalog-detail";
-import type { Deck } from "@mooligan/domain/decks";
+import type { Deck } from "@mooligan/workspace/deck-contract";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 import { motion, useReducedMotionConfig } from "motion/react";

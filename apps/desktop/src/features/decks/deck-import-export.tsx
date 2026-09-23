@@ -1,4 +1,4 @@
-import type { Deck } from "@mooligan/domain/decks";
+import type { Deck } from "@mooligan/workspace/deck-contract";
 import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
 import * as stylex from "@stylexjs/stylex";
 import { useMutation } from "@tanstack/react-query";

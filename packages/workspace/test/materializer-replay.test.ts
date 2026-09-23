@@ -4,13 +4,12 @@ import { test } from "node:test";
 import { makeInMemoryAdapter } from "@livestore/adapter-web";
 import { createStorePromise, type Store } from "@livestore/livestore";
 
+import { events, workspaceSchema } from "../src/schema.ts";
 import {
-  events,
   initialSpoilerResetId,
   spoilerDecisionsQuery,
   spoilerSettingsQuery,
-  workspaceSchema,
-} from "../src/schema.ts";
+} from "../src/spoilers.ts";
 
 type WorkspaceLiveStore = Store<typeof workspaceSchema>;
 

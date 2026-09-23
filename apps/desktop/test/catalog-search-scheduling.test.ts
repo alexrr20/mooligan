@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { ParseResult } from "effect";
 
 import type { CatalogListPage } from "@mooligan/domain/catalog-search";
 
@@ -117,7 +118,7 @@ void test("IPC cancellations resolve normally while genuine failures still rejec
     }, racedFailure.signal),
     /Unreadable catalog/,
   );
-  assert.throws(() => unwrapCatalogRequest({}), /Invalid/);
+  assert.throws(() => unwrapCatalogRequest({}), ParseResult.ParseError);
 });
 
 function deferred<Result>() {

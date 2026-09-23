@@ -52,7 +52,6 @@
     "unplugin": "catalog:",
     "vite": "catalog:",
     "vite-plugin-electron": "catalog:",
-    "vite-plus": "catalog:",
-    "zod": "catalog:"
+    "vite-plus": "catalog:"
   }
 }

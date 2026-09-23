@@ -47,6 +47,10 @@ void test("catalog replacement coordinates worker reads, cancellation, visibilit
             quantity: 2,
             finish: "nonfoil",
             condition: "near-mint",
+            acquiredAt: null,
+            locationId: null,
+            notes: null,
+            unitCost: null,
             language: "en",
           },
         ];

@@ -1,16 +1,13 @@
 import { Worker } from "node:worker_threads";
 import type { CatalogImageDescriptor } from "@mooligan/domain/catalog-detail";
-import type {
-  CollectionListRequest,
-  CollectionListResult,
-  CollectionLot,
-} from "@mooligan/domain/collection";
+import type { CollectionListRequest, CollectionListResult } from "@mooligan/domain/collection";
 import type {
   CatalogPrintingResult,
   CatalogSetSymbolDescriptor,
   SpoilerVisibilitySnapshot,
 } from "@mooligan/domain/spoilers";
-import type { JSONType } from "zod";
+import type { JsonValue } from "@mooligan/domain/schema";
+import type { CollectionLot } from "@mooligan/workspace/collection-contract";
 import { validateCatalogPrintingId } from "@mooligan/catalog/detail";
 import type { CollectionProjection } from "../collection/projection.ts";
 import { CatalogQueryQueue } from "./query-queue.ts";
@@ -113,7 +110,7 @@ export function createCatalogService(options: CatalogServiceOptions) {
   }
 
   async function queryCatalogPrintingDetail(
-    printingId: JSONType,
+    printingId: JsonValue,
   ): Promise<CatalogPrintingResult | null> {
     const validPrintingId = validateCatalogPrintingId(printingId);
 
@@ -248,14 +245,14 @@ export function createCatalogService(options: CatalogServiceOptions) {
     }
   }
 
-  function replaceCatalogCollectionProjection(lots: CollectionLot[]) {
+  function replaceCatalogCollectionProjection(lots: readonly CollectionLot[]) {
     return catalogQueryWorker
       ? sendCatalogOperation(catalogQueryWorker, "collection-projection-replace", [lots])
       : Promise.resolve();
   }
 
   function applyCatalogCollectionProjection(
-    delta: Readonly<{ deletedLotIds: string[]; upserts: CollectionLot[] }>,
+    delta: Readonly<{ deletedLotIds: readonly string[]; upserts: readonly CollectionLot[] }>,
   ) {
     return catalogQueryWorker
       ? sendCatalogOperation(catalogQueryWorker, "collection-projection-apply", [delta])

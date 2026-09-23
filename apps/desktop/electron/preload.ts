@@ -1,3 +1,4 @@
+import { UuidSchema } from "@mooligan/domain/schema";
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import { SpoilerTargetIdSchema } from "@mooligan/domain/spoilers";
 import { CatalogListPageSchema } from "@mooligan/domain/catalog-search";
@@ -7,7 +8,7 @@ import {
   PriceStatusSchema,
   PrintingPricesSchema,
 } from "@mooligan/domain/market";
-import * as z from "zod";
+import { Schema } from "effect";
 
 import {
   validateCollectionListResult,
@@ -29,6 +30,8 @@ import {
 import { validateWorkspaceBackup } from "./workspace/backup";
 import { unwrapCatalogRequest } from "../shared/catalog-request";
 
+const decodeUuid = Schema.decodeUnknownSync(UuidSchema);
+
 function subscribe<Value>(channel: string, callback: (value: Value) => void) {
   const listener = (_event: IpcRendererEvent, value: Value) => callback(value);
   ipcRenderer.on(channel, listener);
@@ -40,12 +43,16 @@ function subscribe<Value>(channel: string, callback: (value: Value) => void) {
 export const desktopApi = {
   prices: {
     exchangeRates: async () =>
-      ExchangeRatesSchema.nullable().parse(await ipcRenderer.invoke("prices:exchange-rates")),
-    status: async () => PriceStatusSchema.parse(await ipcRenderer.invoke("prices:status")),
-    refresh: async () => PriceStatusSchema.parse(await ipcRenderer.invoke("prices:refresh")),
+      Schema.decodeUnknownSync(Schema.NullOr(ExchangeRatesSchema))(
+        await ipcRenderer.invoke("prices:exchange-rates"),
+      ),
+    status: async () =>
+      Schema.decodeUnknownSync(PriceStatusSchema)(await ipcRenderer.invoke("prices:status")),
+    refresh: async () =>
+      Schema.decodeUnknownSync(PriceStatusSchema)(await ipcRenderer.invoke("prices:refresh")),
     printing: async (printingId) =>
-      PrintingPricesSchema.parse(
-        await ipcRenderer.invoke("prices:printing", z.uuid().parse(printingId)),
+      Schema.decodeUnknownSync(PrintingPricesSchema)(
+        await ipcRenderer.invoke("prices:printing", decodeUuid(printingId)),
       ),
     onUpdated: (callback) => subscribe("prices:updated", callback),
   },
@@ -58,20 +65,24 @@ export const desktopApi = {
 
   catalog: {
     deckCost: async (request) =>
-      DeckCostSchema.parse(await ipcRenderer.invoke("catalog:deck-cost", request)),
+      Schema.decodeUnknownSync(DeckCostSchema)(
+        await ipcRenderer.invoke("catalog:deck-cost", request),
+      ),
     colors: (printingIds) => ipcRenderer.invoke("catalog:colors", printingIds),
-    cancelQuery: (requestId) =>
-      ipcRenderer.invoke("catalog:cancel-query", z.uuid().parse(requestId)),
+    cancelQuery: (requestId) => ipcRenderer.invoke("catalog:cancel-query", decodeUuid(requestId)),
     detail: (printingId) => ipcRenderer.invoke("catalog:detail", printingId),
     download: () => ipcRenderer.invoke("catalog:download"),
     list: async (request, requestId) =>
-      CatalogListPageSchema.parse(
+      Schema.decodeUnknownSync(CatalogListPageSchema)(
         unwrapCatalogRequest(await ipcRenderer.invoke("catalog:list", request, requestId)),
       ),
     onProgress: (callback: (progress: CatalogProgress) => void) =>
       subscribe("catalog:progress", callback),
     resolveRootSetId: (targetId) =>
-      ipcRenderer.invoke("catalog:root-set", SpoilerTargetIdSchema.parse(targetId)),
+      ipcRenderer.invoke(
+        "catalog:root-set",
+        Schema.decodeUnknownSync(SpoilerTargetIdSchema)(targetId),
+      ),
     spoilerRevealSummaries: () => ipcRenderer.invoke("catalog:spoiler-reveals"),
     status: () => ipcRenderer.invoke("catalog:status"),
     upcoming: () => ipcRenderer.invoke("catalog:upcoming"),
@@ -100,16 +111,13 @@ export const desktopApi = {
       ),
     connectSpoilers: async (workspaceId) =>
       validateSpoilerProjectionConnection(
-        await ipcRenderer.invoke(
-          "workspace-projection:spoilers-connect",
-          z.uuid().parse(workspaceId),
-        ),
+        await ipcRenderer.invoke("workspace-projection:spoilers-connect", decodeUuid(workspaceId)),
       ),
     connectCollection: async (workspaceId) =>
       validateCollectionProjectionConnection(
         await ipcRenderer.invoke(
           "workspace-projection:collection-connect",
-          z.uuid().parse(workspaceId),
+          decodeUuid(workspaceId),
         ),
       ),
     onCollectionResyncRequired: (callback) =>
@@ -133,20 +141,20 @@ export const desktopApi = {
 
   workspace: {
     activateRestore: (workspaceId) =>
-      ipcRenderer.invoke("workspace:activate-restore", z.uuid().parse(workspaceId)),
+      ipcRenderer.invoke("workspace:activate-restore", decodeUuid(workspaceId)),
     beginRestore: async () =>
       validateWorkspaceBootstrap(await ipcRenderer.invoke("workspace:begin-restore")),
     bootstrap: async () =>
       validateWorkspaceBootstrap(await ipcRenderer.invoke("workspace:bootstrap")),
     cancelRestore: (workspaceId) =>
-      ipcRenderer.invoke("workspace:cancel-restore", z.uuid().parse(workspaceId)),
+      ipcRenderer.invoke("workspace:cancel-restore", decodeUuid(workspaceId)),
     exportBackup: (backup) =>
       ipcRenderer.invoke("workspace:export", validateWorkspaceBackup(backup)),
     onChanged: (callback) => subscribe("workspace:changed", callback),
     refreshSync: async () =>
       validateWorkspaceRuntime(await ipcRenderer.invoke("workspace:refresh-sync")),
     runtime: async () => validateWorkspaceRuntime(await ipcRenderer.invoke("workspace:runtime")),
-    select: (workspaceId) => ipcRenderer.invoke("workspace:select", z.uuid().parse(workspaceId)),
+    select: (workspaceId) => ipcRenderer.invoke("workspace:select", decodeUuid(workspaceId)),
     selectBackup: async () => {
       const value = await ipcRenderer.invoke("workspace:select-backup");
       return value === null ? null : validateWorkspaceBackup(value);

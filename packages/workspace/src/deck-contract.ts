@@ -1,35 +1,52 @@
+import { FinishSchema } from "@mooligan/domain/catalog";
+import { deckSections } from "@mooligan/domain/decks";
 import { Schema } from "effect";
 
-const Identifier = Schema.String.pipe(Schema.minLength(1), Schema.maxLength(128));
-const Name = Schema.String.pipe(Schema.minLength(1), Schema.maxLength(200), Schema.pattern(/\S/u));
-const Format = Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64), Schema.pattern(/\S/u));
-const Notes = Schema.String.pipe(Schema.maxLength(50_000));
-const Tags = Schema.Array(
-  Schema.String.pipe(Schema.minLength(1), Schema.maxLength(80), Schema.pattern(/\S/u)),
-).pipe(Schema.maxItems(50));
-const Timestamp = Schema.String.pipe(
-  Schema.pattern(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u),
-  Schema.filter((value) => Number.isFinite(Date.parse(value))),
-);
-const Quantity = Schema.Int.pipe(Schema.positive(), Schema.lessThanOrEqualTo(1_000_000));
-const Finish = Schema.Literal("nonfoil", "foil", "etched", "glossy");
-const Section = Schema.Literal("mainboard", "sideboard", "commander", "companion", "maybeboard");
+import { IdentifierSchema, TimestampSchema, trimmedTextSchema } from "./primitives.ts";
 
-export const deckMetadataSchema = Schema.Struct({
+export const DeckSectionSchema = Schema.Literal(...deckSections);
+export const deckEntryMaxQuantity = 1_000_000;
+
+/** The user-editable details of a Deck. */
+export const DeckMetadataSchema = Schema.Struct({
   archived: Schema.Boolean,
-  createdAt: Timestamp,
-  formatId: Format,
-  id: Identifier,
-  name: Name,
-  notes: Notes,
-  tags: Tags,
-  updatedAt: Timestamp,
+  formatId: trimmedTextSchema(64),
+  name: trimmedTextSchema(200),
+  notes: Schema.String.pipe(Schema.maxLength(50_000)),
+  tags: Schema.Array(trimmedTextSchema(80)).pipe(Schema.maxItems(50)),
 });
+export type DeckMetadata = typeof DeckMetadataSchema.Type;
 
-export const deckEntrySchema = Schema.Struct({
-  finish: Finish,
-  id: Identifier,
-  printingId: Identifier,
-  quantity: Quantity,
-  section: Section,
+/** A deck slot using an exact printing and finish. */
+export const DeckEntrySchema = Schema.Struct({
+  finish: FinishSchema,
+  id: IdentifierSchema,
+  printingId: IdentifierSchema,
+  quantity: Schema.Int.pipe(Schema.positive(), Schema.lessThanOrEqualTo(deckEntryMaxQuantity)),
+  section: DeckSectionSchema,
 });
+export type DeckEntry = typeof DeckEntrySchema.Type;
+
+export const NewDeckEntrySchema = DeckEntrySchema.omit("id");
+export type NewDeckEntry = typeof NewDeckEntrySchema.Type;
+
+export const DeckSchema = Schema.Struct({
+  ...DeckMetadataSchema.fields,
+  createdAt: TimestampSchema,
+  entries: Schema.Array(DeckEntrySchema).pipe(
+    Schema.maxItems(10_000),
+    Schema.filter(
+      (entries) =>
+        new Set(entries.map(({ id }) => id)).size === entries.length &&
+        new Set(entries.map(deckSlotKey)).size === entries.length,
+      { message: () => "Deck entry IDs and slots must be unique." },
+    ),
+  ),
+  id: IdentifierSchema,
+  updatedAt: TimestampSchema,
+});
+export type Deck = typeof DeckSchema.Type;
+
+export function deckSlotKey(entry: Pick<DeckEntry, "printingId" | "finish" | "section">) {
+  return [entry.printingId, entry.finish, entry.section].join("\0");
+}

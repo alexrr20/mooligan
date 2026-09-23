@@ -3,7 +3,7 @@ import { AppState } from "react-native";
 import { Directory, File, Paths } from "expo-file-system";
 import { defaultDatabaseDirectory, deleteDatabaseSync } from "expo-sqlite";
 import { useSyncExternalStore } from "react";
-import * as z from "zod";
+import { Schema } from "effect";
 import { createCatalogSchema, importCatalogData } from "@mooligan/catalog/import";
 import { createCatalogDetailQuery, createCatalogImageSourceQuery } from "@mooligan/catalog/detail";
 import {
@@ -31,10 +31,12 @@ import {
   type ExchangeRates,
   type PriceSnapshot,
 } from "@mooligan/domain/market";
-import type { CollectionLot } from "@mooligan/domain/collection";
+import type { CollectionLot } from "@mooligan/workspace/collection-contract";
 import { openCatalogDatabase } from "./sqlite";
 import { fileChunks, downloadPriceFeed } from "./download";
 import { catalogLines } from "./gzip-lines";
+
+const decodeNamedDatabase = Schema.decodeUnknownSync(Schema.Struct({ name: Schema.String }));
 
 type ReferenceSnapshot = {
   catalog: ReturnType<typeof catalogQueries>;
@@ -76,9 +78,7 @@ class ReferenceData {
     );
     initializePriceDatabase(this.#prices);
     const installed = this.#registry.prepare("SELECT name FROM catalog_install WHERE id = 1").get();
-    const name = installed
-      ? z.object({ name: z.string() }).parse(installed).name
-      : "catalog-empty.sqlite";
+    const name = installed ? decodeNamedDatabase(installed).name : "catalog-empty.sqlite";
     // A terminated import never becomes active. Reclaim only our abandoned reference files.
     for (const file of new Directory(defaultDatabaseDirectory).list()) {
       if (
@@ -111,9 +111,9 @@ class ReferenceData {
     const rates = readPriceMetadata(this.#prices, "exchange_rates");
     this.#snapshot = {
       catalog: catalogQueries(this.#database),
-      snapshot: metadata ? CatalogSnapshotSchema.parse(metadata) : null,
+      snapshot: metadata ? Schema.decodeUnknownSync(CatalogSnapshotSchema)(metadata) : null,
       prices: readPriceSnapshot(this.#prices),
-      rates: rates ? ExchangeRatesSchema.parse(JSON.parse(rates)) : null,
+      rates: rates ? Schema.decodeUnknownSync(ExchangeRatesSchema)(JSON.parse(rates)) : null,
       busy: false,
       progress: null,
       error: null,
@@ -139,10 +139,10 @@ class ReferenceData {
     try {
       const response = await fetch("https://api.scryfall.com/bulk-data/default_cards");
       if (!response.ok) throw new Error("The catalog download is unavailable.");
-      const bulk = ScryfallBulkDataSchema.parse(await response.json());
+      const bulk = Schema.decodeUnknownSync(ScryfallBulkDataSchema)(await response.json());
       const setsResponse = await fetch("https://api.scryfall.com/sets");
       if (!setsResponse.ok) throw new Error("The set catalog is unavailable.");
-      const sets = ScryfallSetListSchema.parse(await setsResponse.json()).data;
+      const sets = Schema.decodeUnknownSync(ScryfallSetListSchema)(await setsResponse.json()).data;
       this.#set({
         progress: `Downloading ${Math.ceil(bulk.compressed_size / 1_000_000)} MB of cards…`,
       });
@@ -170,7 +170,7 @@ class ReferenceData {
       incoming = undefined;
       this.#set({ catalog: queries, snapshot, revision: this.#snapshot.revision + 1 });
       old.close();
-      if (previous) deleteDatabaseSync(z.object({ name: z.string() }).parse(previous).name);
+      if (previous) deleteDatabaseSync(decodeNamedDatabase(previous).name);
     } catch (error) {
       this.#set({
         error: error instanceof Error ? error.message : "The catalog could not be installed.",

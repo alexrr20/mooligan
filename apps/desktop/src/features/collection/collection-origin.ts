@@ -1,5 +1,5 @@
 import type { HistoryState } from "@tanstack/react-router";
-import type { JSONType } from "zod";
+import type { JsonValue } from "@mooligan/domain/schema";
 
 import { validateCollectionSearch, type CollectionSearchState } from "./collection-state";
 
@@ -15,7 +15,7 @@ export function createCollectionOrigin(search: CollectionSearchState): Collectio
   return { search: validateCollectionSearch(search) };
 }
 
-export function readCollectionOrigin(state: HistoryState | JSONType): CollectionOrigin | null {
+export function readCollectionOrigin(state: HistoryState | JsonValue): CollectionOrigin | null {
   if (!isJsonObject(state) || !isJsonObject(state.collectionOrigin)) return null;
   const origin = state.collectionOrigin;
   const keys = Object.keys(origin);
@@ -33,6 +33,8 @@ export function withCollectionOrigin(origin: CollectionOrigin) {
   });
 }
 
-function isJsonObject(value: HistoryState | JSONType): value is Readonly<Record<string, JSONType>> {
+function isJsonObject(
+  value: HistoryState | JsonValue,
+): value is Readonly<Record<string, JsonValue>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

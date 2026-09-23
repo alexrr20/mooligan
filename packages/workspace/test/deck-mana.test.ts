@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+
+import { Schema } from "effect";
 import { normalizeScryfallCardDetail } from "@mooligan/domain/catalog-detail";
 import {
   ScryfallCardDownloadSchema,
   type ScryfallCardDownload,
 } from "@mooligan/domain/catalog-download";
-import type { DeckEntry } from "@mooligan/domain/decks";
+import type { DeckEntry } from "../src/deck-contract.ts";
 import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
 import {
   analyzeDeckMana,
@@ -19,7 +21,7 @@ function printing(id: string, fields: Partial<ScryfallCardDownload> = {}): Catal
     status: "visible",
     visibility: { reason: "released" },
     detail: normalizeScryfallCardDetail(
-      ScryfallCardDownloadSchema.parse({
+      Schema.decodeUnknownSync(ScryfallCardDownloadSchema)({
         id,
         name: id,
         object: "card",

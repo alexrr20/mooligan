@@ -1,4 +1,5 @@
-import type { DeckEntry, DeckSection } from "@mooligan/domain/decks";
+import type { DeckEntry } from "@mooligan/workspace/deck-contract";
+import type { DeckSection } from "@mooligan/domain/decks";
 import * as stylex from "@stylexjs/stylex";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
@@ -41,12 +42,12 @@ export function DeckEntryEditor({
   const mutations = useDeckMutations();
   const save = useMutation({
     mutationFn: async () => {
-      const change: Partial<Omit<DeckEntry, "id">> = {};
-      if (quantity !== original.quantity) change.quantity = quantity;
-      if (section !== original.section) change.section = section;
-      if (finish !== original.finish) change.finish = finish;
-      if (printingId !== original.printingId) change.printingId = printingId;
-      await mutations.updateEntry(deckId, original.id, change);
+      await mutations.updateEntry(deckId, original.id, {
+        ...(quantity !== original.quantity && { quantity }),
+        ...(section !== original.section && { section }),
+        ...(finish !== original.finish && { finish }),
+        ...(printingId !== original.printingId && { printingId }),
+      });
       onClose();
     },
   });

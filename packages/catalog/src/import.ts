@@ -5,17 +5,30 @@ import {
   type CatalogRelease,
   type ScryfallSetDownload,
 } from "@mooligan/domain/catalog-download";
-import * as z from "zod";
+import { Either, Option, ParseResult, Schema } from "effect";
 
 const transactionSize = 500;
 export const catalogSchemaVersion = 7;
-const IntegrityCheckSchema = z.object({ quick_check: z.literal("ok") });
-const CatalogCountSchema = z.object({ cardCount: z.number().int().nonnegative() });
-const CatalogSetCountSchema = z.object({ setCount: z.number().int().positive() });
-const CatalogMetadataSchema = CatalogSnapshotSchema.extend({
-  schemaVersion: z.number().int(),
-  setCount: z.number().int().positive(),
-});
+const decodeIntegrityCheck = Schema.decodeUnknownOption(
+  Schema.Struct({ quick_check: Schema.Literal("ok") }),
+);
+const decodeCatalogCount = Schema.decodeUnknownOption(
+  Schema.Struct({ cardCount: Schema.NonNegativeInt }),
+);
+const decodeCatalogSetCount = Schema.decodeUnknownOption(
+  Schema.Struct({ setCount: Schema.Int.pipe(Schema.positive()) }),
+);
+const decodeInvalidRootCount = Schema.decodeUnknownOption(
+  Schema.Struct({ invalidRootCount: Schema.NonNegativeInt }),
+);
+const decodeCatalogMetadata = Schema.decodeUnknownOption(
+  Schema.Struct({
+    ...CatalogSnapshotSchema.fields,
+    schemaVersion: Schema.Int,
+    setCount: Schema.Int.pipe(Schema.positive()),
+  }),
+);
+const decodeScryfallCard = Schema.decodeUnknownEither(ScryfallCardDownloadSchema);
 
 export type ResolvedCatalogSet = ScryfallSetDownload & { rootSetId: string };
 export async function importCatalogData(
@@ -59,58 +72,57 @@ export async function importCatalogData(
         throw new Error(`Card record ${completedCards + 1} is not valid JSON.`);
       }
 
-      const card = ScryfallCardDownloadSchema.safeParse(value);
+      const decoded = decodeScryfallCard(value);
 
-      if (!card.success) {
-        const issue = card.error.issues[0];
+      if (Either.isLeft(decoded)) {
+        const issue = ParseResult.ArrayFormatter.formatErrorSync(decoded.left)[0];
         throw new Error(
-          `Card record ${completedCards + 1} is invalid (${issue.path.join(".") || "record"}: ${issue.message}).`,
+          `Card record ${completedCards + 1} is invalid (${issue?.path.join(".") || "record"}: ${issue?.message}).`,
         );
       }
+      const card = decoded.right;
 
-      const cardSet = setsById.get(card.data.set_id);
+      const cardSet = setsById.get(card.set_id);
       if (!cardSet) {
-        throw new Error(
-          `Card record ${completedCards + 1} references missing set ${card.data.set_id}.`,
-        );
+        throw new Error(`Card record ${completedCards + 1} references missing set ${card.set_id}.`);
       }
-      if (cardSet.code !== card.data.set) {
+      if (cardSet.code !== card.set) {
         throw new Error(
-          `Card record ${completedCards + 1} set code ${card.data.set} does not match set ${card.data.set_id}.`,
+          `Card record ${completedCards + 1} set code ${card.set} does not match set ${card.set_id}.`,
         );
       }
 
       insert.run(
-        card.data.id,
-        card.data.oracle_id ?? null,
-        card.data.oracle_id ?? card.data.id,
-        card.data.name,
-        compactCatalogName(card.data.name),
-        card.data.set_id,
+        card.id,
+        card.oracle_id ?? null,
+        card.oracle_id ?? card.id,
+        card.name,
+        compactCatalogName(card.name),
+        card.set_id,
         cardSet.rootSetId,
-        card.data.set,
-        card.data.set_name,
-        card.data.collector_number,
-        card.data.type_line,
+        card.set,
+        card.set_name,
+        card.collector_number,
+        card.type_line,
         combinedCardText(
-          card.data.oracle_text,
-          card.data.card_faces?.map((face) => face.oracle_text),
+          card.oracle_text,
+          card.card_faces?.map((face) => face.oracle_text),
         ),
         combinedCardText(
-          card.data.mana_cost,
-          card.data.card_faces?.map((face) => face.mana_cost),
+          card.mana_cost,
+          card.card_faces?.map((face) => face.mana_cost),
         ),
         combinedCardText(
-          card.data.artist,
-          card.data.card_faces?.map((face) => face.artist),
+          card.artist,
+          card.card_faces?.map((face) => face.artist),
         ),
         combinedCardText(
-          card.data.flavor_text,
-          card.data.card_faces?.map((face) => face.flavor_text),
+          card.flavor_text,
+          card.card_faces?.map((face) => face.flavor_text),
         ),
-        card.data.rarity,
-        card.data.released_at ?? null,
-        card.data.released_at ?? cardSet.released_at ?? null,
+        card.rarity,
+        card.released_at ?? null,
+        card.released_at ?? cardSet.released_at ?? null,
         line,
         release.updatedAt,
       );
@@ -150,7 +162,7 @@ export async function importCatalogData(
     throw error;
   }
 
-  const snapshot = CatalogSnapshotSchema.parse({
+  const snapshot = Schema.decodeUnknownSync(CatalogSnapshotSchema)({
     cardCount: completedCards,
     updatedAt: release.updatedAt,
   });
@@ -374,27 +386,25 @@ export function validateCatalog(
             OR root.root_set_id <> root.id`,
     )
     .get();
-  const snapshot = CatalogMetadataSchema.safeParse(metadata);
-  const integrity = IntegrityCheckSchema.safeParse(check);
-  const catalogCount = CatalogCountSchema.safeParse(count);
-  const catalogSetCount = CatalogSetCountSchema.safeParse(setCount);
-  const invalidRootCount = z
-    .object({ invalidRootCount: z.number().int().nonnegative() })
-    .safeParse(invalidRoots);
+  const snapshot = decodeCatalogMetadata(metadata);
+  const integrity = decodeIntegrityCheck(check);
+  const catalogCount = decodeCatalogCount(count);
+  const catalogSetCount = decodeCatalogSetCount(setCount);
+  const invalidRootCount = decodeInvalidRootCount(invalidRoots);
 
   if (
-    !integrity.success ||
-    !snapshot.success ||
-    !catalogCount.success ||
-    !catalogSetCount.success ||
-    !invalidRootCount.success ||
-    snapshot.data.schemaVersion !== catalogSchemaVersion ||
-    catalogCount.data.cardCount !== expected.cardCount ||
-    catalogSetCount.data.setCount !== expectedSetCount ||
-    snapshot.data.setCount !== expectedSetCount ||
+    Option.isNone(integrity) ||
+    Option.isNone(snapshot) ||
+    Option.isNone(catalogCount) ||
+    Option.isNone(catalogSetCount) ||
+    Option.isNone(invalidRootCount) ||
+    snapshot.value.schemaVersion !== catalogSchemaVersion ||
+    catalogCount.value.cardCount !== expected.cardCount ||
+    catalogSetCount.value.setCount !== expectedSetCount ||
+    snapshot.value.setCount !== expectedSetCount ||
     foreignKeyFailures.length > 0 ||
-    invalidRootCount.data.invalidRootCount > 0 ||
-    snapshot.data.updatedAt !== expected.updatedAt
+    invalidRootCount.value.invalidRootCount > 0 ||
+    snapshot.value.updatedAt !== expected.updatedAt
   ) {
     throw new Error("The downloaded card database failed validation.");
   }

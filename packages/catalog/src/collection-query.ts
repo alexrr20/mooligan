@@ -11,39 +11,38 @@ import {
   type CollectionListRequest,
 } from "@mooligan/domain/collection";
 import { FinishSchema } from "@mooligan/domain/catalog";
-import * as z from "zod";
-import type { JSONType } from "zod";
+import { Schema } from "effect";
+import type { JsonValue } from "@mooligan/domain/schema";
 import type { SpoilerVisibilitySnapshot } from "@mooligan/domain/spoilers";
 import { catalogVisibilityParameters, catalogVisibilitySql } from "@mooligan/catalog/visibility";
 
-const CollectionHoldingRowSchema = z.discriminatedUnion("status", [
-  VisibleCollectionHoldingSchema.omit({ image: true, gridImage: true })
-    .extend({
-      availableFinishes: z
-        .string()
-        .transform((value) => z.array(FinishSchema).parse(JSON.parse(value))),
-      hasImage: z.union([z.literal(0), z.literal(1)]),
-      hasGridImage: z.union([z.literal(0), z.literal(1)]),
-    })
-    .strip(),
-  UnavailableCollectionHoldingSchema.omit({ label: true }).strip(),
-  ProtectedCollectionHoldingSchema.omit({ label: true }).strip(),
-]);
-type CollectionHoldingRow = z.infer<typeof CollectionHoldingRowSchema>;
-
-const count = z.number().int().nonnegative();
-const CollectionSummaryRowSchema = z.object({
-  filteredCards: count,
-  filteredCopies: count,
-  filteredHoldings: count,
-  totalCards: count,
-  totalCopies: count,
-  totalHoldings: count,
-  protectedCopies: count,
-  sets: z
-    .string()
-    .transform((value) => z.array(CollectionSetOptionSchema).parse(JSON.parse(value))),
-});
+const CollectionHoldingRowSchema = Schema.Union(
+  Schema.Struct({
+    ...VisibleCollectionHoldingSchema.omit("image", "gridImage").fields,
+    availableFinishes: Schema.parseJson(Schema.Array(FinishSchema)),
+    hasImage: Schema.Literal(0, 1),
+    hasGridImage: Schema.Literal(0, 1),
+  }),
+  Schema.Struct(UnavailableCollectionHoldingSchema.omit("label").fields),
+  Schema.Struct(ProtectedCollectionHoldingSchema.omit("label").fields),
+);
+type CollectionHoldingRow = typeof CollectionHoldingRowSchema.Type;
+const decodeCollectionHoldingRows = Schema.decodeUnknownSync(
+  Schema.Array(CollectionHoldingRowSchema),
+);
+const decodeCollectionListRequest = Schema.decodeUnknownSync(CollectionListRequestSchema);
+const decodeCollectionSummaryRow = Schema.decodeUnknownSync(
+  Schema.Struct({
+    filteredCards: Schema.NonNegativeInt,
+    filteredCopies: Schema.NonNegativeInt,
+    filteredHoldings: Schema.NonNegativeInt,
+    totalCards: Schema.NonNegativeInt,
+    totalCopies: Schema.NonNegativeInt,
+    totalHoldings: Schema.NonNegativeInt,
+    protectedCopies: Schema.NonNegativeInt,
+    sets: Schema.parseJson(Schema.Array(CollectionSetOptionSchema)),
+  }),
+);
 
 const collectionOrderSql = `CASE WHEN status = 'protected' THEN 1 ELSE 0 END,
   CASE WHEN $sort = 'quantity' THEN quantity END DESC,
@@ -169,7 +168,7 @@ SELECT page.status,
     input: CollectionListRequest = {},
     visibility: SpoilerVisibilitySnapshot,
   ): CollectionListPage => {
-    const request = CollectionListRequestSchema.parse(input);
+    const request = decodeCollectionListRequest(input);
     const limit = request.limit ?? 100;
     const parameters = {
       ...catalogVisibilityParameters(visibility),
@@ -181,7 +180,7 @@ SELECT page.status,
     };
     database.exec("BEGIN");
     try {
-      const rows = z.array(CollectionHoldingRowSchema).parse(
+      const rows = decodeCollectionHoldingRows(
         selectPage.all({
           ...parameters,
           $sort: request.sort ?? "name",
@@ -189,7 +188,7 @@ SELECT page.status,
           $offset: request.offset ?? 0,
         }),
       );
-      const summary = CollectionSummaryRowSchema.parse(selectSummary.get(parameters));
+      const summary = decodeCollectionSummaryRow(selectSummary.get(parameters));
       database.exec("COMMIT");
       return {
         filtered: {
@@ -214,8 +213,10 @@ SELECT page.status,
   };
 }
 
-export function validateCollectionListRequest(value: CollectionListRequest | JSONType | undefined) {
-  return CollectionListRequestSchema.parse(value ?? {});
+export function validateCollectionListRequest(
+  value: CollectionListRequest | JsonValue | undefined,
+) {
+  return decodeCollectionListRequest(value ?? {});
 }
 
 function toCollectionHolding(row: CollectionHoldingRow): CollectionHolding {

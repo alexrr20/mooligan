@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "@mooligan/domain": "workspace:*",
-    "zod": "catalog:"
+    "@mooligan/workspace": "workspace:*",
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

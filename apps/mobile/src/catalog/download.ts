@@ -1,7 +1,8 @@
 import { File, Paths } from "expo-file-system";
 import { gzipText } from "./gzip-lines";
 import { JSONParser } from "@streamparser/json";
-import * as z from "zod";
+import { UuidSchema, IsoDateSchema, JsonValueSchema } from "@mooligan/domain/schema";
+import { Schema } from "effect";
 import type { PriceFeedSource } from "@mooligan/catalog/price-import";
 
 // Read bounded chunks from disk so neither compressed bulk feed lives in JS memory.
@@ -19,6 +20,12 @@ export async function* fileChunks(file: File) {
   }
 }
 
+const decodeMeta = Schema.decodeUnknownSync(
+  Schema.Struct({ date: IsoDateSchema, version: Schema.String.pipe(Schema.startsWith("5.")) }),
+);
+const decodeCardUuid = Schema.decodeUnknownSync(UuidSchema);
+const decodeCard = Schema.decodeUnknownSync(JsonValueSchema);
+
 export const downloadPriceFeed: PriceFeedSource = async (name, onCard) => {
   const file = new File(Paths.cache, `${name}.json.gz`);
   try {
@@ -29,12 +36,9 @@ export const downloadPriceFeed: PriceFeedSource = async (name, onCard) => {
     let count = 0;
     const parser = new JSONParser({ paths: ["$.meta", "$.data.*"], keepStack: false });
     parser.onValue = ({ key, value }) => {
-      if (key === "meta")
-        date = z
-          .object({ date: z.iso.date(), version: z.string().startsWith("5.") })
-          .parse(value).date;
+      if (key === "meta") date = decodeMeta(value).date;
       else {
-        onCard(z.uuid().parse(key), z.json().parse(value));
+        onCard(decodeCardUuid(key), decodeCard(value));
         count++;
       }
     };

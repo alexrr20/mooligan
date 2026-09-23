@@ -1,7 +1,13 @@
 import { ResultsLayout } from "@/components/results-layout";
 import { Fragment, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
-import { deckSections, type Deck, type DeckEntry, type DeckMetadata } from "@mooligan/domain/decks";
+import { deckSectionLabels } from "@mooligan/domain/decks";
+import type {
+  Deck,
+  DeckEntry,
+  DeckMetadata,
+  NewDeckEntry,
+} from "@mooligan/workspace/deck-contract";
 import { summarizeDeck } from "@mooligan/workspace/client/deck-summary";
 import { analyzeDeckMana } from "@mooligan/workspace/client/deck-mana";
 import { DeckManaAnalysis } from "./deck-mana-analysis";
@@ -17,7 +23,7 @@ import { readDocument, shareDocument } from "@/workspace/files";
 import { CatalogSearch } from "./search";
 import { DeckMetadataForm } from "./decks";
 import { AddDeckCard } from "./card-detail";
-import { finishes } from "./collection";
+import { deckSectionOptions, finishOptions } from "./options";
 import {
   cardIdentity,
   tagsForDeck,
@@ -99,12 +105,14 @@ function DeckEditor({ deck }: { deck: Deck }) {
           },
         ];
   function saveMetadata(metadata: DeckMetadata, original: DeckMetadata = deck) {
-    const change: Partial<DeckMetadata> = {};
-    for (const key of ["name", "formatId", "notes"] as const)
-      if (metadata[key] !== original[key]) change[key] = metadata[key];
-    if (JSON.stringify(metadata.tags) !== JSON.stringify(original.tags))
-      change.tags = metadata.tags;
-    deckActions.update(deck.id, change);
+    deckActions.update(deck.id, {
+      ...(metadata.name !== original.name && { name: metadata.name }),
+      ...(metadata.formatId !== original.formatId && { formatId: metadata.formatId }),
+      ...(metadata.notes !== original.notes && { notes: metadata.notes }),
+      ...(JSON.stringify(metadata.tags) !== JSON.stringify(original.tags) && {
+        tags: metadata.tags,
+      }),
+    });
     setMode("cards");
   }
   return (
@@ -225,7 +233,7 @@ function DeckEditor({ deck }: { deck: Deck }) {
           <Choice
             label="Section"
             value={section}
-            options={[{ value: "all", label: "All sections" }, ...deckSections]}
+            options={[{ value: "all", label: "All sections" }, ...deckSectionOptions]}
             onChange={setSection}
           />
           <Choice
@@ -321,7 +329,7 @@ function DeckEditor({ deck }: { deck: Deck }) {
                         }
                         image={detail?.selectedPrinting.images.find((i) => i.size === "small")}
                         gridImage={detail?.selectedPrinting.images.find((i) => i.size === "normal")}
-                        detail={`${deckSections.find((s) => s.value === entry.section)?.label} · ${entry.finish}${detail ? ` · ${detail.legalities.find((l) => l.formatId === deck.formatId)?.status ?? "Legality unavailable"}` : ""}`}
+                        detail={`${deckSectionLabels[entry.section]} · ${entry.finish}${detail ? ` · ${detail.legalities.find((l) => l.formatId === deck.formatId)?.status ?? "Legality unavailable"}` : ""}`}
                         quantity={entry.quantity}
                         finish={entry.finish}
                       />
@@ -417,11 +425,11 @@ function EntryEditor({
         onChangeText={setQuantity}
         keyboardType="number-pad"
       />
-      <Choice label="Section" value={section} options={deckSections} onChange={setSection} />
+      <Choice label="Section" value={section} options={deckSectionOptions} onChange={setSection} />
       <Choice
         label="Finish"
         value={finish}
-        options={finishes.filter((f) => available.includes(f.value))}
+        options={finishOptions.filter((f) => available.includes(f.value))}
         onChange={setFinish}
       />
       <Button quiet label="Change printing" onPress={() => setChoosing(!choosing)} />
@@ -442,11 +450,12 @@ function EntryEditor({
         <Button
           label="Save card"
           onPress={async () => {
-            const change: Partial<Omit<DeckEntry, "id">> = {};
-            if (Number(quantity) !== original.quantity) change.quantity = Number(quantity);
-            if (finish !== original.finish) change.finish = finish;
-            if (section !== original.section) change.section = section;
-            if (replacement) change.printingId = replacement;
+            const change: Partial<NewDeckEntry> = {
+              ...(Number(quantity) !== original.quantity && { quantity: Number(quantity) }),
+              ...(finish !== original.finish && { finish }),
+              ...(section !== original.section && { section }),
+              ...(replacement && { printingId: replacement }),
+            };
             await deckActions.updateEntry(deckId, entry.id, change);
             onDone();
           }}

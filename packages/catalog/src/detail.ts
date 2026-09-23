@@ -13,8 +13,8 @@ import {
   type CatalogSetSymbolDescriptor,
   type SpoilerVisibilitySnapshot,
 } from "@mooligan/domain/spoilers";
-import * as z from "zod";
-import type { JSONType } from "zod";
+import { IsoDateSchema, type JsonValue, UrlSchema } from "@mooligan/domain/schema";
+import { Option, Schema } from "effect";
 
 import { createCatalogReleaseSummaryQuery } from "@mooligan/catalog/release";
 import {
@@ -28,21 +28,27 @@ export const maxCatalogPrintingIdLength = 128;
 
 const catalogOrder = new Intl.Collator("en", { numeric: true, sensitivity: "base" });
 
-const CatalogVisibleRecordRowSchema = z.object({
-  json: z.string(),
-  oracleId: z.string().nullable(),
-  printingId: z.string().min(1),
-  releasedOn: z.iso.date().nullable(),
-  rootSetId: z.string().min(1),
+const CatalogVisibleRecordRowSchema = Schema.Struct({
+  json: Schema.String,
+  oracleId: Schema.NullOr(Schema.String),
+  printingId: Schema.NonEmptyString,
+  releasedOn: Schema.NullOr(IsoDateSchema),
+  rootSetId: Schema.NonEmptyString,
 });
-const CatalogRelatedRecordRowSchema = z.object({ json: z.string() });
-const CatalogProtectedRecordRowSchema = CatalogVisibleRecordRowSchema.omit({
-  json: true,
-  oracleId: true,
-});
-const CatalogImageRecordRowSchema = z.object({ json: z.string() });
-const CatalogSetSymbolSourceRowSchema = z.object({ sourceUrl: z.url() });
-const CatalogPrintingIdSchema = z.string().trim().min(1).max(maxCatalogPrintingIdLength);
+const CatalogRecordRowSchema = Schema.Struct({ json: Schema.String });
+const decodeVisibleRecordRow = Schema.decodeUnknownOption(CatalogVisibleRecordRowSchema);
+const decodeRelatedRecordRows = Schema.decodeUnknownSync(Schema.Array(CatalogRecordRowSchema));
+const decodeProtectedRecordRow = Schema.decodeUnknownOption(
+  CatalogVisibleRecordRowSchema.omit("json", "oracleId"),
+);
+const decodeImageRecordRow = Schema.decodeUnknownOption(CatalogRecordRowSchema);
+const decodeSetSymbolSourceRow = Schema.decodeUnknownOption(
+  Schema.Struct({ sourceUrl: UrlSchema }),
+);
+const decodeCatalogPrintingId = Schema.decodeUnknownOption(
+  Schema.Trim.pipe(Schema.minLength(1), Schema.maxLength(maxCatalogPrintingIdLength)),
+);
+const decodeCatalogRecord = Schema.decodeUnknownSync(Schema.parseJson(ScryfallCardDownloadSchema));
 
 export function createCatalogDetailQuery(database: DatabaseSync) {
   const selectVisiblePrinting = database.prepare(
@@ -77,9 +83,9 @@ export function createCatalogDetailQuery(database: DatabaseSync) {
       $printingId: printingId,
       ...visibilityParameters,
     });
-    const selectedRow = CatalogVisibleRecordRowSchema.safeParse(selectedValue);
+    const selectedRow = decodeVisibleRecordRow(selectedValue);
 
-    if (!selectedRow.success) {
+    if (Option.isNone(selectedRow)) {
       if (selectedValue !== undefined) {
         throw new Error("The local card catalog contains an invalid card row.");
       }
@@ -88,35 +94,33 @@ export function createCatalogDetailQuery(database: DatabaseSync) {
       if (protectedValue === undefined) {
         return null;
       }
-      const protectedRow = CatalogProtectedRecordRowSchema.safeParse(protectedValue);
-      if (!protectedRow.success) {
+      const protectedRow = decodeProtectedRecordRow(protectedValue);
+      if (Option.isNone(protectedRow)) {
         throw new Error("The local card catalog contains an invalid card row.");
       }
-      const reason = catalogVisibilityReason(visibility, protectedRow.data);
-      if (reason !== null || protectedRow.data.releasedOn === null) {
+      const reason = catalogVisibilityReason(visibility, protectedRow.value);
+      if (reason !== null || protectedRow.value.releasedOn === null) {
         throw new Error("The local card catalog returned inconsistent preview visibility.");
       }
 
       return {
-        printingId: protectedRow.data.printingId,
-        release: queryReleaseSummary(protectedRow.data.rootSetId, visibility.currentDate),
-        releasedOn: protectedRow.data.releasedOn,
+        printingId: protectedRow.value.printingId,
+        release: queryReleaseSummary(protectedRow.value.rootSetId, visibility.currentDate),
+        releasedOn: protectedRow.value.releasedOn,
         status: "protected",
       };
     }
 
-    const selected = parseCatalogRecord(selectedRow.data.json);
-    const related = selectedRow.data.oracleId
-      ? z
-          .array(CatalogRelatedRecordRowSchema)
-          .parse(
-            selectRelated.all({ $oracleId: selectedRow.data.oracleId, ...visibilityParameters }),
-          )
-          .map((row) => parseCatalogRecord(row.json))
+    const selected = decodeCatalogRecord(selectedRow.value.json);
+    const related = selectedRow.value.oracleId
+      ? decodeRelatedRecordRows(
+          selectRelated.all({ $oracleId: selectedRow.value.oracleId, ...visibilityParameters }),
+        )
+          .map((row) => decodeCatalogRecord(row.json))
           .sort(comparePrintings)
       : [];
     const detail = normalizeScryfallCardDetail(selected, related);
-    const reason = catalogVisibilityReason(visibility, selectedRow.data);
+    const reason = catalogVisibilityReason(visibility, selectedRow.value);
     if (reason === null) {
       throw new Error("The local card catalog returned inconsistent preview visibility.");
     }
@@ -129,7 +133,7 @@ export function createCatalogDetailQuery(database: DatabaseSync) {
           ? { reason }
           : {
               reason,
-              release: queryReleaseSummary(selectedRow.data.rootSetId, visibility.currentDate),
+              release: queryReleaseSummary(selectedRow.value.rootSetId, visibility.currentDate),
             },
     };
   };
@@ -150,12 +154,12 @@ export function createCatalogImageSourceQuery(database: DatabaseSync) {
     if (value === undefined) {
       return null;
     }
-    const row = CatalogImageRecordRowSchema.safeParse(value);
-    if (!row.success) {
+    const row = decodeImageRecordRow(value);
+    if (Option.isNone(row)) {
       throw new Error("The local card catalog contains an invalid card row.");
     }
 
-    const card = parseCatalogRecord(row.data.json);
+    const card = decodeCatalogRecord(row.value.json);
     const usesFaceImages = card.card_faces?.some((face) => face.image_uris) === true;
 
     if (usesFaceImages) {
@@ -174,21 +178,16 @@ export function createCatalogSetSymbolSourceQuery(database: DatabaseSync) {
     if (value === undefined) {
       return null;
     }
-    const row = CatalogSetSymbolSourceRowSchema.safeParse(value);
-    if (!row.success) {
+    const row = decodeSetSymbolSourceRow(value);
+    if (Option.isNone(row)) {
       throw new Error("The local card catalog contains an invalid set symbol row.");
     }
-    return row.data.sourceUrl;
+    return row.value.sourceUrl;
   };
 }
 
-export function validateCatalogPrintingId(value: JSONType) {
-  const printingId = CatalogPrintingIdSchema.safeParse(value);
-  return printingId.success ? printingId.data : null;
-}
-
-function parseCatalogRecord(value: string) {
-  return ScryfallCardDownloadSchema.parse(JSON.parse(value));
+export function validateCatalogPrintingId(value: JsonValue) {
+  return Option.getOrNull(decodeCatalogPrintingId(value));
 }
 
 function comparePrintings(left: ScryfallCardDownload, right: ScryfallCardDownload) {

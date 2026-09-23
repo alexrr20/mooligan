@@ -1,12 +1,13 @@
 import { FinishSchema, type Finish } from "@mooligan/domain/catalog";
 import type { CatalogListPage, CatalogListRequest } from "@mooligan/domain/catalog-search";
-import {
-  DeckEntrySchema,
-  deckSections,
-  type DeckEntry,
-  type DeckSection,
-} from "@mooligan/domain/decks";
+import { deckSectionLabels, deckSections, type DeckSection } from "@mooligan/domain/decks";
 import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
+import { Schema } from "effect";
+
+import { NewDeckEntrySchema, type DeckEntry, type NewDeckEntry } from "../deck-contract.ts";
+
+const decodeNewEntry = Schema.decodeSync(NewDeckEntrySchema);
+const isFinish = Schema.is(FinishSchema);
 
 type ImportLine = {
   line: number;
@@ -20,7 +21,7 @@ type ImportLine = {
 };
 
 export type DeckImportResult = {
-  entries: Omit<DeckEntry, "id">[];
+  entries: NewDeckEntry[];
   errors: string[];
   warnings: string[];
 };
@@ -72,10 +73,8 @@ export function parseDeckText(text: string) {
       .replace(/\s*\[(?:printing|finish):[^\]]+\]/gu, "")
       .replace(/\s+\*[FE]\*$/u, "")
       .trim();
-    const finish = FinishSchema.safeParse(
-      finishToken ?? (marker === "F" ? "foil" : marker === "E" ? "etched" : undefined),
-    );
-    if (finishToken && !finish.success) {
+    const finish = finishToken ?? (marker === "F" ? "foil" : marker === "E" ? "etched" : undefined);
+    if (finish !== undefined && !isFinish(finish)) {
       errors.push(`Line ${index + 1}: unknown finish.`);
       continue;
     }
@@ -97,7 +96,7 @@ export function parseDeckText(text: string) {
       quantity,
       section: sideboard ? "sideboard" : section,
       printingId,
-      finish: finish.success ? finish.data : undefined,
+      finish,
       setCode: edition?.[1],
       collectorNumber: edition?.[2],
     });
@@ -178,18 +177,9 @@ export async function resolveDeckText(
         card = { printingId, finish };
         resolved.set(key, card);
       }
-      const entry = DeckEntrySchema.parse({
-        ...card,
-        id: "import",
-        quantity: line.quantity,
-        section: line.section,
-      });
-      result.entries.push({
-        printingId: entry.printingId,
-        finish: entry.finish,
-        section: entry.section,
-        quantity: entry.quantity,
-      });
+      result.entries.push(
+        decodeNewEntry({ ...card, quantity: line.quantity, section: line.section }),
+      );
     } catch (cause) {
       result.errors.push(
         `Line ${line.line}: ${cause instanceof Error ? cause.message : "The card could not be read."}`,
@@ -204,7 +194,7 @@ export function exportDeckText(
   printings: ReadonlyMap<string, CatalogPrintingResult | null>,
 ) {
   return deckSections
-    .map(({ value, label }) => {
+    .map((value) => {
       const lines = entries
         .filter(({ section }) => section === value)
         .map((entry) => {
@@ -215,7 +205,7 @@ export function exportDeckText(
             : "";
           return `${entry.quantity} ${name}[printing:${entry.printingId}] [finish:${entry.finish}]`;
         });
-      return lines.length ? `${label}\n${lines.join("\n")}` : "";
+      return lines.length ? `${deckSectionLabels[value]}\n${lines.join("\n")}` : "";
     })
     .filter(Boolean)
     .join("\n\n");

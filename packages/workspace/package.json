@@ -6,9 +6,7 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
-    "./backup": "./src/backup.ts",
-    "./schema": "./src/schema.ts",
-    "./client/*": "./src/client/*.ts"
+    "./*": "./src/*.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",
@@ -18,8 +16,7 @@
     "@livestore/livestore": "catalog:",
     "@mooligan/domain": "workspace:*",
     "effect": "catalog:",
-    "uuid": "catalog:",
-    "zod": "catalog:"
+    "uuid": "catalog:"
   },
   "devDependencies": {
     "@livestore/adapter-web": "catalog:",

@@ -1,9 +1,12 @@
-import { FinishSchema } from "@mooligan/domain/catalog";
+import { Either, Schema } from "effect";
+import { FinishSchema, finishLabels, finishes } from "@mooligan/domain/catalog";
 import {
   CardConditionSchema,
   CardLanguageSchema,
   CollectionSortSchema,
+  cardConditionLabels,
   cardConditions,
+  cardLanguageLabels,
   cardLanguages,
 } from "@mooligan/domain/collection";
 import * as stylex from "@stylexjs/stylex";
@@ -135,39 +138,36 @@ function CollectionPage() {
               label="Finish"
               options={[
                 { label: "All finishes", value: null },
-                { label: "Nonfoil", value: "nonfoil" },
-                { label: "Foil", value: "foil" },
-                { label: "Etched", value: "etched" },
-                { label: "Glossy", value: "glossy" },
+                ...finishes.map((value) => ({ label: finishLabels[value], value })),
               ]}
               value={search.finish ?? ""}
               onChange={(finish) => {
-                const parsed = FinishSchema.safeParse(finish);
-                update({ finish: parsed.success ? parsed.data : undefined });
+                const parsed = Schema.decodeUnknownEither(FinishSchema)(finish);
+                update({ finish: Either.isRight(parsed) ? parsed.right : undefined });
               }}
             />
             <Filter
               label="Language"
               options={[
                 { label: "All languages", value: null },
-                ...cardLanguages.map(({ label, value }) => ({ label, value })),
+                ...cardLanguages.map((value) => ({ label: cardLanguageLabels[value], value })),
               ]}
               value={search.language ?? ""}
               onChange={(language) => {
-                const parsed = CardLanguageSchema.safeParse(language);
-                update({ language: parsed.success ? parsed.data : undefined });
+                const parsed = Schema.decodeUnknownEither(CardLanguageSchema)(language);
+                update({ language: Either.isRight(parsed) ? parsed.right : undefined });
               }}
             />
             <Filter
               label="Condition"
               options={[
                 { label: "All conditions", value: null },
-                ...cardConditions.map(({ label, value }) => ({ label, value })),
+                ...cardConditions.map((value) => ({ label: cardConditionLabels[value], value })),
               ]}
               value={search.condition ?? ""}
               onChange={(condition) => {
-                const parsed = CardConditionSchema.safeParse(condition);
-                update({ condition: parsed.success ? parsed.data : undefined });
+                const parsed = Schema.decodeUnknownEither(CardConditionSchema)(condition);
+                update({ condition: Either.isRight(parsed) ? parsed.right : undefined });
               }}
             />
             <Filter
@@ -179,9 +179,10 @@ function CollectionPage() {
               ]}
               value={search.sort ?? "name"}
               onChange={(sort) => {
-                const parsed = CollectionSortSchema.safeParse(sort);
+                const parsed = Schema.decodeUnknownEither(CollectionSortSchema)(sort);
                 update({
-                  sort: parsed.success && parsed.data !== "name" ? parsed.data : undefined,
+                  sort:
+                    Either.isRight(parsed) && parsed.right !== "name" ? parsed.right : undefined,
                 });
               }}
             />

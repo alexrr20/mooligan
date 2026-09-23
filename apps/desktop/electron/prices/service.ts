@@ -2,15 +2,17 @@ import { updateExchangeRates } from "@mooligan/catalog/exchange-rates";
 import { Worker } from "node:worker_threads";
 
 import { PriceSnapshotSchema, PricePhaseSchema, type PriceStatus } from "@mooligan/domain/market";
-import * as z from "zod";
+import { Either, Schema } from "effect";
 
 import { openPriceDatabase } from "./database.ts";
 import { readPrintingPrices, readPriceSnapshot } from "@mooligan/catalog/prices";
 
-const WorkerMessageSchema = z.union([
-  z.object({ snapshot: PriceSnapshotSchema }),
-  z.object({ phase: PricePhaseSchema }),
-]);
+const decodeWorkerMessage = Schema.decodeUnknownEither(
+  Schema.Union(
+    Schema.Struct({ snapshot: PriceSnapshotSchema }),
+    Schema.Struct({ phase: PricePhaseSchema }),
+  ),
+);
 
 export class PriceService {
   readonly #database;
@@ -67,13 +69,13 @@ export class PriceService {
       this.#worker = worker;
       let complete = false;
       worker.on("message", (value) => {
-        const message = WorkerMessageSchema.safeParse(value);
-        if (!message.success) {
+        const message = decodeWorkerMessage(value);
+        if (Either.isLeft(message)) {
           reject(new Error("The price importer returned an invalid response."));
           void worker.terminate();
-        } else if ("snapshot" in message.data) {
+        } else if ("snapshot" in message.right) {
           complete = true;
-        } else this.#phase = message.data.phase;
+        } else this.#phase = message.right.phase;
       });
       worker.once("error", reject);
       worker.once("exit", (code) => {

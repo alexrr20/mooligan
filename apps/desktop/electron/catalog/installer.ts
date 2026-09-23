@@ -4,7 +4,8 @@ import { DatabaseSync } from "node:sqlite";
 import { ReadableStream as TransferableReadableStream } from "node:stream/web";
 import { Worker } from "node:worker_threads";
 import { net } from "electron";
-import * as z from "zod";
+import { Either, Schema } from "effect";
+import { StrictStruct } from "@mooligan/domain/schema";
 import { CatalogSnapshotSchema, type CatalogSnapshot } from "@mooligan/domain/catalog";
 import {
   CatalogReleaseSchema,
@@ -22,11 +23,14 @@ const scryfallRequestHeaders = {
   Accept: "application/json",
   "User-Agent": "Mooligan/0.0.0 (https://github.com/alexrr20/mooligan)",
 };
-const CatalogMetadataSchema = CatalogSnapshotSchema.extend({ schemaVersion: z.number().int() });
-const CatalogImportWorkerMessageSchema = z.discriminatedUnion("type", [
-  z.strictObject({ completedCards: z.number().int().nonnegative(), type: z.literal("progress") }),
-  z.strictObject({ snapshot: CatalogSnapshotSchema, type: z.literal("complete") }),
-]);
+const CatalogMetadataSchema = Schema.Struct({
+  ...CatalogSnapshotSchema.fields,
+  schemaVersion: Schema.Int,
+});
+const CatalogImportWorkerMessageSchema = Schema.Union(
+  StrictStruct({ completedCards: Schema.NonNegativeInt, type: Schema.Literal("progress") }),
+  StrictStruct({ snapshot: CatalogSnapshotSchema, type: Schema.Literal("complete") }),
+);
 
 export function createCatalogInstaller(
   catalogPath: string,
@@ -74,13 +78,13 @@ export function createCatalogInstaller(
           )
           .get();
 
-        const snapshot = CatalogMetadataSchema.safeParse(row);
+        const snapshot = Schema.decodeUnknownEither(CatalogMetadataSchema)(row);
 
-        if (!snapshot.success || snapshot.data.schemaVersion !== catalogSchemaVersion) {
+        if (Either.isLeft(snapshot) || snapshot.right.schemaVersion !== catalogSchemaVersion) {
           return { installed: false };
         }
 
-        installed = snapshot.data;
+        installed = snapshot.right;
       } finally {
         database.close();
       }
@@ -205,19 +209,19 @@ function importCatalogInWorker(
     };
 
     worker.on("message", (value) => {
-      const message = CatalogImportWorkerMessageSchema.safeParse(value);
-      if (!message.success) {
+      const message = Schema.decodeUnknownEither(CatalogImportWorkerMessageSchema)(value);
+      if (Either.isLeft(message)) {
         void worker.terminate().catch(() => undefined);
         fail(new Error("The catalog import worker returned an invalid response."));
         return;
       }
-      if (message.data.type === "progress") {
-        onProgress(message.data.completedCards);
+      if (message.right.type === "progress") {
+        onProgress(message.right.completedCards);
         return;
       }
 
       settled = true;
-      resolve(message.data.snapshot);
+      resolve(message.right.snapshot);
     });
     worker.once("error", fail);
     worker.once("exit", (code) => {
@@ -230,7 +234,7 @@ function importCatalogInWorker(
   });
 }
 
-async function fetchScryfallSets(): Promise<ScryfallSetDownload[]> {
+async function fetchScryfallSets(): Promise<readonly ScryfallSetDownload[]> {
   const response = await net.fetch(scryfallSetsUrl, { headers: scryfallRequestHeaders });
   if (!response.ok) {
     throw new Error(`The Scryfall set catalog returned HTTP ${response.status}.`);
@@ -242,11 +246,11 @@ async function fetchScryfallSets(): Promise<ScryfallSetDownload[]> {
   } catch {
     throw new Error("The Scryfall set catalog returned invalid JSON.");
   }
-  const sets = ScryfallSetListSchema.safeParse(value);
-  if (!sets.success) {
+  const sets = Schema.decodeUnknownEither(ScryfallSetListSchema)(value);
+  if (Either.isLeft(sets)) {
     throw new Error("The Scryfall set catalog response was invalid.");
   }
-  return sets.data.data;
+  return sets.right.data;
 }
 
 async function fetchCatalogRelease(): Promise<CatalogRelease> {
@@ -260,13 +264,13 @@ async function fetchCatalogRelease(): Promise<CatalogRelease> {
     );
   }
 
-  const release = CatalogReleaseSchema.safeParse(await response.json());
+  const release = Schema.decodeUnknownEither(CatalogReleaseSchema)(await response.json());
 
-  if (!release.success) {
+  if (Either.isLeft(release)) {
     throw new Error("The catalog service returned an invalid release.");
   }
 
-  return release.data;
+  return release.right;
 }
 
 async function replaceCatalog(partial: string, destination: string, backup: string) {

@@ -1,13 +1,17 @@
-import type { DeckCost, DeckCostRequest } from "@mooligan/domain/deck-cost";
+import type { DeckCost } from "@mooligan/domain/deck-cost";
 import { MarketPriceSchema } from "@mooligan/domain/market";
 import type { SpoilerVisibilitySnapshot } from "@mooligan/domain/spoilers";
-import * as z from "zod";
+import type { DeckCostRequest } from "@mooligan/workspace/transport";
+import { Schema } from "effect";
+import type { Mutable } from "effect/Types";
 
 import type { CatalogDatabase } from "./database.ts";
 import { lowestRetailPrice } from "./lowest-prices.ts";
 import { catalogVisibilityParameters, catalogVisibilitySqlFor } from "./visibility.ts";
 
-const PrintingPriceSchema = MarketPriceSchema.extend({ printingId: z.string() });
+const decodePrintingPrice = Schema.decodeUnknownSync(
+  Schema.Struct({ ...MarketPriceSchema.fields, printingId: Schema.String }),
+);
 
 export function createDeckCostQuery(database: CatalogDatabase) {
   const selectPrices = database.prepare(`
@@ -40,7 +44,7 @@ export function createDeckCostQuery(database: CatalogDatabase) {
         [...new Set(entries.map((entry) => entry.printingId))].map((id) => [
           id,
           selectPrices.all({ ...parameters, $printingId: id }).map((row) =>
-            PrintingPriceSchema.parse({
+            decodePrintingPrice({
               ...row,
               money: { amountMinor: row.amountMinor, currency: row.currency },
             }),
@@ -80,12 +84,12 @@ export function createDeckCostQuery(database: CatalogDatabase) {
   };
 }
 
-function emptyTotal(): DeckCost["current"] {
+function emptyTotal(): Mutable<DeckCost["current"]> {
   return { amount: 0, pricedQuantity: 0, priceDate: null, rateDate: null, missingRates: false };
 }
 
 function addPrice(
-  total: DeckCost["current"],
+  total: Mutable<DeckCost["current"]>,
   { lowest, missingRates }: ReturnType<typeof lowestRetailPrice>,
   quantity: number,
 ) {

@@ -4,18 +4,19 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
+import { Either, Schema } from "effect";
 
 import { createDeckCostQuery } from "@mooligan/catalog/deck-cost";
 import { deckCostMetrics } from "@mooligan/catalog/deck-cost-summary";
 import { importCatalogData } from "@mooligan/catalog/import";
 import { initializePriceDatabase } from "@mooligan/catalog/prices";
 
-import { DeckCostRequestSchema, type DeckCostRequest } from "@mooligan/domain/deck-cost";
+import { DeckCostRequestSchema, type DeckCostRequest } from "@mooligan/workspace/transport";
 import {
   ScryfallSetDownloadSchema,
   type ScryfallCardDownload,
 } from "@mooligan/domain/catalog-download";
-import type { DeckEntry } from "@mooligan/domain/decks";
+import type { DeckEntry } from "@mooligan/workspace/deck-contract";
 import type { MarketPrice } from "@mooligan/domain/market";
 import type { SpoilerVisibilitySnapshot } from "@mooligan/domain/spoilers";
 
@@ -50,7 +51,7 @@ void test("deck cost compares selected finishes with visible paper siblings usin
         updatedAt: "2026-09-21T00:00:00Z",
       },
       [
-        ScryfallSetDownloadSchema.parse({
+        Schema.decodeUnknownSync(ScryfallSetDownloadSchema)({
           id: "set-tst",
           code: "tst",
           name: "Test",
@@ -120,8 +121,12 @@ void test("deck cost compares selected finishes with visible paper siblings usin
     assert.equal(result.cheapest.missingRates, false);
     assert.deepEqual(request.entries, entries, "calculating cost never replaces deck entries");
     assert.equal(
-      DeckCostRequestSchema.safeParse({ ...request, entries: [{ ...entries[0], quantity: -1 }] })
-        .success,
+      Either.isRight(
+        Schema.decodeUnknownEither(DeckCostRequestSchema)({
+          ...request,
+          entries: [{ ...entries[0], quantity: -1 }],
+        }),
+      ),
       false,
     );
 

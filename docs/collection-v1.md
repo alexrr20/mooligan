@@ -481,5 +481,5 @@ cover these scenarios:
 
 Do not add an ORM, a second collection database, a separate Holdings table, or
 a generic repository layer for this work. LiveStore, the existing catalog
-SQLite database, Zod, IPC, TanStack Router, Base UI, StyleX, and the current test
+SQLite database, Effect Schema, IPC, TanStack Router, Base UI, StyleX, and the current test
 setup cover the required boundaries.

@@ -1,154 +1,162 @@
-import * as z from "zod";
+import { Schema } from "effect";
 
 import { CatalogCardDetailSchema } from "./catalog-detail.ts";
+import { UuidSchema, IsoDateSchema, StrictStruct, UuidV4Schema } from "./schema.ts";
 
-export const SpoilerTargetIdSchema = z.string().trim().min(1).max(128);
-const idSchema = SpoilerTargetIdSchema;
+export const SpoilerTargetIdSchema = Schema.Trim.pipe(Schema.minLength(1), Schema.maxLength(128));
 const uniqueIds = (ids: readonly string[]) => new Set(ids).size === ids.length;
+const revisionSchema = Schema.Int.pipe(Schema.positive());
 
-export const SpoilerPolicySchema = z.enum(["protect", "show"]);
-export type SpoilerPolicy = z.infer<typeof SpoilerPolicySchema>;
+export const spoilerPolicies = ["protect", "show"] as const;
+export type SpoilerPolicy = (typeof spoilerPolicies)[number];
+export const SpoilerPolicySchema = Schema.Literal(...spoilerPolicies);
 
-export const SpoilerRevealScopeSchema = z.enum(["printing", "release"]);
-export type SpoilerRevealScope = z.infer<typeof SpoilerRevealScopeSchema>;
+export const spoilerRevealScopes = ["printing", "release"] as const;
+export type SpoilerRevealScope = (typeof spoilerRevealScopes)[number];
+export const SpoilerRevealScopeSchema = Schema.Literal(...spoilerRevealScopes);
 
-export const SpoilerDecisionStateSchema = z.enum(["protect", "reveal"]);
-export type SpoilerDecisionState = z.infer<typeof SpoilerDecisionStateSchema>;
+export const spoilerDecisionStates = ["protect", "reveal"] as const;
+export type SpoilerDecisionState = (typeof spoilerDecisionStates)[number];
+export const SpoilerDecisionStateSchema = Schema.Literal(...spoilerDecisionStates);
 
-export const SpoilerProjectionDecisionSchema = z.strictObject({
+export const SpoilerProjectionDecisionSchema = StrictStruct({
   scope: SpoilerRevealScopeSchema,
   state: SpoilerDecisionStateSchema,
-  targetId: idSchema,
+  targetId: SpoilerTargetIdSchema,
 });
-export type SpoilerProjectionDecision = z.infer<typeof SpoilerProjectionDecisionSchema>;
+export type SpoilerProjectionDecision = typeof SpoilerProjectionDecisionSchema.Type;
 
 const MAX_SPOILER_PROJECTION_DECISIONS = 100_000;
-const SpoilerProjectionDecisionsSchema = z
-  .array(SpoilerProjectionDecisionSchema)
-  .max(MAX_SPOILER_PROJECTION_DECISIONS)
-  .refine(
+const SpoilerProjectionDecisionsSchema = Schema.Array(SpoilerProjectionDecisionSchema).pipe(
+  Schema.maxItems(MAX_SPOILER_PROJECTION_DECISIONS),
+  Schema.filter(
     (decisions) =>
       new Set(decisions.map(({ scope, targetId }) => `${scope}\0${targetId}`)).size ===
       decisions.length,
-    { message: "Spoiler projection targets must be unique." },
-  );
+    { message: () => "Spoiler projection targets must be unique." },
+  ),
+);
 
-const SpoilerProjectionIdentitySchema = z.strictObject({
-  revision: z.number().int().positive(),
-  sessionId: z.uuidv4(),
-  workspaceId: z.uuid(),
-});
+const spoilerProjectionConnectionFields = {
+  sessionId: UuidV4Schema,
+  workspaceId: UuidSchema,
+};
 
-export const SpoilerProjectionSnapshotSchema = SpoilerProjectionIdentitySchema.extend({
+export const SpoilerProjectionSnapshotSchema = StrictStruct({
+  ...spoilerProjectionConnectionFields,
+  revision: revisionSchema,
   decisions: SpoilerProjectionDecisionsSchema,
   policy: SpoilerPolicySchema,
 });
-export type SpoilerProjectionSnapshot = z.infer<typeof SpoilerProjectionSnapshotSchema>;
+export type SpoilerProjectionSnapshot = typeof SpoilerProjectionSnapshotSchema.Type;
 
-export const SpoilerProjectionDeltaSchema = SpoilerProjectionIdentitySchema.extend({
+export const SpoilerProjectionDeltaSchema = StrictStruct({
+  ...spoilerProjectionConnectionFields,
+  revision: revisionSchema,
   decisions: SpoilerProjectionDecisionsSchema,
-  policy: SpoilerPolicySchema.optional(),
+  policy: Schema.optional(SpoilerPolicySchema),
 });
-export type SpoilerProjectionDelta = z.infer<typeof SpoilerProjectionDeltaSchema>;
+export type SpoilerProjectionDelta = typeof SpoilerProjectionDeltaSchema.Type;
 
-export const SpoilerProjectionConnectionSchema = z.strictObject({
-  sessionId: z.uuidv4(),
-  workspaceId: z.uuid(),
-});
-export type SpoilerProjectionConnection = z.infer<typeof SpoilerProjectionConnectionSchema>;
+export const SpoilerProjectionConnectionSchema = StrictStruct(spoilerProjectionConnectionFields);
+export type SpoilerProjectionConnection = typeof SpoilerProjectionConnectionSchema.Type;
 
-export const SpoilerProjectionResultSchema = z.discriminatedUnion("status", [
-  z.strictObject({ revision: z.number().int().positive(), status: z.literal("applied") }),
-  z.strictObject({ status: z.literal("resync-required") }),
-]);
-export type SpoilerProjectionResult = z.infer<typeof SpoilerProjectionResultSchema>;
+export const SpoilerProjectionResultSchema = Schema.Union(
+  StrictStruct({ revision: revisionSchema, status: Schema.Literal("applied") }),
+  StrictStruct({ status: Schema.Literal("resync-required") }),
+);
+export type SpoilerProjectionResult = typeof SpoilerProjectionResultSchema.Type;
 
-export const CatalogSetSymbolDescriptorSchema = z.strictObject({ setId: idSchema });
-export type CatalogSetSymbolDescriptor = z.infer<typeof CatalogSetSymbolDescriptorSchema>;
+export const CatalogSetSymbolDescriptorSchema = StrictStruct({ setId: SpoilerTargetIdSchema });
+export type CatalogSetSymbolDescriptor = typeof CatalogSetSymbolDescriptorSchema.Type;
 
-export const CatalogReleaseSummarySchema = z.strictObject({
-  code: z.string().min(1),
-  name: z.string().min(1),
-  nextReleaseOn: z.iso.date(),
-  rootSetId: idSchema,
+export const CatalogReleaseSummarySchema = StrictStruct({
+  code: Schema.NonEmptyString,
+  name: Schema.NonEmptyString,
+  nextReleaseOn: IsoDateSchema,
+  rootSetId: SpoilerTargetIdSchema,
   symbol: CatalogSetSymbolDescriptorSchema,
 });
-export type CatalogReleaseSummary = z.infer<typeof CatalogReleaseSummarySchema>;
+export type CatalogReleaseSummary = typeof CatalogReleaseSummarySchema.Type;
 
-export const SpoilerVisibilitySnapshotSchema = z
-  .strictObject({
-    currentDate: z.iso.date(),
-    policy: SpoilerPolicySchema,
-    revealedPrintingIds: z.array(idSchema),
-    revealedRootSetIds: z.array(idSchema),
-    revision: z.number().int().nonnegative(),
-  })
-  .refine(({ revealedPrintingIds }) => uniqueIds(revealedPrintingIds), {
-    message: "Revealed printing IDs must be unique.",
-    path: ["revealedPrintingIds"],
-  })
-  .refine(({ revealedRootSetIds }) => uniqueIds(revealedRootSetIds), {
-    message: "Revealed release IDs must be unique.",
-    path: ["revealedRootSetIds"],
-  });
-export type SpoilerVisibilitySnapshot = z.infer<typeof SpoilerVisibilitySnapshotSchema>;
+export const SpoilerVisibilitySnapshotSchema = StrictStruct({
+  currentDate: IsoDateSchema,
+  policy: SpoilerPolicySchema,
+  revealedPrintingIds: Schema.Array(SpoilerTargetIdSchema),
+  revealedRootSetIds: Schema.Array(SpoilerTargetIdSchema),
+  revision: Schema.NonNegativeInt,
+}).pipe(
+  Schema.filter(({ revealedPrintingIds, revealedRootSetIds }) => [
+    uniqueIds(revealedPrintingIds) || {
+      message: "Revealed printing IDs must be unique.",
+      path: ["revealedPrintingIds"],
+    },
+    uniqueIds(revealedRootSetIds) || {
+      message: "Revealed release IDs must be unique.",
+      path: ["revealedRootSetIds"],
+    },
+  ]),
+);
+export type SpoilerVisibilitySnapshot = typeof SpoilerVisibilitySnapshotSchema.Type;
 
-export const SpoilerStateSchema = z
-  .strictObject({
-    activePrintingIds: z.array(idSchema),
-    activeRootSetIds: z.array(idSchema),
-    policy: SpoilerPolicySchema,
-    revision: z.number().int().nonnegative(),
-  })
-  .refine(({ activePrintingIds }) => uniqueIds(activePrintingIds), {
-    message: "Active printing IDs must be unique.",
-    path: ["activePrintingIds"],
-  })
-  .refine(({ activeRootSetIds }) => uniqueIds(activeRootSetIds), {
-    message: "Active release IDs must be unique.",
-    path: ["activeRootSetIds"],
-  });
-export type SpoilerState = z.infer<typeof SpoilerStateSchema>;
+export const SpoilerStateSchema = StrictStruct({
+  activePrintingIds: Schema.Array(SpoilerTargetIdSchema),
+  activeRootSetIds: Schema.Array(SpoilerTargetIdSchema),
+  policy: SpoilerPolicySchema,
+  revision: Schema.NonNegativeInt,
+}).pipe(
+  Schema.filter(({ activePrintingIds, activeRootSetIds }) => [
+    uniqueIds(activePrintingIds) || {
+      message: "Active printing IDs must be unique.",
+      path: ["activePrintingIds"],
+    },
+    uniqueIds(activeRootSetIds) || {
+      message: "Active release IDs must be unique.",
+      path: ["activeRootSetIds"],
+    },
+  ]),
+);
+export type SpoilerState = typeof SpoilerStateSchema.Type;
 
-export const CatalogPrintingVisibilitySchema = z.discriminatedUnion("reason", [
-  z.strictObject({ reason: z.literal("released") }),
-  z.strictObject({
-    reason: z.enum(["global", "printing", "release"]),
+export const CatalogPrintingVisibilitySchema = Schema.Union(
+  StrictStruct({ reason: Schema.Literal("released") }),
+  StrictStruct({
+    reason: Schema.Literal("global", "printing", "release"),
     release: CatalogReleaseSummarySchema,
   }),
-]);
-export type CatalogPrintingVisibility = z.infer<typeof CatalogPrintingVisibilitySchema>;
+);
+export type CatalogPrintingVisibility = typeof CatalogPrintingVisibilitySchema.Type;
 
-const VisibleCatalogPrintingSchema = z.strictObject({
+const VisibleCatalogPrintingSchema = StrictStruct({
   detail: CatalogCardDetailSchema,
-  status: z.literal("visible"),
+  status: Schema.Literal("visible"),
   visibility: CatalogPrintingVisibilitySchema,
 });
 
-const ProtectedCatalogPrintingSchema = z.strictObject({
-  printingId: idSchema,
+const ProtectedCatalogPrintingSchema = StrictStruct({
+  printingId: SpoilerTargetIdSchema,
   release: CatalogReleaseSummarySchema,
-  releasedOn: z.iso.date(),
-  status: z.literal("protected"),
+  releasedOn: IsoDateSchema,
+  status: Schema.Literal("protected"),
 });
 
-export const CatalogPrintingResultSchema = z.discriminatedUnion("status", [
+export const CatalogPrintingResultSchema = Schema.Union(
   VisibleCatalogPrintingSchema,
   ProtectedCatalogPrintingSchema,
-]);
-export type CatalogPrintingResult = z.infer<typeof CatalogPrintingResultSchema>;
+);
+export type CatalogPrintingResult = typeof CatalogPrintingResultSchema.Type;
 
-export const SpoilerRevealSummarySchema = z.strictObject({
-  detail: z.string().min(1).optional(),
-  label: z.string().min(1),
-  rootSetId: idSchema.optional(),
+export const SpoilerRevealSummarySchema = StrictStruct({
+  detail: Schema.optional(Schema.NonEmptyString),
+  label: Schema.NonEmptyString,
+  rootSetId: Schema.optional(SpoilerTargetIdSchema),
   scope: SpoilerRevealScopeSchema,
-  targetId: idSchema,
+  targetId: SpoilerTargetIdSchema,
 });
-export type SpoilerRevealSummary = z.infer<typeof SpoilerRevealSummarySchema>;
+export type SpoilerRevealSummary = typeof SpoilerRevealSummarySchema.Type;
 
-export const SpoilerRevealSummariesSchema = z.strictObject({
-  printings: z.array(SpoilerRevealSummarySchema),
-  releases: z.array(SpoilerRevealSummarySchema),
+export const SpoilerRevealSummariesSchema = StrictStruct({
+  printings: Schema.Array(SpoilerRevealSummarySchema),
+  releases: Schema.Array(SpoilerRevealSummarySchema),
 });
-export type SpoilerRevealSummaries = z.infer<typeof SpoilerRevealSummariesSchema>;
+export type SpoilerRevealSummaries = typeof SpoilerRevealSummariesSchema.Type;

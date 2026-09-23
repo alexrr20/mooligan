@@ -1,17 +1,25 @@
 import type { Store } from "@livestore/livestore";
+import type { CollectionPrintingValidationRequest } from "@mooligan/domain/collection";
+import { Schema } from "effect";
+
+import { collectionLotsQuery } from "../collection.ts";
 import {
   AddCollectionHoldingRequestSchema,
-  UpdateCollectionHoldingRequestSchema,
   RemoveCollectionHoldingRequestSchema,
-} from "@mooligan/domain/collection";
-import type {
-  AddCollectionHoldingRequest,
-  CollectionMutationResult,
-  CollectionPrintingValidationRequest,
-  RemoveCollectionHoldingRequest,
-  UpdateCollectionHoldingRequest,
-} from "@mooligan/domain/collection";
-import { collectionLotsQuery, events, tables, workspaceSchema } from "@mooligan/workspace/schema";
+  UpdateCollectionHoldingRequestSchema,
+  collectionHoldingKey,
+  isUnattributedLot,
+  type AddCollectionHoldingRequest,
+  type CollectionLot,
+  type CollectionMutationResult,
+  type RemoveCollectionHoldingRequest,
+  type UpdateCollectionHoldingRequest,
+} from "../collection-contract.ts";
+import { events, workspaceSchema } from "../schema.ts";
+
+const decodeAddRequest = Schema.decodeSync(AddCollectionHoldingRequestSchema);
+const decodeRemoveRequest = Schema.decodeSync(RemoveCollectionHoldingRequestSchema);
+const decodeUpdateRequest = Schema.decodeSync(UpdateCollectionHoldingRequestSchema);
 
 type ValidateCollectionPrinting = (request: CollectionPrintingValidationRequest) => Promise<void>;
 
@@ -21,11 +29,11 @@ export function createCollectionMutations(
 ) {
   return {
     async add(request: AddCollectionHoldingRequest): Promise<CollectionMutationResult> {
-      request = AddCollectionHoldingRequestSchema.parse(request);
+      request = decodeAddRequest(request);
       await validatePrinting({ finish: request.finish, printingId: request.printingId });
       const existing = store
         .query(collectionLotsQuery)
-        .find((lot) => sameHolding(lot, request) && isUnattributed(lot));
+        .find((lot) => sameHolding(lot, request) && isUnattributedLot(lot));
       if (existing && !Number.isSafeInteger(existing.quantity + request.quantity)) {
         throw new Error("The Collection quantity is too large.");
       }
@@ -50,15 +58,15 @@ export function createCollectionMutations(
 
       const target = store
         .query(collectionLotsQuery)
-        .find((lot) => sameHolding(lot, request) && isUnattributed(lot));
+        .find((lot) => sameHolding(lot, request) && isUnattributedLot(lot));
       if (!target) throw new Error("The Collection quantity is too large.");
       return { holdingQuantity: target.quantity, lotId: target.id };
     },
 
     async remove(request: RemoveCollectionHoldingRequest) {
-      request = RemoveCollectionHoldingRequestSchema.parse(request);
+      request = decodeRemoveRequest(request);
       const source = store.query(collectionLotsQuery).find(({ id }) => id === request.lotId);
-      if (!source || !isUnattributed(source)) {
+      if (!source || !isUnattributedLot(source)) {
         throw new Error("This Collection holding cannot be removed.");
       }
       store.commit(
@@ -70,9 +78,9 @@ export function createCollectionMutations(
     },
 
     async update(request: UpdateCollectionHoldingRequest): Promise<CollectionMutationResult> {
-      request = UpdateCollectionHoldingRequestSchema.parse(request);
+      request = decodeUpdateRequest(request);
       const source = store.query(collectionLotsQuery).find(({ id }) => id === request.lotId);
-      if (!source || !isUnattributed(source)) {
+      if (!source || !isUnattributedLot(source)) {
         throw new Error("This Collection holding cannot be edited.");
       }
       await validatePrinting({
@@ -86,7 +94,7 @@ export function createCollectionMutations(
           (lot) =>
             lot.id !== source.id &&
             sameHolding(lot, { ...request, printingId: source.printingId }) &&
-            isUnattributed(lot),
+            isUnattributedLot(lot),
         );
       if (existingTarget && !Number.isSafeInteger(existingTarget.quantity + request.quantity)) {
         throw new Error("The Collection quantity is too large.");
@@ -106,7 +114,8 @@ export function createCollectionMutations(
         .query(collectionLotsQuery)
         .find(
           (lot) =>
-            sameHolding(lot, { ...request, printingId: source.printingId }) && isUnattributed(lot),
+            sameHolding(lot, { ...request, printingId: source.printingId }) &&
+            isUnattributedLot(lot),
         );
       if (!target) throw new Error("The Collection quantity is too large.");
       return { holdingQuantity: target.quantity, lotId: target.id };
@@ -114,26 +123,9 @@ export function createCollectionMutations(
   };
 }
 
-type CollectionLotRow = typeof tables.collectionLots.Type;
-
 function sameHolding(
-  lot: CollectionLotRow,
-  key: Pick<CollectionLotRow, "condition" | "finish" | "language" | "printingId">,
+  lot: CollectionLot,
+  key: Pick<CollectionLot, "condition" | "finish" | "language" | "printingId">,
 ) {
-  return (
-    lot.printingId === key.printingId &&
-    lot.finish === key.finish &&
-    lot.language === key.language &&
-    lot.condition === key.condition
-  );
-}
-
-function isUnattributed(lot: CollectionLotRow) {
-  return (
-    lot.acquiredAt === null &&
-    lot.locationId === null &&
-    lot.notes === null &&
-    lot.unitCostAmountMinor === null &&
-    lot.unitCostCurrency === null
-  );
+  return collectionHoldingKey(lot) === collectionHoldingKey(key);
 }

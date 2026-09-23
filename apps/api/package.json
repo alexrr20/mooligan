@@ -23,8 +23,7 @@
     "effect": "catalog:",
     "hono": "catalog:",
     "jose": "catalog:",
-    "uuid": "catalog:",
-    "zod": "catalog:"
+    "uuid": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "catalog:",

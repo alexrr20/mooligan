@@ -6,14 +6,9 @@ import { normalizeScryfallCardDetail } from "@mooligan/domain/catalog-detail";
 import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
 import { Effect, Schema } from "effect";
 import { workspaceBackupSchema } from "@mooligan/workspace/backup";
-import {
-  emptyProfile,
-  events,
-  profileQuery,
-  readProfile,
-  workspaceSchema,
-  workspaceSyncedEventSchema,
-} from "@mooligan/workspace/schema";
+import { emptyProfile } from "@mooligan/workspace/profile-contract";
+import { events, workspaceSchema, workspaceSyncedEventSchema } from "@mooligan/workspace/schema";
+import { profileQuery, readProfile } from "@mooligan/workspace/profile";
 
 import type { AuthSnapshot, WorkspaceRuntime } from "../shared/desktop-api.ts";
 import { canAccessProfile } from "../src/features/profile/profile-access.ts";

@@ -1,7 +1,8 @@
 import { ipcMain, type IpcMainInvokeEvent } from "electron";
-import * as z from "zod";
-import type { JSONType } from "zod";
-import { DeckCostRequestSchema } from "@mooligan/domain/deck-cost";
+import { Schema } from "effect";
+import { UuidSchema, type JsonValue } from "@mooligan/domain/schema";
+import type { Finish } from "@mooligan/domain/catalog";
+import { DeckCostRequestSchema } from "@mooligan/workspace/transport";
 import { CollectionPrintingValidationRequestSchema } from "@mooligan/domain/collection";
 import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
 import {
@@ -24,7 +25,7 @@ export function registerCatalogIpc(catalog: CatalogService, installer: CatalogIn
   });
   ipcMain.handle("catalog:cancel-query", (event, requestId) => {
     assertTrustedSender(event);
-    const key = `${event.sender.id}:${z.uuid().parse(requestId)}`;
+    const key = `${event.sender.id}:${Schema.decodeUnknownSync(UuidSchema)(requestId)}`;
     catalogRequestControllers.get(key)?.abort();
   });
   ipcMain.handle("catalog:list", (event, request, requestId) => {
@@ -36,7 +37,7 @@ export function registerCatalogIpc(catalog: CatalogService, installer: CatalogIn
   });
   ipcMain.handle("catalog:colors", async (event, printingIds) => {
     assertTrustedSender(event);
-    const ids = CatalogColorPrintingIdsSchema.parse(printingIds);
+    const ids = Schema.decodeUnknownSync(CatalogColorPrintingIdsSchema)(printingIds);
     return catalog.read((visibility) => catalog.query("colors", [ids, visibility]));
   });
   ipcMain.handle("catalog:detail", async (event, printingId) => {
@@ -45,12 +46,12 @@ export function registerCatalogIpc(catalog: CatalogService, installer: CatalogIn
   });
   ipcMain.handle("catalog:deck-cost", async (event, value) => {
     assertTrustedSender(event);
-    const request = DeckCostRequestSchema.parse(value);
+    const request = Schema.decodeUnknownSync(DeckCostRequestSchema)(value);
     return catalog.read((visibility) => catalog.query("deck-cost", [request, visibility]));
   });
   ipcMain.handle("catalog:validate-collection-printing", async (event, value) => {
     assertTrustedSender(event);
-    const request = CollectionPrintingValidationRequestSchema.parse(value);
+    const request = Schema.decodeUnknownSync(CollectionPrintingValidationRequestSchema)(value);
     const result = await catalog.printingDetail(request.printingId);
     assertPrintingCanUseFinish(result, request);
   });
@@ -92,11 +93,11 @@ export function registerCatalogIpc(catalog: CatalogService, installer: CatalogIn
 
   async function withCatalogRequest<Result>(
     event: IpcMainInvokeEvent,
-    requestId: JSONType | undefined,
+    requestId: JsonValue | undefined,
     read: (signal?: AbortSignal) => Promise<Result>,
   ) {
     if (requestId === undefined) return settleCatalogRequest(() => read());
-    const key = `${event.sender.id}:${z.uuid().parse(requestId)}`;
+    const key = `${event.sender.id}:${Schema.decodeUnknownSync(UuidSchema)(requestId)}`;
     if (catalogRequestControllers.has(key)) throw new Error("Duplicate catalog request.");
     const controller = new AbortController();
     catalogRequestControllers.set(key, controller);
@@ -111,8 +112,8 @@ export function registerCatalogIpc(catalog: CatalogService, installer: CatalogIn
 function assertPrintingCanUseFinish(
   result: CatalogPrintingResult | null,
   request: {
-    existingFinish?: "etched" | "foil" | "glossy" | "nonfoil";
-    finish: "etched" | "foil" | "glossy" | "nonfoil";
+    existingFinish?: Finish;
+    finish: Finish;
   },
 ) {
   if (!result) {

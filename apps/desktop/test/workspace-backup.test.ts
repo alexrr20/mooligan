@@ -23,6 +23,7 @@ const backup: WorkspaceBackup = {
       finish: "foil",
       id: "lot-stable-id",
       language: "en",
+      locationId: null,
       notes: "Draft night",
       printingId: "printing-1",
       quantity: 2,
@@ -45,7 +46,7 @@ const backup: WorkspaceBackup = {
   cardTags: [],
   tagAssignments: [],
   tagTemplates: [],
-  version: 8,
+  version: 9,
 };
 
 void test("version 8 backups round trip without device or account metadata", () => {

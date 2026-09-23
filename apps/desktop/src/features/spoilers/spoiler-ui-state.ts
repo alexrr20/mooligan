@@ -1,5 +1,6 @@
 import type {
   CatalogPrintingVisibility,
+  SpoilerDecisionState,
   SpoilerRevealSummary,
   SpoilerState,
 } from "@mooligan/domain/spoilers";
@@ -14,7 +15,7 @@ export type PrintingProtectionControl =
     };
 
 export type ReleaseProtectionControl = {
-  action: "protect" | "reveal";
+  action: SpoilerDecisionState;
   description: string;
   disabled: boolean;
   label: "Protect this release" | "Reveal this release";

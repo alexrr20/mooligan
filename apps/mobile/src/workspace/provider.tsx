@@ -1,20 +1,16 @@
 import { createContext, useContext, useEffect, useSyncExternalStore, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { AppState } from "react-native";
+import { cardTagsQuery, tagAssignmentsQuery, tagTemplatesQuery } from "@mooligan/workspace/tags";
+import { collectionLotsQuery } from "@mooligan/workspace/collection";
+import { decksQuery, deckEntriesQuery } from "@mooligan/workspace/decks";
+import { spoilerSettingsQuery, spoilerDecisionsQuery } from "@mooligan/workspace/spoilers";
 import {
-  cardTagsQuery,
-  tagAssignmentsQuery,
-  tagTemplatesQuery,
-  collectionLotsQuery,
-  decksQuery,
-  deckEntriesQuery,
-  spoilerSettingsQuery,
-  spoilerDecisionsQuery,
   priceCurrencyQuery,
   priceProviderPreferencesQuery,
   readPriceCurrency,
   readEnabledPriceProviders,
-} from "@mooligan/workspace/schema";
+} from "@mooligan/workspace/price-preferences";
 import { createCollectionMutations } from "@mooligan/workspace/client/collection-mutations";
 import { createTagMutations } from "@mooligan/workspace/client/tag-mutations";
 import { materializeTagTemplates } from "@mooligan/workspace/client/tag-state";
@@ -22,7 +18,6 @@ import { createDeckMutations } from "@mooligan/workspace/client/deck-mutations";
 import { materializeDecks } from "@mooligan/workspace/client/deck-state";
 import { runSpoilerAction, type SpoilerAction } from "@mooligan/workspace/client/spoiler-actions";
 import type { SpoilerVisibilitySnapshot } from "@mooligan/domain/spoilers";
-import type { CollectionLot } from "@mooligan/domain/collection";
 import type { WorkspaceStore } from "@/account/workspace-store";
 import { useMobileAccount } from "@/account/account-provider";
 import { useReferenceData } from "@/catalog/catalog";
@@ -86,7 +81,6 @@ export function useWorkspace() {
 
 function useWorkspaceData(store: WorkspaceStore) {
   const reference = useReferenceData();
-  const rows = store.useQuery(collectionLotsQuery);
   const settings = store.useQuery(spoilerSettingsQuery);
   const decisions = store.useQuery(spoilerDecisionsQuery);
   const currentDate = useSyncExternalStore(subscribeDate, localDate);
@@ -107,16 +101,7 @@ function useWorkspaceData(store: WorkspaceStore) {
       .filter((d) => d.scope === "release" && d.state === "reveal")
       .map((d) => d.targetId),
   };
-  const lots: CollectionLot[] = rows.map((lot) => ({
-    ...lot,
-    acquiredAt: lot.acquiredAt ?? undefined,
-    locationId: lot.locationId ?? undefined,
-    notes: lot.notes ?? undefined,
-    unitCost:
-      lot.unitCostAmountMinor !== null && lot.unitCostCurrency !== null
-        ? { amountMinor: lot.unitCostAmountMinor, currency: lot.unitCostCurrency }
-        : undefined,
-  }));
+  const lots = store.useQuery(collectionLotsQuery);
   const detail = async (id: string) => reference.catalog.detail(id, visibility);
   const collection = createCollectionMutations(store, async (request) => {
     const result = await detail(request.printingId);

@@ -2,17 +2,17 @@ import { useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import type { CatalogCardDetail } from "@mooligan/domain/catalog-detail";
 import type { Finish } from "@mooligan/domain/catalog";
-import {
-  cardConditions,
-  cardLanguages,
-  type CardCondition,
-  type CardLanguage,
-} from "@mooligan/domain/collection";
-import { deckSections, type DeckSection } from "@mooligan/domain/decks";
+import { cardLanguages, type CardCondition, type CardLanguage } from "@mooligan/domain/collection";
+import type { DeckSection } from "@mooligan/domain/decks";
 import { Button, Choice, Copy, Field, Panel, Row, Screen } from "@/components/ui";
 import { CardImage, CardRow, PrintingPrice } from "@/components/cards";
 import { useCatalogQuery, useWorkspace } from "@/workspace/provider";
-import { finishes } from "./collection";
+import {
+  cardConditionOptions,
+  cardLanguageOptions,
+  deckSectionOptions,
+  finishOptions,
+} from "./options";
 
 export default function CardDetailScreen() {
   const { printingId } = useLocalSearchParams<{ printingId: string }>();
@@ -192,7 +192,7 @@ function AddCollection({ detail }: { detail: CatalogCardDetail }) {
   const printing = detail.selectedPrinting;
   const [finish, setFinish] = useState<Finish>(printing.finishes?.[0] ?? "nonfoil");
   const [language, setLanguage] = useState<CardLanguage>(
-    cardLanguages.find((l) => l.value === printing.language)?.value ?? "en",
+    cardLanguages.find((value) => value === printing.language) ?? "en",
   );
   const [condition, setCondition] = useState<CardCondition>("near-mint");
   const [quantity, setQuantity] = useState("1");
@@ -209,14 +209,19 @@ function AddCollection({ detail }: { detail: CatalogCardDetail }) {
       <Choice
         label="Finish"
         value={finish}
-        options={finishes.filter((f) => printing.finishes?.includes(f.value))}
+        options={finishOptions.filter((f) => printing.finishes?.includes(f.value))}
         onChange={setFinish}
       />
-      <Choice label="Language" value={language} options={cardLanguages} onChange={setLanguage} />
+      <Choice
+        label="Language"
+        value={language}
+        options={cardLanguageOptions}
+        onChange={setLanguage}
+      />
       <Choice
         label="Condition"
         value={condition}
-        options={cardConditions}
+        options={cardConditionOptions}
         onChange={setCondition}
       />
       <Button
@@ -272,11 +277,11 @@ export function AddDeckCard({
         onChangeText={setQuantity}
         keyboardType="number-pad"
       />
-      <Choice label="Section" value={section} options={deckSections} onChange={setSection} />
+      <Choice label="Section" value={section} options={deckSectionOptions} onChange={setSection} />
       <Choice
         label="Finish"
         value={finish}
-        options={finishes.filter((f) => detail.selectedPrinting.finishes?.includes(f.value))}
+        options={finishOptions.filter((f) => detail.selectedPrinting.finishes?.includes(f.value))}
         onChange={setFinish}
       />
       <Button

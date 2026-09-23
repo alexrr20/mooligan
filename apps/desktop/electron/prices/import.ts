@@ -4,12 +4,21 @@ import { pipeline } from "node:stream/promises";
 import { createGunzip } from "node:zlib";
 import { JSONParser } from "@streamparser/json-node";
 import type { PriceStatus } from "@mooligan/domain/market";
-import * as z from "zod";
-import type { JSONType } from "zod";
+import {
+  UuidSchema,
+  IsoDateSchema,
+  type JsonValue,
+  JsonValueSchema,
+} from "@mooligan/domain/schema";
+import { Schema } from "effect";
 import { openPriceDatabase } from "./database.ts";
 import { importPriceData } from "@mooligan/catalog/price-import";
-const MetaSchema = z.object({ date: z.iso.date(), version: z.string().startsWith("5.") });
-const ElementSchema = z.object({ key: z.string(), value: z.json() });
+const MetaSchema = Schema.Struct({
+  date: IsoDateSchema,
+  version: Schema.String.pipe(Schema.startsWith("5.")),
+});
+const ElementSchema = Schema.Struct({ key: Schema.String, value: JsonValueSchema });
+const decodeCardUuid = Schema.decodeUnknownSync(UuidSchema);
 export type PriceImportSource = (file: "AllPricesToday" | "AllIdentifiers") => Promise<Readable>;
 export async function importPrices(
   path: string,
@@ -35,16 +44,16 @@ export async function importPrices(
     live.close();
   }
 }
-async function readFeed(input: Readable, onCard: (uuid: string, value: JSONType) => void) {
+async function readFeed(input: Readable, onCard: (uuid: string, value: JsonValue) => void) {
   let date: string | undefined;
   let entries = 0;
   const parser = new JSONParser({ paths: ["$.meta", "$.data.*"], keepStack: false });
   await pipeline(input, createGunzip(), parser, async (elements) => {
     for await (const element of elements) {
-      const { key, value } = ElementSchema.parse(element);
-      if (key === "meta") date = MetaSchema.parse(value).date;
+      const { key, value } = Schema.decodeUnknownSync(ElementSchema)(element);
+      if (key === "meta") date = Schema.decodeUnknownSync(MetaSchema)(value).date;
       else {
-        onCard(z.uuid().parse(key), value);
+        onCard(decodeCardUuid(key), value);
         entries += 1;
       }
     }

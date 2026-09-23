@@ -1,10 +1,11 @@
 import { Checkbox } from "@base-ui/react/checkbox";
-import { tagColors, type CardTag } from "@mooligan/domain/tags";
+import { tagColorStyles } from "@mooligan/domain/tags";
+import { type CardTag } from "@mooligan/workspace/tag-contract";
 import * as stylex from "@stylexjs/stylex";
 import { useId, type ReactNode } from "react";
 
 export function CardTagBadge({ tag }: { tag: CardTag }) {
-  const color = tagColors.find(({ value }) => value === tag.color)!.hex;
+  const color = tagColorStyles[tag.color].hex;
   return (
     <span {...stylex.props(tagStyles.badge, tagStyles.color(color))}>
       <span {...stylex.props(tagStyles.dot)} aria-hidden="true" />

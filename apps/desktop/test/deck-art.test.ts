@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { normalizeScryfallCardDetail } from "@mooligan/domain/catalog-detail";
-import type { DeckEntry } from "@mooligan/domain/decks";
+import type { DeckEntry } from "@mooligan/workspace/deck-contract";
 import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
 
 import { commanderArt } from "../src/features/decks/deck-art.ts";

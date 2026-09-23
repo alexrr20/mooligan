@@ -3,12 +3,8 @@ import { test } from "node:test";
 
 import { makeInMemoryAdapter } from "@livestore/adapter-web";
 import { createStorePromise } from "@livestore/livestore";
-import {
-  events,
-  spoilerDecisionsQuery,
-  spoilerSettingsQuery,
-  workspaceSchema,
-} from "@mooligan/workspace/schema";
+import { events, workspaceSchema } from "@mooligan/workspace/schema";
+import { spoilerDecisionsQuery, spoilerSettingsQuery } from "@mooligan/workspace/spoilers";
 
 import { runSpoilerAction } from "@mooligan/workspace/client/spoiler-actions";
 

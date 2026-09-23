@@ -1,27 +1,19 @@
-import * as z from "zod";
+import { Schema } from "effect";
 
-import { DeckEntrySchema } from "./decks.ts";
-import { ExchangeRatesSchema, MoneySchema } from "./market.ts";
+import { MoneySchema } from "./market.ts";
+import { IsoDateSchema } from "./schema.ts";
 
-export const DeckCostRequestSchema = MoneySchema.pick({ currency: true })
-  .extend({
-    entries: z.array(DeckEntrySchema).max(100_000),
-    providers: z.array(z.string().regex(/^[a-z0-9_-]+$/)).max(20),
-    rates: ExchangeRatesSchema.nullable(),
-  })
-  .strict();
-export type DeckCostRequest = z.infer<typeof DeckCostRequestSchema>;
-
-const DeckCostTotalSchema = z.object({
-  amount: z.number().finite().nonnegative(),
-  pricedQuantity: z.number().int().nonnegative(),
-  priceDate: z.iso.date().nullable(),
-  rateDate: z.iso.date().nullable(),
-  missingRates: z.boolean(),
+const DeckCostTotalSchema = Schema.Struct({
+  amount: Schema.Finite.pipe(Schema.nonNegative()),
+  pricedQuantity: Schema.NonNegativeInt,
+  priceDate: Schema.NullOr(IsoDateSchema),
+  rateDate: Schema.NullOr(IsoDateSchema),
+  missingRates: Schema.Boolean,
 });
-export const DeckCostSchema = MoneySchema.pick({ currency: true }).extend({
-  quantity: z.number().int().nonnegative(),
+export const DeckCostSchema = Schema.Struct({
+  ...MoneySchema.pick("currency").fields,
+  quantity: Schema.NonNegativeInt,
   current: DeckCostTotalSchema,
   cheapest: DeckCostTotalSchema,
 });
-export type DeckCost = z.infer<typeof DeckCostSchema>;
+export type DeckCost = typeof DeckCostSchema.Type;

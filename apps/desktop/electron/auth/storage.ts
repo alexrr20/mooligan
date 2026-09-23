@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-import * as z from "zod";
-import type { JSONType } from "zod";
+import { type JsonValue, StrictStruct } from "@mooligan/domain/schema";
+import { Either, Schema } from "effect";
 
 import type { AuthUser } from "../../shared/desktop-api.ts";
 
@@ -36,26 +36,26 @@ export interface ProtectedAuthState {
   user: StoredAuthUser | null;
 }
 
-const StoredAuthCookieSchema = z.object({
-  expiresAt: z.number().finite().nullable(),
-  value: z.string(),
+const StoredAuthCookieSchema = Schema.Struct({
+  expiresAt: Schema.NullOr(Schema.Finite),
+  value: Schema.String,
 });
-const PendingAuthSchema = z.object({
-  expiresAt: z.number().finite(),
-  state: z.string(),
-  verifier: z.string(),
+const PendingAuthSchema = Schema.Struct({
+  expiresAt: Schema.Finite,
+  state: Schema.String,
+  verifier: Schema.String,
 });
-const StoredAuthUserSchema = z.strictObject({
-  email: z.string().min(1).max(320),
-  id: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
-  image: z.string().max(2_048).nullable(),
-  name: z.string().min(1).max(200),
+const StoredAuthUserSchema = StrictStruct({
+  email: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(320)),
+  id: Schema.String.pipe(Schema.pattern(/^[A-Za-z0-9_-]{1,128}$/)),
+  image: Schema.NullOr(Schema.String.pipe(Schema.maxLength(2_048))),
+  name: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(200)),
 });
-export const ProtectedAuthStateSchema = z.strictObject({
-  cookies: z.record(z.string(), StoredAuthCookieSchema),
-  pendingAuth: PendingAuthSchema.nullable(),
-  user: StoredAuthUserSchema.nullable(),
-  version: z.literal(2),
+export const ProtectedAuthStateSchema = StrictStruct({
+  cookies: Schema.Record({ key: Schema.String, value: StoredAuthCookieSchema }),
+  pendingAuth: Schema.NullOr(PendingAuthSchema),
+  user: Schema.NullOr(StoredAuthUserSchema),
+  version: Schema.Literal(2),
 });
 export interface AuthStateStorage {
   load(): Promise<ProtectedAuthState>;
@@ -182,12 +182,12 @@ export function emptyAuthState(): ProtectedAuthState {
   return { cookies: {}, pendingAuth: null, user: null, version: 2 };
 }
 
-function validateProtectedAuthState(value: ProtectedAuthState | JSONType): ProtectedAuthState {
-  const state = ProtectedAuthStateSchema.safeParse(value);
-  if (!state.success) {
+function validateProtectedAuthState(value: ProtectedAuthState | JsonValue): ProtectedAuthState {
+  const state = Schema.decodeUnknownEither(ProtectedAuthStateSchema)(value);
+  if (Either.isLeft(state)) {
     throw new ProtectedStorageError("Protected authentication state is invalid.");
   }
-  return state.data;
+  return state.right;
 }
 
 function isFileNotFound(cause: unknown) {

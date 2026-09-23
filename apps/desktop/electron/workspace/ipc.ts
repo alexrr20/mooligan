@@ -1,9 +1,10 @@
+import { UuidSchema } from "@mooligan/domain/schema";
 import { randomUUID } from "node:crypto";
 import { rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { BrowserWindow, dialog, ipcMain, type OpenDialogOptions } from "electron";
-import * as z from "zod";
+import { Schema } from "effect";
 
 import { validateWorkspaceBootstrap } from "../../shared/desktop-api.ts";
 import { assertTrustedSender } from "../ipc-security";
@@ -15,6 +16,8 @@ import {
 } from "./backup";
 import type { AccountWorkspace } from "@mooligan/account/workspace";
 import type { WorkspaceRegistry } from "./registry";
+
+const decodeUuid = Schema.decodeUnknownSync(UuidSchema);
 
 export function registerWorkspaceIpc(
   registry: WorkspaceRegistry,
@@ -97,12 +100,12 @@ export function registerWorkspaceIpc(
   });
   ipcMain.handle("workspace:activate-restore", async (event, value) => {
     assertTrustedSender(event);
-    registry.activateRestore(z.uuid().parse(value));
+    registry.activateRestore(decodeUuid(value));
     await accountWorkspace.workspaceActivated();
   });
   ipcMain.handle("workspace:cancel-restore", (event, value) => {
     assertTrustedSender(event);
-    registry.cancelRestore(z.uuid().parse(value));
+    registry.cancelRestore(decodeUuid(value));
   });
   ipcMain.handle("workspace:runtime", (event) => {
     assertTrustedSender(event);
@@ -114,7 +117,7 @@ export function registerWorkspaceIpc(
   });
   ipcMain.handle("workspace:select", async (event, value) => {
     assertTrustedSender(event);
-    await accountWorkspace.selectWorkspace(z.uuid().parse(value));
+    await accountWorkspace.selectWorkspace(decodeUuid(value));
   });
 }
 

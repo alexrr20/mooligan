@@ -1,5 +1,6 @@
 import { type CatalogCardDetail, getCatalogFormatName } from "@mooligan/domain/catalog-detail";
-import { deckFormats, type DeckEntry, type DeckMetadata } from "@mooligan/domain/decks";
+import { deckFormats } from "@mooligan/domain/decks";
+import { type DeckEntry, type DeckMetadata } from "@mooligan/workspace/deck-contract";
 import * as stylex from "@stylexjs/stylex";
 import { useState, type RefObject } from "react";
 
@@ -75,12 +76,14 @@ export function DeckMetadataEditor({
               ],
               archived: original.archived,
             };
-            const changed: Partial<DeckMetadata> = {};
-            if (metadata.name !== original.name) changed.name = metadata.name;
-            if (metadata.formatId !== original.formatId) changed.formatId = metadata.formatId;
-            if (metadata.notes !== original.notes) changed.notes = metadata.notes;
-            if (JSON.stringify(metadata.tags) !== JSON.stringify(original.tags))
-              changed.tags = metadata.tags;
+            const changed: Partial<DeckMetadata> = {
+              ...(metadata.name !== original.name && { name: metadata.name }),
+              ...(metadata.formatId !== original.formatId && { formatId: metadata.formatId }),
+              ...(metadata.notes !== original.notes && { notes: metadata.notes }),
+              ...(JSON.stringify(metadata.tags) !== JSON.stringify(original.tags) && {
+                tags: metadata.tags,
+              }),
+            };
             try {
               const printing = hasCommander ? commander?.selectedPrinting : undefined;
               const finish =

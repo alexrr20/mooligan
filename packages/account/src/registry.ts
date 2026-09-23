@@ -1,5 +1,6 @@
 import { workspaceIdForBindingSecret } from "@mooligan/workspace";
-import * as z from "zod";
+import { UuidSchema, UuidV4Schema } from "@mooligan/domain/schema";
+import { Schema } from "effect";
 
 import { validateWorkspaceBootstrap, type WorkspaceBootstrap } from "./runtime.ts";
 
@@ -15,18 +16,23 @@ export interface RegistryDatabase {
   close(): void;
 }
 
-const DeviceRowSchema = z.object({ clientId: z.uuidv4() });
-const WorkspaceIdSchema = z.uuid();
-const WorkspaceRowSchema = z.object({
-  accountId: z.string().nullable(),
-  bindingSecret: z.uuidv4().nullable(),
-  workspaceId: WorkspaceIdSchema,
+const decodeDeviceRow = Schema.decodeUnknownSync(Schema.Struct({ clientId: UuidV4Schema }));
+const decodeWorkspaceId = Schema.decodeUnknownSync(UuidSchema);
+const decodeAccountId = Schema.decodeUnknownSync(Schema.Trim.pipe(Schema.minLength(1)));
+const decodeOptionalAccountId = Schema.decodeUnknownSync(
+  Schema.NullOr(Schema.Trim.pipe(Schema.minLength(1))),
+);
+const WorkspaceRowSchema = Schema.Struct({
+  accountId: Schema.NullOr(Schema.String),
+  bindingSecret: Schema.NullOr(UuidV4Schema),
+  workspaceId: UuidSchema,
 });
-const ListedWorkspaceRowSchema = WorkspaceRowSchema.extend({
-  active: z.union([z.literal(0), z.literal(1)]),
-});
+const decodeWorkspaceRow = Schema.decodeUnknownSync(WorkspaceRowSchema);
+const decodeListedWorkspaceRow = Schema.decodeUnknownSync(
+  Schema.Struct({ ...WorkspaceRowSchema.fields, active: Schema.Literal(0, 1) }),
+);
 
-export type RegisteredWorkspace = z.infer<typeof WorkspaceRowSchema>;
+export type RegisteredWorkspace = typeof WorkspaceRowSchema.Type;
 
 export class WorkspaceRegistry {
   readonly #database: RegistryDatabase;
@@ -67,7 +73,7 @@ export class WorkspaceRegistry {
         .prepare("INSERT OR IGNORE INTO device (singleton, client_id) VALUES (1, ?)")
         .run(randomUUID());
 
-      this.#clientId = DeviceRowSchema.parse(
+      this.#clientId = decodeDeviceRow(
         this.#database
           .prepare("SELECT client_id AS clientId FROM device WHERE singleton = 1")
           .get(),
@@ -126,7 +132,7 @@ export class WorkspaceRegistry {
   }
 
   activateRestore(workspaceId: string) {
-    const validatedWorkspaceId = WorkspaceIdSchema.parse(workspaceId);
+    const validatedWorkspaceId = decodeWorkspaceId(workspaceId);
     if (this.#pendingRestoreWorkspaceId !== validatedWorkspaceId) {
       throw new Error("The workspace restore is no longer active.");
     }
@@ -149,7 +155,7 @@ export class WorkspaceRegistry {
   }
 
   cancelRestore(workspaceId: string) {
-    const validatedWorkspaceId = WorkspaceIdSchema.parse(workspaceId);
+    const validatedWorkspaceId = decodeWorkspaceId(workspaceId);
     if (this.#pendingRestoreWorkspaceId !== validatedWorkspaceId) {
       return;
     }
@@ -159,7 +165,7 @@ export class WorkspaceRegistry {
   }
 
   activateWorkspace(workspaceId: string) {
-    const validatedWorkspaceId = WorkspaceIdSchema.parse(workspaceId);
+    const validatedWorkspaceId = decodeWorkspaceId(workspaceId);
 
     transact(this.#database, () => {
       const known = this.#database
@@ -178,7 +184,7 @@ export class WorkspaceRegistry {
   }
 
   removeWorkspace(workspaceId: string) {
-    const validatedWorkspaceId = WorkspaceIdSchema.parse(workspaceId);
+    const validatedWorkspaceId = decodeWorkspaceId(workspaceId);
     const result = this.#database
       .prepare("DELETE FROM workspaces WHERE workspace_id = ? AND active = 0")
       .run(validatedWorkspaceId);
@@ -189,8 +195,8 @@ export class WorkspaceRegistry {
   }
 
   bindWorkspace(workspaceId: string, accountId: string | null) {
-    const validatedWorkspaceId = WorkspaceIdSchema.parse(workspaceId);
-    const validatedAccountId = z.string().trim().min(1).nullable().parse(accountId);
+    const validatedWorkspaceId = decodeWorkspaceId(workspaceId);
+    const validatedAccountId = decodeOptionalAccountId(accountId);
     const current = this.#workspaceRow(validatedWorkspaceId);
     if (
       current.accountId !== null &&
@@ -209,8 +215,8 @@ export class WorkspaceRegistry {
   }
 
   registerAccountWorkspace(workspaceId: string, accountId: string) {
-    const validatedWorkspaceId = WorkspaceIdSchema.parse(workspaceId);
-    const validatedAccountId = z.string().trim().min(1).parse(accountId);
+    const validatedWorkspaceId = decodeWorkspaceId(workspaceId);
+    const validatedAccountId = decodeAccountId(accountId);
 
     transact(this.#database, () => {
       const accountWorkspace = this.#database
@@ -219,7 +225,7 @@ export class WorkspaceRegistry {
         )
         .get(validatedAccountId);
       if (accountWorkspace !== undefined) {
-        const existing = WorkspaceRowSchema.parse(accountWorkspace);
+        const existing = decodeWorkspaceRow(accountWorkspace);
         if (existing.workspaceId !== validatedWorkspaceId) {
           throw new Error("The account is already associated with another workspace.");
         }
@@ -232,7 +238,7 @@ export class WorkspaceRegistry {
         )
         .get(validatedWorkspaceId);
       if (workspace !== undefined) {
-        const existing = WorkspaceRowSchema.parse(workspace);
+        const existing = decodeWorkspaceRow(workspace);
         if (existing.accountId !== null && existing.accountId !== validatedAccountId) {
           throw new Error("The workspace is already associated with another account.");
         }
@@ -261,7 +267,7 @@ export class WorkspaceRegistry {
       )
       .all()
       .map((row, index) => {
-        const workspace = ListedWorkspaceRowSchema.parse(row);
+        const workspace = decodeListedWorkspaceRow(row);
         return {
           accountAssociation:
             workspace.accountId === null ? ("unbound" as const) : ("account" as const),
@@ -298,16 +304,16 @@ export class WorkspaceRegistry {
         "SELECT workspace_id AS workspaceId, account_id AS accountId, binding_secret AS bindingSecret FROM workspaces WHERE active = 1 AND restore_pending = 0",
       )
       .get();
-    return row === undefined ? undefined : WorkspaceRowSchema.parse(row);
+    return row === undefined ? undefined : decodeWorkspaceRow(row);
   }
 
   #workspaceRow(workspaceId: string) {
-    return WorkspaceRowSchema.parse(
+    return decodeWorkspaceRow(
       this.#database
         .prepare(
           "SELECT workspace_id AS workspaceId, account_id AS accountId, binding_secret AS bindingSecret FROM workspaces WHERE workspace_id = ?",
         )
-        .get(WorkspaceIdSchema.parse(workspaceId)),
+        .get(decodeWorkspaceId(workspaceId)),
     );
   }
 }

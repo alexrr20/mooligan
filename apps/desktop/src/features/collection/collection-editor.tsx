@@ -1,13 +1,16 @@
+import { Either, Schema } from "effect";
 import type { CatalogCardDetail } from "@mooligan/domain/catalog-detail";
 import {
   CardLanguageSchema,
+  cardConditionLabels,
   cardConditions,
+  cardLanguageLabels,
   cardLanguages,
   type CardCondition,
   type CardLanguage,
-  type CollectionMutationResult,
 } from "@mooligan/domain/collection";
-import type { Finish } from "@mooligan/domain/catalog";
+import type { CollectionMutationResult } from "@mooligan/workspace/collection-contract";
+import { finishLabels, type Finish } from "@mooligan/domain/catalog";
 import * as stylex from "@stylexjs/stylex";
 import { useState } from "react";
 
@@ -145,7 +148,7 @@ function CollectionForm({
           disabled={pending || finishLocked}
           label="Finish"
           name="finish"
-          options={availableFinishes.map((value) => ({ label: finishLabel(value), value }))}
+          options={availableFinishes.map((value) => ({ label: finishLabels[value], value }))}
           placeholder="Choose finish"
           value={finish}
           onValueChange={setFinish}
@@ -154,7 +157,7 @@ function CollectionForm({
           disabled={pending}
           label="Language"
           name="language"
-          options={cardLanguages}
+          options={cardLanguages.map((value) => ({ label: cardLanguageLabels[value], value }))}
           placeholder="Choose language"
           value={language}
           onValueChange={setLanguage}
@@ -163,7 +166,7 @@ function CollectionForm({
           disabled={pending}
           label="Condition"
           name="condition"
-          options={cardConditions}
+          options={cardConditions.map((value) => ({ label: cardConditionLabels[value], value }))}
           placeholder="Choose condition"
           value={condition}
           onValueChange={setCondition}
@@ -350,12 +353,8 @@ export function AddToCollectionButton({
 }
 
 function knownLanguage(value: string | undefined): CardLanguage | undefined {
-  const parsed = CardLanguageSchema.safeParse(value);
-  return parsed.success ? parsed.data : undefined;
-}
-
-export function finishLabel(value: Finish) {
-  return value === "nonfoil" ? "Nonfoil" : `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
+  const parsed = Schema.decodeUnknownEither(CardLanguageSchema)(value);
+  return Either.isRight(parsed) ? parsed.right : undefined;
 }
 
 export function cleanCollectionError(cause: unknown) {

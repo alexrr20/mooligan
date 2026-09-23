@@ -1,5 +1,5 @@
 import type { HistoryState } from "@tanstack/react-router";
-import type { JSONType } from "zod";
+import type { JsonValue } from "@mooligan/domain/schema";
 import { readDeckOrigin, withDeckOrigin, type DeckOrigin } from "../decks/deck-origin";
 
 import {
@@ -18,7 +18,7 @@ export type CardDetailOrigin =
   | Readonly<{ kind: "collection"; value: CollectionOrigin }>
   | Readonly<{ kind: "search"; value: CatalogSearchOrigin }>;
 
-export function readCardDetailOrigin(state: HistoryState | JSONType): CardDetailOrigin | null {
+export function readCardDetailOrigin(state: HistoryState | JsonValue): CardDetailOrigin | null {
   const collection = readCollectionOrigin(state);
   if (collection) return { kind: "collection", value: collection };
 

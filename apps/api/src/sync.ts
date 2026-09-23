@@ -8,9 +8,9 @@ import {
 } from "@mooligan/workspace";
 import { Schema } from "effect";
 import { jwtVerify, SignJWT } from "jose";
-import * as z from "zod";
+import { UuidSchema, StrictStruct } from "@mooligan/domain/schema";
 
-import { accountOwnsWorkspace, WorkspaceIdSchema } from "./workspace.js";
+import { accountOwnsWorkspace, decodeWorkspaceId } from "./workspace.js";
 
 export const syncAudience = "mooligan-livestore-sync";
 export const syncCredentialLifetimeSeconds = 5 * 60;
@@ -24,15 +24,19 @@ const decodeWorkspaceSyncedEvent = Schema.decodeUnknownPromise(workspaceSyncedEv
   onExcessProperty: "error",
 });
 
-const CredentialClaimsSchema = z
-  .object({
-    aud: z.literal(syncAudience),
-    exp: z.number().int(),
-    iat: z.number().int(),
-    sub: z.uuid(),
-    workspaceId: z.uuid(),
-  })
-  .strict();
+const decodeCredentialClaims = Schema.decodeUnknownSync(
+  StrictStruct({
+    aud: Schema.Literal(syncAudience),
+    exp: Schema.Int,
+    iat: Schema.Int,
+    sub: UuidSchema,
+    workspaceId: UuidSchema,
+  }),
+);
+const decodeAppVersion = Schema.decodeSync(
+  Schema.Trim.pipe(Schema.minLength(1), Schema.maxLength(64)),
+);
+const decodeEventSchemaVersion = Schema.decodeSync(Schema.NonNegativeInt);
 
 export async function issueSyncCredential(
   environment: Pick<Env, "SYNC_CREDENTIAL_SECRET">,
@@ -41,8 +45,8 @@ export async function issueSyncCredential(
   appVersion: string,
   eventSchemaVersion: number,
 ) {
-  z.string().trim().min(1).max(64).parse(appVersion);
-  const validatedEventSchemaVersion = z.number().int().nonnegative().parse(eventSchemaVersion);
+  decodeAppVersion(appVersion);
+  const validatedEventSchemaVersion = decodeEventSchemaVersion(eventSchemaVersion);
   if (validatedEventSchemaVersion < minimumWorkspaceEventSchemaVersion) {
     throw new Error("The desktop client is too old to synchronize this workspace.");
   }
@@ -68,13 +72,13 @@ export async function authorizeSyncPayload(
   payload: WorkspaceSyncPayload,
   requestedStoreId: string,
 ) {
-  const storeId = WorkspaceIdSchema.parse(requestedStoreId);
-  const payloadWorkspaceId = WorkspaceIdSchema.parse(payload.workspaceId);
+  const storeId = decodeWorkspaceId(requestedStoreId);
+  const payloadWorkspaceId = decodeWorkspaceId(payload.workspaceId);
   const { payload: rawClaims } = await jwtVerify(payload.credential, syncSecret(environment), {
     algorithms: ["HS256"],
     audience: syncAudience,
   });
-  const claims = CredentialClaimsSchema.parse(rawClaims);
+  const claims = decodeCredentialClaims(rawClaims);
 
   if (
     storeId !== payloadWorkspaceId ||

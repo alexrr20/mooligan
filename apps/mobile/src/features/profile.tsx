@@ -1,6 +1,6 @@
 import { useDeferredValue, useState } from "react";
 import { Redirect, router } from "expo-router";
-import { profileQuery, readProfile } from "@mooligan/workspace/schema";
+import { profileQuery, readProfile } from "@mooligan/workspace/profile";
 import {
   changeProfileBanner,
   featureProfileCard,

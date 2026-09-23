@@ -19,11 +19,11 @@ void test("workspace bootstrap accepts only renderer-safe IDs", () => {
   assert.deepEqual(validateWorkspaceBootstrap(bootstrap), bootstrap);
   assert.throws(
     () => validateWorkspaceBootstrap({ ...bootstrap, workspacePath: "/private/workspace.sqlite" }),
-    /Unrecognized key/u,
+    /is unexpected/u,
   );
   assert.throws(
     () => validateWorkspaceBootstrap({ ...bootstrap, bindingSecret }),
-    /Unrecognized key/u,
+    /is unexpected/u,
   );
   assert.throws(
     () => validateWorkspaceBootstrap({ ...bootstrap, clientId: "not-a-client-id" }),
