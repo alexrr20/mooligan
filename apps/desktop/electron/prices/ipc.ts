@@ -2,10 +2,13 @@ import { ipcMain } from "electron";
 import * as z from "zod";
 
 import { assertTrustedSender } from "../ipc-security.ts";
-import { queryCatalogPrintingDetail } from "../catalog/ipc.ts";
+import type { CatalogService } from "../catalog/service.ts";
 import type { PriceService } from "./service.ts";
 
-export function registerPriceIpc(prices: PriceService) {
+export function registerPriceIpc(
+  prices: PriceService,
+  readPrinting: CatalogService["printingDetail"],
+) {
   ipcMain.handle("prices:exchange-rates", (event) => {
     assertTrustedSender(event);
     return prices.exchangeRates();
@@ -21,7 +24,7 @@ export function registerPriceIpc(prices: PriceService) {
   ipcMain.handle("prices:printing", async (event, value) => {
     assertTrustedSender(event);
     const printingId = z.uuid().parse(value);
-    const result = await queryCatalogPrintingDetail(printingId);
+    const result = await readPrinting(printingId);
     if (!result || result.status !== "visible" || result.detail.selectedPrinting.isDigital) {
       return { prices: [], snapshot: prices.status().snapshot };
     }

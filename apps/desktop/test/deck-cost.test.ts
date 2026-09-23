@@ -9,10 +9,7 @@ import { createDeckCostQuery } from "@mooligan/catalog/deck-cost";
 import { deckCostMetrics } from "@mooligan/catalog/deck-cost-summary";
 import { importCatalogData } from "@mooligan/catalog/import";
 import { initializePriceDatabase } from "@mooligan/catalog/prices";
-import {
-  parseCatalogQueryWorkerRequest,
-  parseCatalogQueryWorkerResponse,
-} from "@mooligan/catalog/query";
+
 import { DeckCostRequestSchema, type DeckCostRequest } from "@mooligan/domain/deck-cost";
 import {
   ScryfallSetDownloadSchema,
@@ -122,15 +119,6 @@ void test("deck cost compares selected finishes with visible paper siblings usin
     assert.equal(result.cheapest.rateDate, null);
     assert.equal(result.cheapest.missingRates, false);
     assert.deepEqual(request.entries, entries, "calculating cost never replaces deck entries");
-    assert.ok(
-      parseCatalogQueryWorkerRequest({
-        id: 1,
-        operation: { type: "deck-cost", request, visibility },
-      }),
-    );
-    assert.ok(
-      parseCatalogQueryWorkerResponse({ id: 1, operation: "deck-cost", result }, "deck-cost"),
-    );
     assert.equal(
       DeckCostRequestSchema.safeParse({ ...request, entries: [{ ...entries[0], quantity: -1 }] })
         .success,

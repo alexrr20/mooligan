@@ -1,3 +1,4 @@
+import { maxCatalogPrintingIdLength } from "@mooligan/catalog/detail";
 import { readFile } from "node:fs/promises";
 
 import {
@@ -90,7 +91,7 @@ export function parseCatalogImageUrl(value: string): CatalogImageDescriptor | nu
     return null;
   }
 
-  if (!/^(0|[1-9]\d*)$/.test(parts[1])) {
+  if (printingId.length > maxCatalogPrintingIdLength || !/^(0|[1-9]\d*)$/.test(parts[1])) {
     return null;
   }
 

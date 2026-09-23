@@ -5,7 +5,7 @@ import * as z from "zod";
 
 import type { CatalogDatabase } from "./database.ts";
 import { lowestRetailPrice } from "./lowest-prices.ts";
-import { catalogVisibilityArguments, catalogVisibilitySqlFor } from "./visibility.ts";
+import { catalogVisibilityParameters, catalogVisibilitySqlFor } from "./visibility.ts";
 
 const PrintingPriceSchema = MarketPriceSchema.extend({ printingId: z.string() });
 
@@ -17,33 +17,34 @@ export function createDeckCostQuery(database: CatalogDatabase) {
     FROM cards
     JOIN cards AS sibling ON sibling.identity_id = cards.identity_id
     JOIN market_prices.prices ON prices.printing_id = sibling.id
-    WHERE cards.id = ?
+    WHERE cards.id = $printingId
       AND COALESCE(json_extract(cards.json, '$.digital'), 0) = 0
       AND COALESCE(json_extract(sibling.json, '$.digital'), 0) = 0
       AND ${catalogVisibilitySqlFor("cards")}
       AND ${catalogVisibilitySqlFor("sibling")}
       AND prices.kind = 'retail'
-      AND prices.market IN (SELECT value FROM json_each(?))
+      AND prices.market IN (SELECT value FROM json_each($providers))
   `);
 
   return (request: DeckCostRequest, visibility: SpoilerVisibilitySnapshot): DeckCost => {
     const current = emptyTotal();
     const cheapest = emptyTotal();
     const entries = request.entries.filter((entry) => entry.section !== "maybeboard");
-    const visibilityArgs = catalogVisibilityArguments(visibility);
+    const parameters = {
+      ...catalogVisibilityParameters(visibility),
+      $providers: JSON.stringify(request.providers),
+    };
     database.exec("BEGIN");
     try {
       const prices = new Map(
         [...new Set(entries.map((entry) => entry.printingId))].map((id) => [
           id,
-          selectPrices
-            .all(id, ...visibilityArgs, ...visibilityArgs, JSON.stringify(request.providers))
-            .map((row) =>
-              PrintingPriceSchema.parse({
-                ...row,
-                money: { amountMinor: row.amountMinor, currency: row.currency },
-              }),
-            ),
+          selectPrices.all({ ...parameters, $printingId: id }).map((row) =>
+            PrintingPriceSchema.parse({
+              ...row,
+              money: { amountMinor: row.amountMinor, currency: row.currency },
+            }),
+          ),
         ]),
       );
       for (const entry of entries) {

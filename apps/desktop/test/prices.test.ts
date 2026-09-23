@@ -193,7 +193,7 @@ void test("conflicting face mappings are omitted and search uses saved MTGJSON p
         const compiled = compileScryfallQuery(query, visibility);
         assert.ok(compiled.success);
         assert.equal(
-          database.prepare(`SELECT id FROM cards WHERE ${compiled.sql}`).all(...compiled.parameters)
+          database.prepare(`SELECT id FROM cards WHERE ${compiled.sql}`).all(compiled.parameters)
             .length,
           expected,
         );

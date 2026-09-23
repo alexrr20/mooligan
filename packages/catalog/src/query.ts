@@ -1,13 +1,9 @@
 import type { CatalogDatabase as DatabaseSync } from "./database.ts";
 
 import { ColorSchema } from "@mooligan/domain/catalog";
-import { DeckCostRequestSchema, DeckCostSchema } from "@mooligan/domain/deck-cost";
-import { CatalogImageDescriptorSchema } from "@mooligan/domain/catalog-detail";
 import {
   CatalogCardSummarySchema,
-  CatalogListPageSchema,
   CatalogListRequestSchema,
-  CatalogUpcomingPrintingPageSchema,
   CatalogUpcomingPrintingRequestSchema,
   type CatalogCardSummary,
   type CatalogListPage,
@@ -16,13 +12,7 @@ import {
   type CatalogUpcomingPrintingPage,
   type CatalogUpcomingPrintingRequest,
 } from "@mooligan/domain/catalog-search";
-import { CollectionListPageSchema, CollectionListRequestSchema } from "@mooligan/domain/collection";
 import {
-  CatalogPrintingResultSchema,
-  CatalogReleaseSummarySchema,
-  CatalogSetSymbolDescriptorSchema,
-  SpoilerRevealSummariesSchema,
-  SpoilerVisibilitySnapshotSchema,
   type CatalogReleaseSummary,
   type SpoilerRevealSummary,
   type SpoilerRevealSummaries,
@@ -33,7 +23,7 @@ import type { JSONType } from "zod";
 
 import { CatalogReleaseSummaryRowSchema, toCatalogReleaseSummary } from "@mooligan/catalog/release";
 import {
-  catalogVisibilityArguments,
+  catalogVisibilityParameters,
   catalogVisibilitySql,
   catalogVisibilitySqlFor,
   effectiveReleaseDateSql,
@@ -43,148 +33,6 @@ import { compileScryfallQuery } from "@mooligan/catalog/scryfall-query";
 const catalogPrintingIdSchema = z.string().min(1).max(128);
 
 export const CatalogColorPrintingIdsSchema = z.array(catalogPrintingIdSchema).max(100_000);
-
-const CatalogQueryOperationSchema = z.discriminatedUnion("type", [
-  z.object({
-    request: DeckCostRequestSchema,
-    type: z.literal("deck-cost"),
-    visibility: SpoilerVisibilitySnapshotSchema,
-  }),
-  z.object({
-    printingIds: CatalogColorPrintingIdsSchema,
-    type: z.literal("colors"),
-    visibility: SpoilerVisibilitySnapshotSchema,
-  }),
-  z.object({
-    printingId: catalogPrintingIdSchema,
-    type: z.literal("detail"),
-    visibility: SpoilerVisibilitySnapshotSchema,
-  }),
-  z.object({
-    image: CatalogImageDescriptorSchema.extend({ printingId: catalogPrintingIdSchema }),
-    type: z.literal("image-source"),
-    visibility: SpoilerVisibilitySnapshotSchema,
-  }),
-  z.object({
-    request: CatalogListRequestSchema,
-    type: z.literal("list"),
-    visibility: SpoilerVisibilitySnapshotSchema,
-  }),
-  z.object({
-    request: CollectionListRequestSchema,
-    type: z.literal("collection-list"),
-    visibility: SpoilerVisibilitySnapshotSchema,
-  }),
-  z.object({
-    request: CatalogUpcomingPrintingRequestSchema,
-    type: z.literal("upcoming-printings"),
-    visibility: SpoilerVisibilitySnapshotSchema,
-  }),
-  z.object({
-    rootSetIds: z.array(catalogPrintingIdSchema),
-    printingIds: z.array(catalogPrintingIdSchema),
-    type: z.literal("spoiler-reveals"),
-  }),
-  z.object({ symbol: CatalogSetSymbolDescriptorSchema, type: z.literal("set-symbol-source") }),
-  z.object({ targetId: catalogPrintingIdSchema, type: z.literal("root-set") }),
-  z.object({ type: z.literal("upcoming"), visibility: SpoilerVisibilitySnapshotSchema }),
-]);
-export type CatalogQueryOperation = z.infer<typeof CatalogQueryOperationSchema>;
-
-const CatalogQueryWorkerRequestSchema = z.object({
-  id: z.number().int().positive(),
-  operation: CatalogQueryOperationSchema,
-});
-export type CatalogQueryWorkerRequest = z.infer<typeof CatalogQueryWorkerRequestSchema>;
-
-const CatalogQueryWorkerResponseSchema = z.union([
-  z.object({
-    id: z.number().int().positive(),
-    operation: z.literal("deck-cost"),
-    result: DeckCostSchema,
-  }),
-  z.object({
-    id: z.number().int().positive(),
-    operation: z.literal("colors"),
-    result: z.array(ColorSchema).nullable(),
-  }),
-  z.object({
-    id: z.number().int().positive(),
-    operation: z.literal("detail"),
-    result: CatalogPrintingResultSchema.nullable(),
-  }),
-  z.object({
-    id: z.number().int().positive(),
-    operation: z.literal("image-source"),
-    result: z.string().min(1).nullable(),
-  }),
-  z.object({
-    id: z.number().int().positive(),
-    operation: z.literal("list"),
-    result: CatalogListPageSchema,
-  }),
-  z.object({
-    id: z.number().int().positive(),
-    operation: z.literal("collection-list"),
-    result: CollectionListPageSchema,
-  }),
-  z.object({
-    id: z.number().int().positive(),
-    operation: z.literal("upcoming-printings"),
-    result: CatalogUpcomingPrintingPageSchema,
-  }),
-  z.object({
-    id: z.number().int().positive(),
-    operation: z.literal("root-set"),
-    result: catalogPrintingIdSchema.nullable(),
-  }),
-  z.object({
-    id: z.number().int().positive(),
-    operation: z.literal("set-symbol-source"),
-    result: z.string().min(1).nullable(),
-  }),
-  z.object({
-    id: z.number().int().positive(),
-    operation: z.literal("spoiler-reveals"),
-    result: SpoilerRevealSummariesSchema,
-  }),
-  z.object({
-    id: z.number().int().positive(),
-    operation: z.literal("upcoming"),
-    result: z.array(CatalogReleaseSummarySchema),
-  }),
-  z.object({
-    error: z.string().min(1),
-    id: z.number().int().positive(),
-    operation: z.enum([
-      "deck-cost",
-      "colors",
-      "detail",
-      "collection-list",
-      "image-source",
-      "list",
-      "root-set",
-      "set-symbol-source",
-      "spoiler-reveals",
-      "upcoming",
-      "upcoming-printings",
-    ]),
-  }),
-]);
-export type CatalogQueryWorkerResponse = z.infer<typeof CatalogQueryWorkerResponseSchema>;
-
-export function parseCatalogQueryWorkerRequest(value: JSONType) {
-  const request = CatalogQueryWorkerRequestSchema.safeParse(value);
-  return request.success ? request.data : null;
-}
-
-export function parseCatalogQueryWorkerResponse(
-  value: JSONType,
-  expectedOperation: CatalogQueryOperation["type"],
-) {
-  const response = CatalogQueryWorkerResponseSchema.safeParse(value);
-  return response.success && response.data.operation === expectedOperation ? response.data : null;
-}
 
 const cardColumns = `cards.id,
                      cards.name,
@@ -203,21 +51,22 @@ const cardColumns = `cards.id,
                      cards.type_line AS typeLine,
                      cards.rarity,
                      ${effectiveReleaseDateSql} AS releasedOn`;
-const artSeriesFilter = "? OR COALESCE(json_extract(cards.json, '$.layout'), '') <> 'art_series'";
-const digitalFilter = "? OR COALESCE(json_extract(cards.json, '$.digital'), 0) = 0";
+const artSeriesFilter =
+  "$includeArtSeries OR COALESCE(json_extract(cards.json, '$.layout'), '') <> 'art_series'";
+const digitalFilter = "$includeDigital OR COALESCE(json_extract(cards.json, '$.digital'), 0) = 0";
 const tokenCard =
   "COALESCE(json_extract(cards.json, '$.layout'), '') IN ('token', 'double_faced_token')";
 const adCard = `COALESCE(json_extract(cards.json, '$.layout'), '') = 'token'
   AND cards.type_line = 'Card'
   AND substr(cards.name, -3) = ' Ad'`;
-const tokenFilter = `? OR NOT (${tokenCard}) OR (${adCard})`;
-const adCardFilter = `? OR NOT (${adCard})`;
+const tokenFilter = `$includeTokens OR NOT (${tokenCard}) OR (${adCard})`;
+const adCardFilter = `$includeAdCards OR NOT (${adCard})`;
 const universesBeyond = `EXISTS (
   SELECT 1
   FROM json_each(cards.json, '$.promo_types')
   WHERE value = 'universesbeyond'
 )`;
-const universeFilter = `? = '' OR (${universesBeyond}) = (? = 'beyond')`;
+const universeFilter = `$universe = '' OR (${universesBeyond}) = ($universe = 'beyond')`;
 const cardFilter = `(${artSeriesFilter})
   AND (${digitalFilter})
   AND (${tokenFilter})
@@ -253,7 +102,7 @@ export function createCatalogQuery(database: DatabaseSync) {
               cards.set_code COLLATE NOCASE,
               cards.collector_number COLLATE NOCASE,
               cards.id
-     LIMIT ? OFFSET ?`,
+     LIMIT $limit OFFSET $offset`,
   );
   const browseUniqueCards = database.prepare(
     `SELECT ${cardColumns}
@@ -273,7 +122,7 @@ export function createCatalogQuery(database: DatabaseSync) {
               cards.set_code COLLATE NOCASE,
               cards.collector_number COLLATE NOCASE,
               cards.id
-     LIMIT ? OFFSET ?`,
+     LIMIT $limit OFFSET $offset`,
   );
   const catalogTotal = database.prepare(
     `SELECT COUNT(*) AS total
@@ -312,7 +161,7 @@ export function createCatalogQuery(database: DatabaseSync) {
     request: CatalogListRequest = {},
     visibility: SpoilerVisibilitySnapshot,
   ): CatalogListPage => {
-    const visibilityArguments = catalogVisibilityArguments(visibility);
+    const visibilityParameters = catalogVisibilityParameters(visibility);
     const limit =
       Number.isSafeInteger(request.limit) && request.limit! > 0
         ? Math.min(request.limit!, 250)
@@ -327,14 +176,13 @@ export function createCatalogQuery(database: DatabaseSync) {
     const includeTokens = request.includeTokens !== false;
     const uniqueCards = request.uniqueCards === true;
     const universe = request.universe ?? "";
-    const filterArguments = [
-      Number(includeArtSeries),
-      Number(includeDigital),
-      Number(includeTokens),
-      Number(includeAdCards),
-      universe,
-      universe,
-    ];
+    const filterParameters = {
+      $includeArtSeries: Number(includeArtSeries),
+      $includeDigital: Number(includeDigital),
+      $includeTokens: Number(includeTokens),
+      $includeAdCards: Number(includeAdCards),
+      $universe: universe,
+    };
 
     if (compiledQuery && !compiledQuery.success) {
       return { cards: [], hasMore: false, queryError: compiledQuery.error, total: 0 };
@@ -362,7 +210,7 @@ export function createCatalogQuery(database: DatabaseSync) {
                         cards.set_code COLLATE NOCASE,
                         cards.collector_number COLLATE NOCASE,
                         cards.id
-               LIMIT ? OFFSET ?`
+               LIMIT $limit OFFSET $offset`
             : `SELECT ${cardColumns}
                FROM cards INDEXED BY cards_recent_order
                WHERE (${compiledQuery.sql})
@@ -373,61 +221,44 @@ export function createCatalogQuery(database: DatabaseSync) {
                         cards.set_code COLLATE NOCASE,
                         cards.collector_number COLLATE NOCASE,
                         cards.id
-               LIMIT ? OFFSET ?`,
+               LIMIT $limit OFFSET $offset`,
         )
       : uniqueCards
         ? browseUniqueCards
         : browse;
-    const rows = z
-      .array(CatalogCardSummaryRowSchema)
-      .parse(
-        compiledQuery
-          ? statement.all(
-              ...compiledQuery.parameters,
-              ...filterArguments,
-              ...visibilityArguments,
-              ...(uniqueCards
-                ? [...compiledQuery.parameters, ...filterArguments, ...visibilityArguments]
-                : []),
-              limit + 1,
-              offset,
-            )
-          : uniqueCards
-            ? statement.all(
-                ...filterArguments,
-                ...visibilityArguments,
-                ...filterArguments,
-                ...visibilityArguments,
-                limit + 1,
-                offset,
-              )
-            : statement.all(...filterArguments, ...visibilityArguments, limit + 1, offset),
-      );
+    const rows = z.array(CatalogCardSummaryRowSchema).parse(
+      statement.all({
+        ...compiledQuery?.parameters,
+        ...filterParameters,
+        ...visibilityParameters,
+        $limit: limit + 1,
+        $offset: offset,
+      }),
+    );
     const hasMore = rows.length > limit;
     const cards = rows.slice(0, limit).map(toCatalogCardSummary);
-    const total =
-      compiledQuery || !includeAdCards || !includeDigital || !includeTokens || universe
-        ? hasMore
-          ? null
-          : offset + cards.length
-        : CatalogTotalRowSchema.parse(
-            uniqueCards
-              ? includeArtSeries && visibility.policy === "show"
-                ? fullUniqueCardTotal.get()
-                : includeArtSeries &&
-                    visibility.revealedPrintingIds.length === 0 &&
-                    visibility.revealedRootSetIds.length === 0
-                  ? protectedUniqueCardTotal.get(visibility.currentDate)
-                  : uniqueCardTotal.get(Number(includeArtSeries), ...visibilityArguments)
-              : !includeArtSeries
-                ? nonArtSeriesTotal.get(...visibilityArguments)
-                : visibility.policy === "show"
-                  ? fullCatalogTotal.get()
-                  : visibility.revealedPrintingIds.length === 0 &&
-                      visibility.revealedRootSetIds.length === 0
-                    ? protectedCatalogTotal.get(visibility.currentDate)
-                    : catalogTotal.get(...visibilityArguments),
-          ).total;
+    let total: number | null;
+    if (compiledQuery || !includeAdCards || !includeDigital || !includeTokens || universe) {
+      total = hasMore ? null : offset + cards.length;
+    } else {
+      const noReveals =
+        visibility.revealedPrintingIds.length === 0 && visibility.revealedRootSetIds.length === 0;
+      let row;
+      if (uniqueCards) {
+        if (includeArtSeries && visibility.policy === "show") row = fullUniqueCardTotal.get();
+        else if (includeArtSeries && noReveals)
+          row = protectedUniqueCardTotal.get(visibility.currentDate);
+        else
+          row = uniqueCardTotal.get({
+            $includeArtSeries: Number(includeArtSeries),
+            ...visibilityParameters,
+          });
+      } else if (!includeArtSeries) row = nonArtSeriesTotal.get(visibilityParameters);
+      else if (visibility.policy === "show") row = fullCatalogTotal.get();
+      else if (noReveals) row = protectedCatalogTotal.get(visibility.currentDate);
+      else row = catalogTotal.get(visibilityParameters);
+      total = CatalogTotalRowSchema.parse(row).total;
+    }
 
     return { cards, hasMore, total };
   };
@@ -470,7 +301,7 @@ export function createCatalogUpcomingPrintingsQuery(database: DatabaseSync) {
               CASE WHEN ${catalogVisibilitySql} THEN 1 ELSE 0 END AS isVisible
        FROM cards
        JOIN sets AS root_sets ON root_sets.id = cards.root_set_id
-       WHERE ${effectiveReleaseDateSql} > ?
+       WHERE ${effectiveReleaseDateSql} > $visibilityDate
      )
      SELECT id,
             CASE WHEN isVisible = 1 THEN name ELSE NULL END AS name,
@@ -493,7 +324,7 @@ export function createCatalogUpcomingPrintingsQuery(database: DatabaseSync) {
               releaseName COLLATE NOCASE,
               releaseCode COLLATE NOCASE,
               id
-     LIMIT ? OFFSET ?`,
+     LIMIT $limit OFFSET $offset`,
   );
   const countUpcoming = database.prepare(
     `SELECT COUNT(*) AS total
@@ -507,16 +338,13 @@ export function createCatalogUpcomingPrintingsQuery(database: DatabaseSync) {
   ): CatalogUpcomingPrintingPage => {
     const limit = request.limit ?? 100;
     const offset = request.offset ?? 0;
-    const rows = z
-      .array(CatalogUpcomingPrintingRowSchema)
-      .parse(
-        selectUpcoming.all(
-          ...catalogVisibilityArguments(visibility),
-          visibility.currentDate,
-          limit + 1,
-          offset,
-        ),
-      );
+    const rows = z.array(CatalogUpcomingPrintingRowSchema).parse(
+      selectUpcoming.all({
+        ...catalogVisibilityParameters(visibility),
+        $limit: limit + 1,
+        $offset: offset,
+      }),
+    );
     const total = CatalogTotalRowSchema.parse(countUpcoming.get(visibility.currentDate)).total;
 
     return {
@@ -533,11 +361,11 @@ export function createCatalogRootSetQuery(database: DatabaseSync) {
      FROM (
        SELECT sets.root_set_id AS rootSetId, 0 AS priority
        FROM sets
-       WHERE sets.id = ?
+       WHERE sets.id = $targetId
        UNION ALL
        SELECT cards.root_set_id AS rootSetId, 1 AS priority
        FROM cards
-       WHERE cards.id = ?
+       WHERE cards.id = $targetId
      )
      ORDER BY priority
      LIMIT 1`,
@@ -546,7 +374,7 @@ export function createCatalogRootSetQuery(database: DatabaseSync) {
   return (targetId: string): string | null => {
     const row = z
       .object({ rootSetId: catalogPrintingIdSchema })
-      .safeParse(selectRoot.get(targetId, targetId));
+      .safeParse(selectRoot.get({ $targetId: targetId }));
     return row.success ? row.data.rootSetId : null;
   };
 }
@@ -723,13 +551,16 @@ export function createCatalogColorsQuery(database: DatabaseSync) {
     `SELECT CASE WHEN cards.id IS NOT NULL AND ${catalogVisibilitySql}
                  THEN COALESCE(json_extract(cards.json, '$.color_identity'), '[]')
                  ELSE NULL END AS colors
-     FROM json_each(?) AS requested
+     FROM json_each($printingIds) AS requested
      LEFT JOIN cards ON cards.id = requested.value`,
   );
   return (printingIds: readonly string[], visibility: SpoilerVisibilitySnapshot) => {
-    const rows = z
-      .array(z.object({ colors: z.string().nullable() }))
-      .parse(select.all(...catalogVisibilityArguments(visibility), JSON.stringify(printingIds)));
+    const rows = z.array(z.object({ colors: z.string().nullable() })).parse(
+      select.all({
+        ...catalogVisibilityParameters(visibility),
+        $printingIds: JSON.stringify(printingIds),
+      }),
+    );
     if (!rows.length || rows.some(({ colors }) => colors === null)) return null;
     return [
       ...new Set(rows.flatMap(({ colors }) => z.array(ColorSchema).parse(JSON.parse(colors!)))),

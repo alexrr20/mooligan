@@ -1,12 +1,12 @@
 import type { SpoilerVisibilitySnapshot } from "@mooligan/domain/spoilers";
 
-import { catalogVisibilityArguments, catalogVisibilitySqlFor } from "@mooligan/catalog/visibility";
+import { catalogVisibilityParameters, catalogVisibilitySqlFor } from "@mooligan/catalog/visibility";
 
 type SearchParameter = string | number;
 
 export type CompiledScryfallQuery =
   | {
-      parameters: SearchParameter[];
+      parameters: Record<string, SearchParameter>;
       sql: string;
       success: true;
     }
@@ -94,12 +94,20 @@ export function compileScryfallQuery(
   try {
     const tokens = tokenize(query);
     if (tokens.length === 0) {
-      return { parameters: [], sql: "0", success: true };
+      return { parameters: {}, sql: "0", success: true };
     }
 
     const parser = new SearchParser(tokens);
-    const fragment = compileNode(parser.parse(), visibility);
-    return { ...fragment, success: true };
+    const fragment = compileNode(parser.parse());
+    const parameters = Object.fromEntries(
+      fragment.parameters.map((value, index) => [`$search${index}`, value]),
+    );
+    let index = 0;
+    // Compiler SQL reserves ? for bindings; user text is always a parameter.
+    const sql = fragment.sql.replaceAll("?", () => `$search${index++}`);
+    if (sql.includes("$visibilityDate"))
+      Object.assign(parameters, catalogVisibilityParameters(visibility));
+    return { parameters, sql, success: true };
   } catch (error) {
     return {
       error:
@@ -260,21 +268,21 @@ function tokenize(query: string): SearchToken[] {
   return tokens;
 }
 
-function compileNode(node: SearchNode, visibility: SpoilerVisibilitySnapshot): SqlFragment {
-  if (node.type === "term") return compileTerm(node.raw, visibility);
+function compileNode(node: SearchNode): SqlFragment {
+  if (node.type === "term") return compileTerm(node.raw);
   if (node.type === "not") {
-    const child = compileNode(node.child, visibility);
+    const child = compileNode(node.child);
     return { parameters: child.parameters, sql: `NOT (${child.sql})` };
   }
 
-  const children = node.children.map((child) => compileNode(child, visibility));
+  const children = node.children.map((child) => compileNode(child));
   return {
     parameters: children.flatMap((child) => child.parameters),
     sql: children.map((child) => `(${child.sql})`).join(node.type === "and" ? " AND " : " OR "),
   };
 }
 
-function compileTerm(raw: string, visibility: SpoilerVisibilitySnapshot): SqlFragment {
+function compileTerm(raw: string): SqlFragment {
   if (raw.startsWith("!")) {
     const name = decodeValue(raw.slice(1));
     if (!name) throw new SearchSyntaxError("Add a card name after the exclamation mark.");
@@ -471,13 +479,13 @@ function compileTerm(raw: string, visibility: SpoilerVisibilitySnapshot): SqlFra
     case "sets":
     case "paperprints":
     case "papersets":
-      return compilePrintCount(field, value, comparison, visibility);
+      return compilePrintCount(field, value, comparison);
     case "is":
-      return requireEquality(field, comparison, compileIs(value, visibility));
+      return requireEquality(field, comparison, compileIs(value));
     case "not": {
       const fragment = cardTypeWords.has(value.toLowerCase())
         ? compileFtsText(value, "type_line")
-        : compileIs(value, visibility);
+        : compileIs(value);
       return requireEquality(field, comparison, {
         parameters: fragment.parameters,
         sql: `NOT (${fragment.sql})`,
@@ -491,7 +499,7 @@ function compileTerm(raw: string, visibility: SpoilerVisibilitySnapshot): SqlFra
         comparison,
         ["arena", "mtgo", "paper"].includes(value.toLowerCase())
           ? compileArrayValue("$.games", value)
-          : compileEverPrintedIn(value, visibility),
+          : compileEverPrintedIn(value),
       );
     default:
       throw new SearchSyntaxError(`The local catalog does not support the "${field}" operator.`);
@@ -769,19 +777,14 @@ function compilePrice(field: string, value: string, comparison: Comparison): Sql
   };
 }
 
-function compilePrintCount(
-  field: string,
-  value: string,
-  comparison: Comparison,
-  visibility: SpoilerVisibilitySnapshot,
-): SqlFragment {
+function compilePrintCount(field: string, value: string, comparison: Comparison): SqlFragment {
   const count = parseNumber(value, field);
   const paperOnly = field.startsWith("paper")
     ? "AND COALESCE(json_extract(sibling.json, '$.digital'), 0) = 0"
     : "";
   const distinct = field.endsWith("sets") ? "DISTINCT sibling.set_id" : "sibling.id";
   return {
-    parameters: [...catalogVisibilityArguments(visibility), count],
+    parameters: [count],
     sql: `(SELECT COUNT(${distinct})
       FROM cards AS sibling
       WHERE sibling.identity_id = cards.identity_id
@@ -791,7 +794,7 @@ function compilePrintCount(
   };
 }
 
-function compileIs(value: string, visibility: SpoilerVisibilitySnapshot): SqlFragment {
+function compileIs(value: string): SqlFragment {
   switch (value.toLowerCase()) {
     case "digital":
       return { parameters: [], sql: "COALESCE(json_extract(cards.json, '$.digital'), 0) = 1" };
@@ -850,7 +853,7 @@ function compileIs(value: string, visibility: SpoilerVisibilitySnapshot): SqlFra
       return { parameters: [], sql: "COALESCE(json_extract(cards.json, '$.reprint'), 0) = 0" };
     case "unique":
       return {
-        parameters: [...catalogVisibilityArguments(visibility)],
+        parameters: [],
         sql: `(SELECT COUNT(*)
           FROM cards AS sibling
           WHERE sibling.identity_id = cards.identity_id
@@ -931,12 +934,12 @@ function compileHas(value: string): SqlFragment {
   };
 }
 
-function compileEverPrintedIn(value: string, visibility: SpoilerVisibilitySnapshot): SqlFragment {
+function compileEverPrintedIn(value: string): SqlFragment {
   const normalized = value.toLowerCase();
   const rarity = rarityOrder.some((candidate) => candidate === normalized);
   const valueParameters = rarity ? [normalized] : [normalized, normalized];
   return {
-    parameters: [...valueParameters, ...catalogVisibilityArguments(visibility)],
+    parameters: valueParameters,
     sql: `EXISTS (
       SELECT 1 FROM cards AS sibling
       WHERE sibling.identity_id = cards.identity_id

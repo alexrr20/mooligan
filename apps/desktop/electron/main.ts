@@ -14,13 +14,9 @@ import {
   resolveCatalogSetSymbolCacheDirectory,
 } from "./catalog/image-cache-directory";
 import { registerCatalogImageProtocol } from "./catalog/image-protocol";
-import {
-  applyCatalogCollectionProjection,
-  queryCatalogImageSource,
-  queryCatalogSetSymbolSource,
-  registerCatalogIpc,
-  replaceCatalogCollectionProjection,
-} from "./catalog/ipc";
+import { registerCatalogIpc } from "./catalog/ipc";
+import { createCatalogService } from "./catalog/service";
+import { createCatalogInstaller } from "./catalog/installer";
 import { createCatalogSetSymbolCache } from "./catalog/set-symbol-cache";
 import { registerCatalogSetSymbolProtocol } from "./catalog/set-symbol-protocol";
 import { registerCollectionProjectionIpc } from "./collection/projection-ipc";
@@ -115,25 +111,27 @@ if (!authStartup.isPrimary) {
       const prices = new PriceService(pricePath, () =>
         publishRendererEvent("prices:updated", undefined),
       );
-      registerPriceIpc(prices);
       const activeWorkspaceId = () => workspaceRegistry.bootstrap().workspaceId;
       const spoilers = new SpoilerProjection(activeWorkspaceId, {
         onChanged: () => publishRendererEvent("workspace-projection:spoilers-changed", undefined),
       });
       const collection = new CollectionProjection(activeWorkspaceId, {
-        applyDelta: applyCatalogCollectionProjection,
+        applyDelta: (delta) => catalog.applyCollection(delta),
         onResyncRequired: () =>
           publishRendererEvent("workspace-projection:collection-resync-required", undefined),
-        replace: replaceCatalogCollectionProjection,
+        replace: (lots) => catalog.replaceCollection(lots),
       });
 
-      registerCatalogIpc({
+      const catalogPath = join(app.getPath("userData"), "catalog", "cards.sqlite");
+      const catalog = createCatalogService({
+        catalogPath,
         pricePath,
-        getCollectionProjectionLots: () => collection.lots(),
-        getVisibilitySnapshot: () => spoilers.visibilitySnapshot(),
-        isCollectionProjectionReady: () => collection.isReady(),
-        onCollectionProjectionInvalidated: () => collection.workerInvalidated(),
+        workerUrl: new URL(/* @vite-ignore */ "./catalog-query-worker.js", import.meta.url),
+        collection,
+        readVisibility: () => spoilers.visibilitySnapshot(),
       });
+      registerCatalogIpc(catalog, createCatalogInstaller(catalogPath, catalog.replace));
+      registerPriceIpc(prices, catalog.printingDetail);
       registerCollectionProjectionIpc(collection);
       registerSpoilerProjectionIpc(spoilers);
 
@@ -147,11 +145,11 @@ if (!authStartup.isPrimary) {
         imageCache.initialize().catch(() => undefined),
         setSymbolCache.initialize().catch(() => undefined),
       ]);
-      registerCatalogImageProtocol(session.defaultSession, imageCache, queryCatalogImageSource);
+      registerCatalogImageProtocol(session.defaultSession, imageCache, catalog.imageSource);
       registerCatalogSetSymbolProtocol(
         session.defaultSession,
         setSymbolCache,
-        queryCatalogSetSymbolSource,
+        catalog.setSymbolSource,
       );
 
       const authOrigin = resolveAuthOrigin();

@@ -1,5 +1,10 @@
 import { openDatabaseSync, type SQLiteStatement } from "expo-sqlite";
-import type { CatalogDatabase, CatalogRow } from "@mooligan/catalog/database";
+import type {
+  CatalogArguments,
+  CatalogDatabase,
+  CatalogParameters,
+  CatalogRow,
+} from "@mooligan/catalog/database";
 
 export function openCatalogDatabase(name: string) {
   const database = openDatabaseSync(name, { useNewConnection: true });
@@ -23,17 +28,20 @@ export function openCatalogDatabase(name: string) {
     path: database.databasePath,
     exec: (sql: string) => database.execSync(sql),
     prepare: (sql: string): ReturnType<CatalogDatabase["prepare"]> => ({
-      get: (...values) => {
-        const result = statement(sql).executeSync<CatalogRow>(values);
+      get: (...values: CatalogArguments) => {
+        const result = statement(sql).executeSync<CatalogRow>(isNamed(values) ? values[0] : values);
         try {
           return result.getFirstSync() ?? undefined;
         } finally {
           result.resetSync();
         }
       },
-      all: (...values) => statement(sql).executeSync<CatalogRow>(values).getAllSync(),
-      run: (...values) => {
-        statement(sql).executeSync(values);
+      all: (...values: CatalogArguments) =>
+        statement(sql)
+          .executeSync<CatalogRow>(isNamed(values) ? values[0] : values)
+          .getAllSync(),
+      run: (...values: CatalogArguments) => {
+        statement(sql).executeSync(isNamed(values) ? values[0] : values);
       },
     }),
     close() {
@@ -42,4 +50,8 @@ export function openCatalogDatabase(name: string) {
       database.closeSync();
     },
   };
+}
+
+function isNamed(values: CatalogArguments): values is [CatalogParameters] {
+  return values.length === 1 && values[0] !== null && typeof values[0] === "object";
 }

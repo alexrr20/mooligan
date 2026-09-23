@@ -1,53 +1,54 @@
-import type { CatalogDatabase as DatabaseSync } from "./database.ts";
+import type { CatalogDatabase } from "./database.ts";
 
 import {
-  CollectionListPageSchema,
   CollectionListRequestSchema,
-  CollectionHoldingSchema,
+  CollectionSetOptionSchema,
+  VisibleCollectionHoldingSchema,
+  UnavailableCollectionHoldingSchema,
+  ProtectedCollectionHoldingSchema,
   type CollectionHolding,
   type CollectionListPage,
   type CollectionListRequest,
 } from "@mooligan/domain/collection";
+import { FinishSchema } from "@mooligan/domain/catalog";
 import * as z from "zod";
 import type { JSONType } from "zod";
-
-import { catalogVisibilityArguments, catalogVisibilitySql } from "@mooligan/catalog/visibility";
 import type { SpoilerVisibilitySnapshot } from "@mooligan/domain/spoilers";
+import { catalogVisibilityParameters, catalogVisibilitySql } from "@mooligan/catalog/visibility";
 
-const CollectionQueryRowSchema = z.object({
-  availableFinishes: z.string().nullable(),
-  cardId: z.string().nullable(),
-  collectorNumber: z.string().nullable(),
-  condition: z.string().nullable(),
-  editableLotId: z.string().nullable(),
-  filteredCards: z.number().int().nonnegative().nullable(),
-  filteredCopies: z.number().int().nonnegative().nullable(),
-  filteredHoldings: z.number().int().nonnegative().nullable(),
-  finish: z.string().nullable(),
-  hasGridImage: z.union([z.literal(0), z.literal(1)]).nullable(),
-  hasImage: z.union([z.literal(0), z.literal(1)]).nullable(),
-  isSummary: z.union([z.literal(0), z.literal(1)]),
-  language: z.string().nullable(),
-  name: z.string().nullable(),
-  position: z.number().int().positive().nullable(),
-  printingId: z.string().nullable(),
-  protectedCopies: z.number().int().nonnegative().nullable(),
-  quantity: z.number().int().positive().nullable(),
-  routePrintingId: z.string().nullable(),
-  setCode: z.string().nullable(),
-  setName: z.string().nullable(),
-  sets: z.string().nullable(),
-  status: z.enum(["protected", "unavailable", "visible"]).nullable(),
-  totalCards: z.number().int().nonnegative().nullable(),
-  totalCopies: z.number().int().nonnegative().nullable(),
-  totalHoldings: z.number().int().nonnegative().nullable(),
+const CollectionHoldingRowSchema = z.discriminatedUnion("status", [
+  VisibleCollectionHoldingSchema.omit({ image: true, gridImage: true })
+    .extend({
+      availableFinishes: z
+        .string()
+        .transform((value) => z.array(FinishSchema).parse(JSON.parse(value))),
+      hasImage: z.union([z.literal(0), z.literal(1)]),
+      hasGridImage: z.union([z.literal(0), z.literal(1)]),
+    })
+    .strip(),
+  UnavailableCollectionHoldingSchema.omit({ label: true }).strip(),
+  ProtectedCollectionHoldingSchema.omit({ label: true }).strip(),
+]);
+type CollectionHoldingRow = z.infer<typeof CollectionHoldingRowSchema>;
+
+const count = z.number().int().nonnegative();
+const CollectionSummaryRowSchema = z.object({
+  filteredCards: count,
+  filteredCopies: count,
+  filteredHoldings: count,
+  totalCards: count,
+  totalCopies: count,
+  totalHoldings: count,
+  protectedCopies: count,
+  sets: z
+    .string()
+    .transform((value) => z.array(CollectionSetOptionSchema).parse(JSON.parse(value))),
 });
-type CollectionQueryRow = z.infer<typeof CollectionQueryRowSchema>;
 
 const collectionOrderSql = `CASE WHEN status = 'protected' THEN 1 ELSE 0 END,
-  CASE WHEN ? = 'quantity' THEN quantity END DESC,
-  CASE WHEN ? = 'set' THEN setName END COLLATE NOCASE,
-  CASE WHEN ? = 'set' THEN collectorNumber END COLLATE NOCASE,
+  CASE WHEN $sort = 'quantity' THEN quantity END DESC,
+  CASE WHEN $sort = 'set' THEN setName END COLLATE NOCASE,
+  CASE WHEN $sort = 'set' THEN collectorNumber END COLLATE NOCASE,
   CASE status WHEN 'visible' THEN 0 WHEN 'unavailable' THEN 1 ELSE 2 END,
   name COLLATE NOCASE,
   setCode COLLATE NOCASE,
@@ -57,21 +58,7 @@ const collectionOrderSql = `CASE WHEN status = 'protected' THEN 1 ELSE 0 END,
   condition,
   printingId`;
 
-export function createCollectionQuery(database: DatabaseSync) {
-  return (
-    input: CollectionListRequest = {},
-    visibility: SpoilerVisibilitySnapshot,
-  ): CollectionListPage => {
-    const request = CollectionListRequestSchema.parse(input);
-    const query = request.query?.trim() ?? "";
-    const setCode = request.setCode?.trim() ?? "";
-    const finish = request.finish ?? "";
-    const language = request.language ?? "";
-    const condition = request.condition ?? "";
-    const sort = request.sort ?? "name";
-    const limit = Math.min(request.limit ?? 100, 100);
-    const offset = request.offset ?? 0;
-    const statement = database.prepare(`
+const collectionRowsSql = `
       WITH holdings AS (
         SELECT printing_id AS printingId,
                finish,
@@ -121,37 +108,17 @@ export function createCollectionQuery(database: DatabaseSync) {
         WHERE status = 'protected'
            OR (
              status <> 'protected'
-             AND (? = '' OR (status = 'visible' AND name LIKE '%' || ? || '%' COLLATE NOCASE))
-             AND (? = '' OR (status = 'visible' AND setCode = ? COLLATE NOCASE))
-             AND (? = '' OR finish = ?)
-             AND (? = '' OR language = ?)
-             AND (? = '' OR condition = ?)
+             AND ($query = '' OR (status = 'visible' AND name LIKE '%' || $query || '%' COLLATE NOCASE))
+             AND ($setCode = '' OR (status = 'visible' AND setCode = $setCode COLLATE NOCASE))
+             AND ($finish = '' OR finish = $finish)
+             AND ($language = '' OR language = $language)
+             AND ($condition = '' OR condition = $condition)
            )
-      ), ordered AS (
-        SELECT *, ROW_NUMBER() OVER (ORDER BY ${collectionOrderSql}) AS position
-        FROM filtered
-      ), page AS (
-        SELECT * FROM ordered WHERE position > ? AND position <= ?
-      ), summary AS (
-        SELECT
-          COALESCE((SELECT SUM(quantity) FROM enriched WHERE status <> 'protected'), 0) AS totalCopies,
-          COALESCE((SELECT COUNT(DISTINCT COALESCE(cardId, printingId))
-                    FROM enriched WHERE status <> 'protected'), 0) AS totalCards,
-          COALESCE((SELECT COUNT(*) FROM enriched WHERE status <> 'protected'), 0) AS totalHoldings,
-          COALESCE((SELECT SUM(quantity) FROM filtered WHERE status <> 'protected'), 0) AS filteredCopies,
-          COALESCE((SELECT COUNT(DISTINCT COALESCE(cardId, printingId))
-                    FROM filtered WHERE status <> 'protected'), 0) AS filteredCards,
-          COALESCE((SELECT COUNT(*) FROM filtered WHERE status <> 'protected'), 0) AS filteredHoldings,
-          COALESCE((SELECT SUM(quantity) FROM enriched WHERE status = 'protected'), 0) AS protectedCopies,
-          COALESCE((SELECT json_group_array(json_object('code', setCode, 'name', setName))
-                    FROM (SELECT DISTINCT setCode, setName
-                          FROM enriched
-                          WHERE status = 'visible'
-                          ORDER BY setName COLLATE NOCASE, setCode COLLATE NOCASE)), '[]') AS sets
-      )
-      SELECT 0 AS isSummary,
-             page.position,
-             page.status,
+      )`;
+
+export function createCollectionQuery(database: CatalogDatabase) {
+  const selectPage = database.prepare(`${collectionRowsSql}
+SELECT page.status,
              CASE WHEN page.status = 'protected' THEN NULL ELSE page.printingId END AS printingId,
              page.printingId AS routePrintingId,
              CASE WHEN page.status = 'protected' THEN NULL ELSE page.finish END AS finish,
@@ -172,94 +139,78 @@ export function createCollectionQuery(database: DatabaseSync) {
              CASE WHEN page.status = 'visible' THEN page.collectorNumber ELSE NULL END AS collectorNumber,
              CASE WHEN page.status = 'visible' THEN page.hasImage ELSE NULL END AS hasImage,
              CASE WHEN page.status = 'visible' THEN page.hasGridImage ELSE NULL END AS hasGridImage,
-             CASE WHEN page.status = 'visible' THEN page.availableFinishes ELSE NULL END AS availableFinishes,
-             NULL AS totalCopies,
-             NULL AS totalCards,
-             NULL AS totalHoldings,
-             NULL AS filteredCopies,
-             NULL AS filteredCards,
-             NULL AS filteredHoldings,
-             NULL AS protectedCopies,
-             NULL AS sets
-      FROM page
-      UNION ALL
-      SELECT 1 AS isSummary,
-             NULL AS position,
-             NULL AS status,
-             NULL AS printingId,
-             NULL AS routePrintingId,
-             NULL AS finish,
-             NULL AS language,
-             NULL AS condition,
-             NULL AS quantity,
-             NULL AS editableLotId,
-             NULL AS cardId,
-             NULL AS name,
-             NULL AS setCode,
-             NULL AS setName,
-             NULL AS collectorNumber,
-             NULL AS hasImage,
-             NULL AS hasGridImage,
-             NULL AS availableFinishes,
-             summary.totalCopies,
-             summary.totalCards,
-             summary.totalHoldings,
-             summary.filteredCopies,
-             summary.filteredCards,
-             summary.filteredHoldings,
-             summary.protectedCopies,
-             summary.sets
-      FROM summary
-      ORDER BY isSummary, position
-    `);
-    const rows = z
-      .array(CollectionQueryRowSchema)
-      .parse(
-        statement.all(
-          ...catalogVisibilityArguments(visibility),
-          query,
-          query,
-          setCode,
-          setCode,
-          finish,
-          finish,
-          language,
-          language,
-          condition,
-          condition,
-          sort,
-          sort,
-          sort,
-          offset,
-          offset + limit + 1,
-        ),
-      );
-    const summary = rows.at(-1);
+             CASE WHEN page.status = 'visible' THEN page.availableFinishes ELSE NULL END AS availableFinishes
+      FROM filtered AS page
+      ORDER BY ${collectionOrderSql}
+      LIMIT $limit OFFSET $offset
+  `);
+  const selectSummary = database.prepare(`${collectionRowsSql}
+    SELECT totals.*, matching.*,
+           (SELECT json_group_array(json_object('code', setCode, 'name', setName))
+            FROM (SELECT DISTINCT setCode, setName FROM enriched
+                  WHERE status = 'visible'
+                  ORDER BY setName COLLATE NOCASE, setCode COLLATE NOCASE)) AS sets
+    FROM (
+      SELECT COALESCE(SUM(CASE WHEN status <> 'protected' THEN quantity ELSE 0 END), 0) AS totalCopies,
+             COUNT(DISTINCT CASE WHEN status <> 'protected' THEN COALESCE(cardId, printingId) END) AS totalCards,
+             COUNT(CASE WHEN status <> 'protected' THEN 1 END) AS totalHoldings,
+             COALESCE(SUM(CASE WHEN status = 'protected' THEN quantity ELSE 0 END), 0) AS protectedCopies
+      FROM enriched
+    ) AS totals
+    CROSS JOIN (
+      SELECT COALESCE(SUM(quantity), 0) AS filteredCopies,
+             COUNT(DISTINCT COALESCE(cardId, printingId)) AS filteredCards,
+             COUNT(*) AS filteredHoldings
+      FROM filtered WHERE status <> 'protected'
+    ) AS matching
+  `);
 
-    if (!summary || summary.isSummary !== 1) {
-      throw new Error("The local Collection returned an invalid summary.");
-    }
-
-    const holdingRows = rows.slice(0, -1);
-    const holdings = holdingRows.slice(0, limit).map(toCollectionHolding);
-    const result = {
-      filtered: {
-        cards: summary.filteredCards ?? 0,
-        copies: summary.filteredCopies ?? 0,
-        holdings: summary.filteredHoldings ?? 0,
-      },
-      hasMore: holdingRows.length > limit,
-      holdings,
-      protectedCopies: summary.protectedCopies ?? 0,
-      sets: JSON.parse(summary.sets ?? "[]"),
-      total: {
-        cards: summary.totalCards ?? 0,
-        copies: summary.totalCopies ?? 0,
-        holdings: summary.totalHoldings ?? 0,
-      },
+  return (
+    input: CollectionListRequest = {},
+    visibility: SpoilerVisibilitySnapshot,
+  ): CollectionListPage => {
+    const request = CollectionListRequestSchema.parse(input);
+    const limit = request.limit ?? 100;
+    const parameters = {
+      ...catalogVisibilityParameters(visibility),
+      $query: request.query?.trim() ?? "",
+      $setCode: request.setCode?.trim() ?? "",
+      $finish: request.finish ?? "",
+      $language: request.language ?? "",
+      $condition: request.condition ?? "",
     };
-
-    return CollectionListPageSchema.parse(result);
+    database.exec("BEGIN");
+    try {
+      const rows = z.array(CollectionHoldingRowSchema).parse(
+        selectPage.all({
+          ...parameters,
+          $sort: request.sort ?? "name",
+          $limit: limit + 1,
+          $offset: request.offset ?? 0,
+        }),
+      );
+      const summary = CollectionSummaryRowSchema.parse(selectSummary.get(parameters));
+      database.exec("COMMIT");
+      return {
+        filtered: {
+          cards: summary.filteredCards,
+          copies: summary.filteredCopies,
+          holdings: summary.filteredHoldings,
+        },
+        total: {
+          cards: summary.totalCards,
+          copies: summary.totalCopies,
+          holdings: summary.totalHoldings,
+        },
+        hasMore: rows.length > limit,
+        holdings: rows.slice(0, limit).map(toCollectionHolding),
+        protectedCopies: summary.protectedCopies,
+        sets: summary.sets,
+      };
+    } catch (error) {
+      database.exec("ROLLBACK");
+      throw error;
+    }
   };
 }
 
@@ -267,59 +218,13 @@ export function validateCollectionListRequest(value: CollectionListRequest | JSO
   return CollectionListRequestSchema.parse(value ?? {});
 }
 
-function toCollectionHolding(row: CollectionQueryRow): CollectionHolding {
-  if (row.status === "protected" && row.quantity && row.routePrintingId) {
-    return {
-      label: "Protected preview",
-      quantity: row.quantity,
-      routePrintingId: row.routePrintingId,
-      status: "protected",
-    };
-  }
-
-  if (!row.printingId || !row.finish || !row.language || !row.condition || !row.quantity) {
-    throw new Error("The local Collection returned an invalid Holding.");
-  }
-
-  const common = {
-    condition: row.condition,
-    editableLotId: row.editableLotId,
-    finish: row.finish,
-    language: row.language,
-    printingId: row.printingId,
-    quantity: row.quantity,
+function toCollectionHolding(row: CollectionHoldingRow): CollectionHolding {
+  if (row.status === "protected") return { ...row, label: "Protected preview" };
+  if (row.status === "unavailable") return { ...row, label: "Unavailable printing" };
+  const { hasImage, hasGridImage, ...holding } = row;
+  return {
+    ...holding,
+    image: hasImage ? { faceIndex: 0, printingId: row.printingId, size: "thumb" } : null,
+    gridImage: hasGridImage ? { faceIndex: 0, printingId: row.printingId, size: "grid" } : null,
   };
-
-  if (row.status === "unavailable") {
-    return CollectionHoldingSchema.parse({
-      ...common,
-      label: "Unavailable printing",
-      status: "unavailable",
-    });
-  }
-
-  if (
-    row.status !== "visible" ||
-    !row.cardId ||
-    !row.name ||
-    !row.setCode ||
-    !row.setName ||
-    row.collectorNumber === null ||
-    row.availableFinishes === null
-  ) {
-    throw new Error("The local Collection returned an invalid Holding.");
-  }
-
-  return CollectionHoldingSchema.parse({
-    ...common,
-    availableFinishes: JSON.parse(row.availableFinishes),
-    cardId: row.cardId,
-    collectorNumber: row.collectorNumber,
-    gridImage: row.hasGridImage ? { faceIndex: 0, printingId: row.printingId, size: "grid" } : null,
-    image: row.hasImage ? { faceIndex: 0, printingId: row.printingId, size: "thumb" } : null,
-    name: row.name,
-    setCode: row.setCode,
-    setName: row.setName,
-    status: "visible",
-  });
 }

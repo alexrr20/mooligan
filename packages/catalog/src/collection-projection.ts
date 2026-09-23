@@ -1,62 +1,5 @@
 import type { CatalogDatabase as DatabaseSync } from "./database.ts";
-
-import { CollectionLotSchema, type CollectionLot } from "@mooligan/domain/collection";
-import { MoneySchema } from "@mooligan/domain/market";
-import * as z from "zod";
-import type { JSONType } from "zod";
-
-const ProjectionLotSchema = CollectionLotSchema.extend({
-  unitCost: MoneySchema.strict().optional(),
-}).strict();
-const ProjectionLotIdSchema = z.string().trim().min(1).max(128);
-const CollectionProjectionWorkerOperationSchema = z.discriminatedUnion("type", [
-  z.strictObject({
-    lots: z.array(ProjectionLotSchema).max(100_000),
-    type: z.literal("collection-projection-replace"),
-  }),
-  z.strictObject({
-    deletedLotIds: z.array(ProjectionLotIdSchema).max(1_000),
-    type: z.literal("collection-projection-apply"),
-    upserts: z.array(ProjectionLotSchema).max(1_000),
-  }),
-]);
-export type CollectionProjectionWorkerOperation = z.infer<
-  typeof CollectionProjectionWorkerOperationSchema
->;
-
-const CollectionProjectionWorkerRequestSchema = z.strictObject({
-  id: z.number().int().positive(),
-  operation: CollectionProjectionWorkerOperationSchema,
-});
-export type CollectionProjectionWorkerRequest = z.infer<
-  typeof CollectionProjectionWorkerRequestSchema
->;
-
-const CollectionProjectionWorkerResponseSchema = z.union([
-  z.strictObject({
-    id: z.number().int().positive(),
-    operation: z.enum(["collection-projection-replace", "collection-projection-apply"]),
-    status: z.literal("applied"),
-  }),
-  z.strictObject({
-    error: z.string().min(1),
-    id: z.number().int().positive(),
-    operation: z.enum(["collection-projection-replace", "collection-projection-apply"]),
-  }),
-]);
-
-export function parseCollectionProjectionWorkerRequest(value: JSONType) {
-  const result = CollectionProjectionWorkerRequestSchema.safeParse(value);
-  return result.success ? result.data : null;
-}
-
-export function parseCollectionProjectionWorkerResponse(
-  value: JSONType,
-  expectedOperation: CollectionProjectionWorkerOperation["type"],
-) {
-  const result = CollectionProjectionWorkerResponseSchema.safeParse(value);
-  return result.success && result.data.operation === expectedOperation ? result.data : null;
-}
+import type { CollectionLot } from "@mooligan/domain/collection";
 
 export function createCollectionProjection(database: DatabaseSync) {
   database.exec(`
@@ -97,13 +40,16 @@ export function createCollectionProjection(database: DatabaseSync) {
   const clear = database.prepare("DELETE FROM collection_lots");
 
   return {
-    apply({ deletedLotIds, upserts }: { deletedLotIds: string[]; upserts: CollectionLot[] }) {
+    apply(
+      this: void,
+      { deletedLotIds, upserts }: { deletedLotIds: string[]; upserts: CollectionLot[] },
+    ) {
       transact(database, () => {
         for (const lotId of deletedLotIds) remove.run(lotId);
         for (const lot of upserts) insert.run(...collectionLotArguments(lot));
       });
     },
-    replace(lots: CollectionLot[]) {
+    replace(this: void, lots: CollectionLot[]) {
       transact(database, () => {
         clear.run();
         for (const lot of lots) insert.run(...collectionLotArguments(lot));

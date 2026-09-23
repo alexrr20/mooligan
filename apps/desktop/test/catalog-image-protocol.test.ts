@@ -49,6 +49,7 @@ void test("commander artwork descriptors round-trip through the image protocol",
 
 void test("catalog image URLs reject untrusted hosts, faces, sizes, and shapes", () => {
   assert.equal(parseCatalogImageUrl("https://catalog/printing-1/0/small"), null);
+  assert.equal(parseCatalogImageUrl(`mooligan-image://catalog/${"x".repeat(129)}/0/small`), null);
   assert.equal(parseCatalogImageUrl("mooligan-image://attacker/printing-1/0/small"), null);
   assert.equal(parseCatalogImageUrl("mooligan-image://catalog/printing-1/-1/small"), null);
   assert.equal(parseCatalogImageUrl("mooligan-image://catalog/printing-1/0/large"), null);
