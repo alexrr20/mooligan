@@ -13,12 +13,12 @@ import {
   parseCatalogQueryWorkerRequest,
   parseCatalogQueryWorkerResponse,
 } from "@mooligan/catalog/query";
-import { DeckCostRequestSchema, type DeckCostRequest } from "@mooligan/domain/deck-cost";
+import { DeckCostRequestSchema, type DeckCostRequest } from "@mooligan/workspace/transport";
 import {
   ScryfallSetDownloadSchema,
   type ScryfallCardDownload,
 } from "@mooligan/domain/catalog-download";
-import type { DeckEntry } from "@mooligan/domain/decks";
+import type { DeckEntry } from "@mooligan/workspace/deck-contract";
 import type { MarketPrice } from "@mooligan/domain/market";
 import type { SpoilerVisibilitySnapshot } from "@mooligan/domain/spoilers";
 

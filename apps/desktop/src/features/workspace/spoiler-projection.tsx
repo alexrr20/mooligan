@@ -4,7 +4,7 @@ import type {
   SpoilerProjectionDelta,
   SpoilerProjectionSnapshot,
 } from "@mooligan/domain/spoilers";
-import { spoilerDecisionsQuery, spoilerSettingsQuery } from "@mooligan/workspace/schema";
+import { spoilerDecisionsQuery, spoilerSettingsQuery } from "@mooligan/workspace/spoilers";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 

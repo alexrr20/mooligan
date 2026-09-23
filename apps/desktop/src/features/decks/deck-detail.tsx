@@ -1,7 +1,7 @@
-import type { Deck, DeckEntry } from "@mooligan/domain/decks";
+import type { Deck, DeckEntry } from "@mooligan/workspace/deck-contract";
 import { Tabs } from "@base-ui/react/tabs";
 import { analyzeDeckMana } from "@mooligan/workspace/client/deck-mana";
-import { collectionLotsQuery } from "@mooligan/workspace/schema";
+import { collectionLotsQuery } from "@mooligan/workspace/collection";
 import * as stylex from "@stylexjs/stylex";
 import { useMutation, useQueries } from "@tanstack/react-query";
 import { useRef, useState } from "react";

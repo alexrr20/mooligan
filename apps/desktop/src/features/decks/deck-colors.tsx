@@ -1,4 +1,4 @@
-import type { Deck } from "@mooligan/domain/decks";
+import type { Deck } from "@mooligan/workspace/deck-contract";
 import * as stylex from "@stylexjs/stylex";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotionConfig } from "motion/react";

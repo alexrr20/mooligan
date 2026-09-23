@@ -1,8 +1,8 @@
 import { Schema } from "effect";
 
-const PrintingId = Schema.String.pipe(Schema.minLength(1), Schema.maxLength(128));
+import { IdentifierSchema as PrintingId } from "./primitives.ts";
 
-export const profileSettingsSchema = Schema.Struct({
+export const ProfileSettingsSchema = Schema.Struct({
   bannerPrintingId: Schema.NullOr(PrintingId),
   featuredPrintingIds: Schema.Array(Schema.NullOr(PrintingId)).pipe(
     Schema.itemsCount(4),
@@ -16,7 +16,7 @@ export const profileSettingsSchema = Schema.Struct({
   ),
 });
 
-export type ProfileSettings = typeof profileSettingsSchema.Type;
+export type ProfileSettings = typeof ProfileSettingsSchema.Type;
 
 export const emptyProfile: ProfileSettings = {
   bannerPrintingId: null,

@@ -4,7 +4,8 @@ import { test } from "node:test";
 import { makeInMemoryAdapter } from "@livestore/adapter-web";
 import { createStorePromise, type Store } from "@livestore/livestore";
 
-import { collectionLotsQuery, events, tables, workspaceSchema } from "../src/schema.ts";
+import { collectionLotsQuery } from "../src/collection.ts";
+import { events, tables, workspaceSchema } from "../src/schema.ts";
 
 type WorkspaceLiveStore = Store<typeof workspaceSchema>;
 

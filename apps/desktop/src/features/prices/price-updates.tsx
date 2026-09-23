@@ -1,4 +1,4 @@
-import { priceCurrencies } from "@mooligan/workspace/schema";
+import { priceCurrencies, priceProviderLabels, priceProviders } from "@mooligan/domain/market";
 import {
   Select,
   SelectTrigger,
@@ -12,7 +12,7 @@ import { useEffect } from "react";
 
 import { Button } from "../../components/ui/button";
 import { Checkbox } from "@base-ui/react/checkbox";
-import { priceProviders, usePriceProviders } from "./use-price-providers";
+import { usePriceProviders } from "./use-price-providers";
 import { colors } from "../../styles/tokens.stylex.js";
 
 export function usePriceUpdates() {
@@ -125,15 +125,15 @@ export function PriceSettings() {
         </p>
         <div {...stylex.props(styles.providerList)}>
           {priceProviders.map((provider) => (
-            <label key={provider.id} {...stylex.props(styles.provider)}>
+            <label key={provider} {...stylex.props(styles.provider)}>
               <Checkbox.Root
-                checked={enabledProviders.includes(provider.id)}
-                onCheckedChange={(checked) => setProviderEnabled(provider.id, checked)}
+                checked={enabledProviders.includes(provider)}
+                onCheckedChange={(checked) => setProviderEnabled(provider, checked)}
                 {...stylex.props(styles.checkbox)}
               >
                 <Checkbox.Indicator>✓</Checkbox.Indicator>
               </Checkbox.Root>
-              {provider.name}
+              {priceProviderLabels[provider]}
             </label>
           ))}
         </div>

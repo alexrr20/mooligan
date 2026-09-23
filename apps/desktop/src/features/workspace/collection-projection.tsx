@@ -1,7 +1,8 @@
-import type { CollectionLot, CollectionProjectionConnection } from "@mooligan/domain/collection";
-import { collectionLotsQuery, tables } from "@mooligan/workspace/schema";
+import type { CollectionLot } from "@mooligan/workspace/collection-contract";
+import type { CollectionProjectionConnection } from "@mooligan/domain/collection";
+import { collectionLotsQuery } from "@mooligan/workspace/collection";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { useWorkspaceLiveStore } from "./workspace-store-context";
 import { diffCollectionLots } from "./collection-projection-diff";
@@ -17,8 +18,7 @@ export function CollectionProjectionStartup({
 }) {
   const store = useWorkspaceLiveStore();
   const queryClient = useQueryClient();
-  const rows = store.useQuery(collectionLotsQuery);
-  const lots = useMemo(() => rows.map(toCollectionLot), [rows]);
+  const lots = store.useQuery(collectionLotsQuery);
   const connection = useRef<CollectionProjectionConnection>(undefined);
   const lastLots = useRef<CollectionLot[]>(undefined);
   const queue = useRef(Promise.resolve());
@@ -87,22 +87,4 @@ export function CollectionProjectionStartup({
 
   if (failure) throw failure;
   return ready ? children : loading;
-}
-
-function toCollectionLot(row: typeof tables.collectionLots.Type): CollectionLot {
-  const lot: CollectionLot = {
-    condition: row.condition,
-    finish: row.finish,
-    id: row.id,
-    language: row.language,
-    printingId: row.printingId,
-    quantity: row.quantity,
-  };
-  if (row.acquiredAt !== null) lot.acquiredAt = row.acquiredAt;
-  if (row.locationId !== null) lot.locationId = row.locationId;
-  if (row.notes !== null) lot.notes = row.notes;
-  if (row.unitCostAmountMinor !== null && row.unitCostCurrency !== null) {
-    lot.unitCost = { amountMinor: row.unitCostAmountMinor, currency: row.unitCostCurrency };
-  }
-  return lot;
 }

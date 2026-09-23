@@ -1,14 +1,21 @@
-import { TagTemplateSchema, type CardTag, type TagAssignment } from "@mooligan/domain/tags";
-import type { DeckEntry } from "@mooligan/domain/decks";
 import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
-import type { tables } from "../schema.ts";
+import { Schema } from "effect";
+
+import type { DeckEntry } from "../deck-contract.ts";
+import { TagTemplateSchema, type CardTag, type TagAssignment } from "../tag-contract.ts";
+import type { tagTables } from "../tags.ts";
+
+const decodeTagTemplate = Schema.decodeSync(
+  Schema.Struct({
+    ...TagTemplateSchema.fields,
+    categories: Schema.parseJson(TagTemplateSchema.fields.categories),
+  }),
+);
 
 export function materializeTagTemplates(
-  rows: readonly Omit<typeof tables.tagTemplates.Type, "nameKey">[],
+  rows: readonly Omit<typeof tagTables.tagTemplates.Type, "nameKey">[],
 ) {
-  return rows.map(({ deleted: _deleted, categories, ...template }) =>
-    TagTemplateSchema.parse({ ...template, categories: JSON.parse(categories) }),
-  );
+  return rows.map(({ deleted: _deleted, ...template }) => decodeTagTemplate(template));
 }
 
 export function tagsForDeck(tags: readonly CardTag[], deckId: string, includeGlobal = true) {

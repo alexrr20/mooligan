@@ -8,7 +8,8 @@ import { test } from "node:test";
 import { makeInMemoryAdapter } from "@livestore/adapter-web";
 import { createStorePromise } from "@livestore/livestore";
 import type { SpoilerVisibilitySnapshot } from "@mooligan/domain/spoilers";
-import { collectionLotsQuery, workspaceSchema } from "@mooligan/workspace/schema";
+import { collectionLotsQuery } from "@mooligan/workspace/collection";
+import { workspaceSchema } from "@mooligan/workspace/schema";
 
 import { createCollectionProjection } from "@mooligan/catalog/collection-projection";
 import { createCollectionQuery } from "@mooligan/catalog/collection-query";
@@ -156,28 +157,40 @@ void test("collection reads separate visible, protected, and unavailable Holding
     const projection = createCollectionProjection(database);
     projection.replace([
       {
+        acquiredAt: null,
         condition: "near-mint",
         finish: "nonfoil",
         id: "visible-lot",
         language: "en",
+        locationId: null,
+        notes: null,
         printingId: "visible-printing",
         quantity: 2,
+        unitCost: null,
       },
       {
+        acquiredAt: null,
         condition: "near-mint",
         finish: "foil",
         id: "future-lot",
         language: "ja",
+        locationId: null,
+        notes: null,
         printingId: "future-printing",
         quantity: 3,
+        unitCost: null,
       },
       {
+        acquiredAt: null,
         condition: "damaged",
         finish: "etched",
         id: "missing-lot",
         language: "de",
+        locationId: null,
+        notes: null,
         printingId: "missing-printing",
         quantity: 4,
+        unitCost: null,
       },
     ]);
 

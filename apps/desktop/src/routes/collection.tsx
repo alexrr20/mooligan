@@ -1,9 +1,11 @@
-import { FinishSchema } from "@mooligan/domain/catalog";
+import { FinishSchema, finishLabels, finishes } from "@mooligan/domain/catalog";
 import {
   CardConditionSchema,
   CardLanguageSchema,
   CollectionSortSchema,
+  cardConditionLabels,
   cardConditions,
+  cardLanguageLabels,
   cardLanguages,
 } from "@mooligan/domain/collection";
 import * as stylex from "@stylexjs/stylex";
@@ -135,10 +137,7 @@ function CollectionPage() {
               label="Finish"
               options={[
                 { label: "All finishes", value: null },
-                { label: "Nonfoil", value: "nonfoil" },
-                { label: "Foil", value: "foil" },
-                { label: "Etched", value: "etched" },
-                { label: "Glossy", value: "glossy" },
+                ...finishes.map((value) => ({ label: finishLabels[value], value })),
               ]}
               value={search.finish ?? ""}
               onChange={(finish) => {
@@ -150,7 +149,7 @@ function CollectionPage() {
               label="Language"
               options={[
                 { label: "All languages", value: null },
-                ...cardLanguages.map(({ label, value }) => ({ label, value })),
+                ...cardLanguages.map((value) => ({ label: cardLanguageLabels[value], value })),
               ]}
               value={search.language ?? ""}
               onChange={(language) => {
@@ -162,7 +161,7 @@ function CollectionPage() {
               label="Condition"
               options={[
                 { label: "All conditions", value: null },
-                ...cardConditions.map(({ label, value }) => ({ label, value })),
+                ...cardConditions.map((value) => ({ label: cardConditionLabels[value], value })),
               ]}
               value={search.condition ?? ""}
               onChange={(condition) => {

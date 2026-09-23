@@ -1,20 +1,20 @@
 import { Events, queryDb, Schema, State } from "@livestore/livestore";
 
-import { emptyProfile, profileSettingsSchema, type ProfileSettings } from "./profile-contract.ts";
+import { emptyProfile, ProfileSettingsSchema, type ProfileSettings } from "./profile-contract.ts";
 
 export const profileTables = {
   profile: State.SQLite.table({
     name: "profile",
     schema: Schema.Struct({
       id: Schema.Literal("profile").pipe(State.SQLite.withPrimaryKey),
-      bannerPrintingId: profileSettingsSchema.fields.bannerPrintingId,
+      bannerPrintingId: ProfileSettingsSchema.fields.bannerPrintingId,
       featuredPrintingIds: Schema.String,
     }),
   }),
 };
 
 export const profileEvents = {
-  profileChanged: Events.synced({ name: "v1.ProfileChanged", schema: profileSettingsSchema }),
+  profileChanged: Events.synced({ name: "v1.ProfileChanged", schema: ProfileSettingsSchema }),
 };
 
 export const profileMaterializers = {
@@ -34,7 +34,7 @@ export const profileQuery = queryDb(profileTables.profile.select().first(), {
 });
 
 const decodeFeaturedPrintings = Schema.decodeUnknownSync(
-  Schema.parseJson(profileSettingsSchema.fields.featuredPrintingIds),
+  Schema.parseJson(ProfileSettingsSchema.fields.featuredPrintingIds),
 );
 
 export function readProfile(row: typeof profileTables.profile.Type | undefined): ProfileSettings {

@@ -1,5 +1,5 @@
 import type { CatalogSnapshot, Color } from "@mooligan/domain/catalog";
-import type { DeckCost, DeckCostRequest } from "@mooligan/domain/deck-cost";
+import type { DeckCost } from "@mooligan/domain/deck-cost";
 import type { ExchangeRates, PriceStatus, PrintingPrices } from "@mooligan/domain/market";
 import type {
   CatalogListPage,
@@ -11,18 +11,23 @@ import type {
   CollectionListResult,
   CollectionListRequest,
   CollectionPrintingValidationRequest,
-  CollectionProjectionDelta,
   CollectionProjectionResult,
-  CollectionProjectionSnapshot,
 } from "@mooligan/domain/collection";
+import type {
+  CollectionProjectionDelta,
+  CollectionProjectionSnapshot,
+  DeckCostRequest,
+} from "@mooligan/workspace/transport";
 import {
   CollectionListResultSchema,
   CollectionPrintingValidationRequestSchema,
   CollectionProjectionConnectionSchema,
-  CollectionProjectionDeltaSchema,
   CollectionProjectionResultSchema,
-  CollectionProjectionSnapshotSchema,
 } from "@mooligan/domain/collection";
+import {
+  CollectionProjectionDeltaSchema,
+  CollectionProjectionSnapshotSchema,
+} from "@mooligan/workspace/transport";
 import type {
   CatalogPrintingResult,
   CatalogReleaseSummary,

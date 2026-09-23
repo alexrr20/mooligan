@@ -1,36 +1,22 @@
+import { FinishSchema, type Finish } from "@mooligan/domain/catalog";
 import {
   CardConditionSchema,
   CardLanguageSchema,
   CollectionSortSchema,
+  type CardCondition,
+  type CardLanguage,
+  type CollectionSort,
 } from "@mooligan/domain/collection";
-import { FinishSchema } from "@mooligan/domain/catalog";
 import * as z from "zod";
 import type { JSONType } from "zod";
 
 export type CollectionSearchState = {
-  condition?: "near-mint" | "lightly-played" | "moderately-played" | "heavily-played" | "damaged";
-  finish?: "nonfoil" | "foil" | "etched" | "glossy";
-  language?:
-    | "en"
-    | "es"
-    | "fr"
-    | "de"
-    | "it"
-    | "pt"
-    | "ja"
-    | "ko"
-    | "ru"
-    | "zhs"
-    | "zht"
-    | "he"
-    | "la"
-    | "grc"
-    | "ar"
-    | "sa"
-    | "ph";
+  condition?: CardCondition;
+  finish?: Finish;
+  language?: CardLanguage;
   query?: string;
   set?: string;
-  sort?: "set" | "quantity";
+  sort?: Exclude<CollectionSort, "name">;
 };
 
 type CollectionSearchInput = CollectionSearchState | JSONType;

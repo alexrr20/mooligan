@@ -8,7 +8,9 @@ import cardsphere from "../../assets/markets/cardsphere.svg";
 import manapool from "../../assets/markets/manapool.svg";
 import tcgplayer from "../../assets/markets/tcgplayer.ico";
 import { lowestRetailPrice } from "@mooligan/catalog/lowest-prices";
-import { priceProviders, usePriceProviders } from "./use-price-providers";
+import { priceProviderLabels, priceProviders } from "@mooligan/domain/market";
+
+import { usePriceProviders } from "./use-price-providers";
 
 const marketLogos = { cardkingdom, cardmarket, cardsphere, manapool, tcgplayer };
 
@@ -42,7 +44,7 @@ export function PrintingPrice({ printingId, finish }: { printingId: string; fini
     rates.data,
     finish,
   );
-  const market = lowest ? priceProviders.find(({ id }) => id === lowest.price.market) : undefined;
+  const market = priceProviders.find((provider) => provider === lowest?.price.market);
   const converted = lowest && lowest.price.money.currency !== currency;
   const stale =
     lowest &&
@@ -63,7 +65,7 @@ export function PrintingPrice({ printingId, finish }: { printingId: string; fini
       ) : (
         <span
           {...stylex.props(styles.value)}
-          title={`${market?.name} · ${lowest.price.finish} · ${lowest.price.priceDate} · Retail reference per copy${converted ? ` · Converted from ${lowest.price.money.currency} using ECB rates dated ${lowest.rateDate}` : ""}`}
+          title={`${market ? priceProviderLabels[market] : lowest.price.market} · ${lowest.price.finish} · ${lowest.price.priceDate} · Retail reference per copy${converted ? ` · Converted from ${lowest.price.money.currency} using ECB rates dated ${lowest.rateDate}` : ""}`}
         >
           <span>
             {!finish ? "From " : ""}
@@ -76,9 +78,9 @@ export function PrintingPrice({ printingId, finish }: { printingId: string; fini
           </span>
           {market ? (
             <img
-              src={marketLogos[market.id]}
-              alt={market.name}
-              title={market.name}
+              src={marketLogos[market]}
+              alt={priceProviderLabels[market]}
+              title={priceProviderLabels[market]}
               width={16}
               height={16}
               {...stylex.props(styles.logo)}

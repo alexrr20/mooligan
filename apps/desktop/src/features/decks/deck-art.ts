@@ -1,5 +1,5 @@
 import type { CatalogImageDescriptor } from "@mooligan/domain/catalog-detail";
-import type { Deck } from "@mooligan/domain/decks";
+import type { Deck } from "@mooligan/workspace/deck-contract";
 import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
 
 export function commanderArt(

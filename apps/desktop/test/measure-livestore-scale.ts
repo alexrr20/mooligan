@@ -4,12 +4,9 @@ import { makeInMemoryAdapter } from "@livestore/adapter-web";
 import { SyncBackend } from "@livestore/common";
 import { createStorePromise, StoreInternalsSymbol, type Store } from "@livestore/livestore";
 import { SyncMessage } from "@livestore/sync-cf/common";
-import {
-  collectionLotsQuery,
-  events,
-  spoilerDecisionsQuery,
-  workspaceSchema,
-} from "@mooligan/workspace/schema";
+import { collectionLotsQuery } from "@mooligan/workspace/collection";
+import { events, workspaceSchema } from "@mooligan/workspace/schema";
+import { spoilerDecisionsQuery } from "@mooligan/workspace/spoilers";
 import type { WorkspaceBackup } from "@mooligan/workspace/backup";
 import { Effect, Option, Schema, Stream, SubscriptionRef } from "effect";
 
@@ -131,12 +128,16 @@ process.stdout.write(`${JSON.stringify(measurements, null, 2)}\n`);
 function largeBackup(): WorkspaceBackup {
   return {
     collectionLots: Array.from({ length: collectionLotCount }, (_, index) => ({
+      acquiredAt: null,
       condition: "near-mint" as const,
       finish: "nonfoil" as const,
       id: `lot-${index}`,
       language: "en" as const,
+      locationId: null,
+      notes: null,
       printingId: `printing-${index}`,
       quantity: 1,
+      unitCost: null,
     })),
     decks: [],
     format: "mooligan-workspace",
@@ -155,7 +156,7 @@ function largeBackup(): WorkspaceBackup {
     cardTags: [],
     tagAssignments: [],
     tagTemplates: [],
-    version: 8,
+    version: 9,
   };
 }
 

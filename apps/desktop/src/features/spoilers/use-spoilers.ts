@@ -1,5 +1,5 @@
 import type { SpoilerPolicy, SpoilerState } from "@mooligan/domain/spoilers";
-import { spoilerDecisionsQuery, spoilerSettingsQuery } from "@mooligan/workspace/schema";
+import { spoilerDecisionsQuery, spoilerSettingsQuery } from "@mooligan/workspace/spoilers";
 import { useMutation } from "@tanstack/react-query";
 
 import { useWorkspaceLiveStore } from "../workspace/workspace-store-context.tsx";

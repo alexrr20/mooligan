@@ -1,16 +1,13 @@
+import { events } from "@mooligan/workspace/schema";
 import {
-  events,
   priceCurrencyQuery,
-  readPriceCurrency,
-  type PriceCurrency,
   priceProviderPreferencesQuery,
   readEnabledPriceProviders,
-  type PriceProvider,
-} from "@mooligan/workspace/schema";
+  readPriceCurrency,
+} from "@mooligan/workspace/price-preferences";
+import type { PriceCurrency, PriceProvider } from "@mooligan/domain/market";
 
 import { useWorkspaceLiveStore } from "../workspace/workspace-store-context";
-
-export { priceProviders } from "@mooligan/workspace/schema";
 
 export function usePriceProviders() {
   const store = useWorkspaceLiveStore();

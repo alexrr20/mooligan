@@ -4,16 +4,14 @@ import { makeInMemoryAdapter } from "@livestore/adapter-web";
 import { createStorePromise, StoreInternalsSymbol } from "@livestore/livestore";
 import { Effect, Schema } from "effect";
 import { workspaceBackupSchema } from "@mooligan/workspace/backup";
+import { events, workspaceSchema, workspaceSyncedEventSchema } from "@mooligan/workspace/schema";
 import {
-  events,
   priceCurrencyQuery,
   readPriceCurrency,
-  priceProviders,
   priceProviderPreferencesQuery,
   readEnabledPriceProviders,
-  workspaceSchema,
-  workspaceSyncedEventSchema,
-} from "@mooligan/workspace/schema";
+} from "@mooligan/workspace/price-preferences";
+import { priceProviders } from "@mooligan/domain/market";
 import {
   createWorkspaceBackup,
   restoreWorkspaceBackup,
@@ -33,9 +31,9 @@ void test("price providers belong to each Workspace and survive backup restore a
   try {
     assert.deepEqual(
       readEnabledPriceProviders(source.query(priceProviderPreferencesQuery)),
-      priceProviders.map(({ id }) => id),
+      priceProviders,
     );
-    for (const { id: provider } of priceProviders) {
+    for (const provider of priceProviders) {
       source.commit(events.priceProviderChanged({ provider, enabled: provider === "cardmarket" }));
     }
     assert.deepEqual(readEnabledPriceProviders(source.query(priceProviderPreferencesQuery)), [

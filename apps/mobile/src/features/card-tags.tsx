@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Text, View } from "react-native";
-import { starterCategories, tagColors, type CardTag, type TagStyle } from "@mooligan/domain/tags";
+import { starterCategories, type CardTag, type TagStyle } from "@mooligan/workspace/tag-contract";
+import { tagColorStyles, tagColors } from "@mooligan/domain/tags";
 import { tagsForDeck } from "@mooligan/workspace/client/tag-state";
 import { Button, Choice, Copy, Field, Panel, Row, confirmRemoval } from "@/components/ui";
 import { useWorkspace } from "@/workspace/provider";
@@ -16,7 +17,7 @@ export function CardTagBadges({ tags }: { tags: readonly CardTag[] }) {
           style={{
             color: palette.text,
             borderLeftWidth: 3,
-            borderLeftColor: tagColors.find(({ value }) => value === tag.color)!.hex,
+            borderLeftColor: tagColorStyles[tag.color].hex,
             paddingHorizontal: 8,
             paddingVertical: 4,
             backgroundColor: palette.background,
@@ -261,7 +262,12 @@ function TagDefinitionForm({
   return (
     <Panel>
       <Field label="Tag name" value={name} onChangeText={setName} maxLength={80} />
-      <Choice label="Color" value={color} onChange={setColor} options={tagColors} />
+      <Choice
+        label="Color"
+        value={color}
+        onChange={setColor}
+        options={tagColors.map((value) => ({ value, label: tagColorStyles[value].label }))}
+      />
       <Button
         label={tag ? "Save tag" : "Create tag"}
         disabled={!name.trim()}

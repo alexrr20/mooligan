@@ -4,15 +4,21 @@ import { DatabaseSync } from "node:sqlite";
 import { ReadableStream as TransferableReadableStream } from "node:stream/web";
 import { Worker } from "node:worker_threads";
 
-import { CatalogSnapshotSchema, type CatalogSnapshot, type Color } from "@mooligan/domain/catalog";
-import { DeckCostRequestSchema, type DeckCost } from "@mooligan/domain/deck-cost";
+import {
+  CatalogSnapshotSchema,
+  type CatalogSnapshot,
+  type Color,
+  type Finish,
+} from "@mooligan/domain/catalog";
+import { DeckCostRequestSchema } from "@mooligan/workspace/transport";
+import { type DeckCost } from "@mooligan/domain/deck-cost";
 import type { CatalogImageDescriptor } from "@mooligan/domain/catalog-detail";
 import type { CatalogListPage, CatalogUpcomingPrintingPage } from "@mooligan/domain/catalog-search";
 import {
   CollectionPrintingValidationRequestSchema,
   type CollectionListPage,
-  type CollectionLot,
 } from "@mooligan/domain/collection";
+import type { CollectionLot } from "@mooligan/workspace/collection-contract";
 import {
   CatalogReleaseSchema,
   ScryfallSetListSchema,
@@ -796,8 +802,8 @@ function sendCollectionProjectionOperation(operation: CollectionProjectionWorker
 function assertPrintingCanUseFinish(
   result: CatalogPrintingResult | null,
   request: {
-    existingFinish?: "etched" | "foil" | "glossy" | "nonfoil";
-    finish: "etched" | "foil" | "glossy" | "nonfoil";
+    existingFinish?: Finish;
+    finish: Finish;
   },
 ) {
   if (!result) {

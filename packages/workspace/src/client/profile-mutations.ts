@@ -1,12 +1,9 @@
 import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
 import type { Store } from "@livestore/livestore";
-import {
-  collectionLotsQuery,
-  events,
-  profileQuery,
-  readProfile,
-  workspaceSchema,
-} from "@mooligan/workspace/schema";
+
+import { collectionLotsQuery } from "../collection.ts";
+import { profileQuery, readProfile } from "../profile.ts";
+import { events, workspaceSchema } from "../schema.ts";
 
 type WorkspaceStore = Store<typeof workspaceSchema>;
 

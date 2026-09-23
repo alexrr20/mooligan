@@ -1,7 +1,7 @@
 import {
   CollectionProjectionDeltaSchema,
   CollectionProjectionSnapshotSchema,
-} from "@mooligan/domain/collection";
+} from "@mooligan/workspace/transport";
 import { ipcMain } from "electron";
 import * as z from "zod";
 

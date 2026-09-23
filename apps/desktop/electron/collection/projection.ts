@@ -1,12 +1,14 @@
 import { randomUUID } from "node:crypto";
 
+import type { CollectionLot } from "@mooligan/workspace/collection-contract";
 import type {
-  CollectionLot,
   CollectionProjectionConnection,
-  CollectionProjectionDelta,
   CollectionProjectionResult,
-  CollectionProjectionSnapshot,
 } from "@mooligan/domain/collection";
+import type {
+  CollectionProjectionDelta,
+  CollectionProjectionSnapshot,
+} from "@mooligan/workspace/transport";
 
 type ProjectionSession = {
   id: string;

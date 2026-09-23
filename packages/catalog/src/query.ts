@@ -1,7 +1,7 @@
 import type { CatalogDatabase as DatabaseSync } from "./database.ts";
 
 import { ColorSchema } from "@mooligan/domain/catalog";
-import { DeckCostRequestSchema, DeckCostSchema } from "@mooligan/domain/deck-cost";
+import { DeckCostSchema } from "@mooligan/domain/deck-cost";
 import { CatalogImageDescriptorSchema } from "@mooligan/domain/catalog-detail";
 import {
   CatalogCardSummarySchema,
@@ -39,6 +39,7 @@ import {
   effectiveReleaseDateSql,
 } from "@mooligan/catalog/visibility";
 import { compileScryfallQuery } from "@mooligan/catalog/scryfall-query";
+import { DeckCostRequestSchema } from "@mooligan/workspace/transport";
 
 const catalogPrintingIdSchema = z.string().min(1).max(128);
 

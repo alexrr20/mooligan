@@ -5,21 +5,16 @@ import { makeInMemoryAdapter } from "@livestore/adapter-web";
 import { createStorePromise } from "@livestore/livestore";
 import { Schema } from "effect";
 import type { WorkspaceBackup } from "@mooligan/workspace/backup";
-import {
-  collectionLotsQuery,
-  events,
-  spoilerDecisionsQuery,
-  spoilerSettingsQuery,
-  workspaceSchema,
-  workspaceSyncedEventSchema,
-} from "@mooligan/workspace/schema";
+import { collectionLotsQuery } from "@mooligan/workspace/collection";
+import { events, workspaceSchema, workspaceSyncedEventSchema } from "@mooligan/workspace/schema";
+import { spoilerDecisionsQuery, spoilerSettingsQuery } from "@mooligan/workspace/spoilers";
 
 import {
   createWorkspaceBackup,
   restoreWorkspaceBackup,
 } from "@mooligan/workspace/client/workspace-backup";
 
-void test("backup v8 reads collection, deck, and spoiler state from LiveStore", async () => {
+void test("backup v9 reads collection, deck, and spoiler state from LiveStore", async () => {
   const store = await openStore("backup-source");
   try {
     store.commit(events.spoilerPolicyChanged({ policy: "show" }));
@@ -57,16 +52,16 @@ void test("backup v8 reads collection, deck, and spoiler state from LiveStore", 
     assert.deepEqual(backup, {
       collectionLots: [
         {
-          acquiredAt: undefined,
+          acquiredAt: null,
           condition: "near-mint",
           finish: "foil",
           id: "lot-one",
           language: "en",
-          locationId: undefined,
-          notes: undefined,
+          locationId: null,
+          notes: null,
           printingId: "printing-one",
           quantity: 2,
-          unitCost: undefined,
+          unitCost: null,
         },
       ],
       decks: [],
@@ -82,7 +77,7 @@ void test("backup v8 reads collection, deck, and spoiler state from LiveStore", 
       cardTags: [],
       tagAssignments: [],
       tagTemplates: [],
-      version: 8,
+      version: 9,
     });
     assert.equal(Object.hasOwn(backup, "clientId"), false);
     assert.equal(Object.hasOwn(backup, "motion"), false);
@@ -91,7 +86,7 @@ void test("backup v8 reads collection, deck, and spoiler state from LiveStore", 
   }
 });
 
-void test("backup v8 restore commits and verifies normal LiveStore events", async () => {
+void test("backup v9 restore commits and verifies normal LiveStore events", async () => {
   const store = await openStore("backup-target");
   try {
     await restoreWorkspaceBackup(store, backupFixture);
@@ -192,12 +187,16 @@ void test("restore groups assignments by tag into bounded events and keeps 500-e
 const backupFixture: WorkspaceBackup = {
   collectionLots: [
     {
+      acquiredAt: null,
       condition: "near-mint",
       finish: "nonfoil",
       id: "lot-one",
       language: "en",
+      locationId: null,
+      notes: null,
       printingId: "printing-one",
       quantity: 4,
+      unitCost: null,
     },
   ],
   decks: [],
@@ -216,7 +215,7 @@ const backupFixture: WorkspaceBackup = {
   cardTags: [],
   tagAssignments: [],
   tagTemplates: [],
-  version: 8,
+  version: 9,
 };
 
 function openStore(storeId: string) {

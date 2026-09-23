@@ -1,9 +1,10 @@
 import { Menu } from "@base-ui/react/menu";
 import { PreviewCard } from "@base-ui/react/preview-card";
 import type { CatalogImageDescriptor } from "@mooligan/domain/catalog-detail";
-import type { Deck, DeckEntry } from "@mooligan/domain/decks";
+import type { Deck, DeckEntry } from "@mooligan/workspace/deck-contract";
 import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
-import { tagColors, type CardTag } from "@mooligan/domain/tags";
+import { tagColorStyles } from "@mooligan/domain/tags";
+import { type CardTag } from "@mooligan/workspace/tag-contract";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
@@ -150,7 +151,7 @@ export function DeckCardItem({
                   <span
                     key={tag.id}
                     style={{
-                      backgroundColor: tagColors.find(({ value }) => value === tag.color)!.hex,
+                      backgroundColor: tagColorStyles[tag.color].hex,
                     }}
                   />
                 ))}

@@ -1,4 +1,4 @@
-import type { Deck, DeckEntry } from "@mooligan/domain/decks";
+import type { Deck, DeckEntry } from "@mooligan/workspace/deck-contract";
 import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
 import * as stylex from "@stylexjs/stylex";
 import { Menu } from "@base-ui/react/menu";

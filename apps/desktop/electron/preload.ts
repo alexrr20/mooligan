@@ -1,7 +1,8 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import { SpoilerTargetIdSchema } from "@mooligan/domain/spoilers";
 import { CatalogListPageSchema } from "@mooligan/domain/catalog-search";
-import { DeckCostRequestSchema, DeckCostSchema } from "@mooligan/domain/deck-cost";
+import { DeckCostRequestSchema } from "@mooligan/workspace/transport";
+import { DeckCostSchema } from "@mooligan/domain/deck-cost";
 import {
   ExchangeRatesSchema,
   PriceStatusSchema,

@@ -1,5 +1,6 @@
 import { PrintingPrice } from "../prices/printing-price";
-import { collectionLotsQuery, profileQuery, readProfile } from "@mooligan/workspace/schema";
+import { collectionLotsQuery } from "@mooligan/workspace/collection";
+import { profileQuery, readProfile } from "@mooligan/workspace/profile";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";

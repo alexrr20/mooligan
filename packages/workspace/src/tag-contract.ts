@@ -1,30 +1,54 @@
+import { tagColors } from "@mooligan/domain/tags";
 import { Schema } from "effect";
 
-const Identifier = Schema.String.pipe(Schema.minLength(1), Schema.maxLength(128));
-const Name = Schema.String.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(80),
-  Schema.filter((name) => name.trim() === name && name.length > 0),
-);
-export const tagStyleSchema = Schema.Struct({
-  name: Name,
-  color: Schema.Literal("sage", "blue", "rose", "amber", "violet", "slate"),
+import { IdentifierSchema, trimmedTextSchema } from "./primitives.ts";
+
+const TagNameSchema = trimmedTextSchema(80);
+
+/** Tag names are stored trimmed, so one case-insensitive key decides uniqueness. */
+export function tagNameKey(name: string) {
+  return name.toLowerCase();
+}
+
+export const TagStyleSchema = Schema.Struct({
+  name: TagNameSchema,
+  color: Schema.Literal(...tagColors),
 });
-export const cardTagSchema = Schema.Struct({
-  ...tagStyleSchema.fields,
-  id: Identifier,
-  deckId: Schema.NullOr(Identifier),
+export type TagStyle = typeof TagStyleSchema.Type;
+
+export const CardTagSchema = Schema.Struct({
+  ...TagStyleSchema.fields,
+  id: IdentifierSchema,
+  deckId: Schema.NullOr(IdentifierSchema),
 });
-export const tagAssignmentSchema = Schema.Struct({ tagId: Identifier, cardId: Identifier });
-export const tagTemplateSchema = Schema.Struct({
-  id: Identifier,
-  name: Name,
-  categories: Schema.Array(tagStyleSchema).pipe(
+export type CardTag = typeof CardTagSchema.Type;
+
+export const TagAssignmentSchema = Schema.Struct({
+  tagId: IdentifierSchema,
+  cardId: IdentifierSchema,
+});
+export type TagAssignment = typeof TagAssignmentSchema.Type;
+
+export const TagTemplateSchema = Schema.Struct({
+  id: IdentifierSchema,
+  name: TagNameSchema,
+  categories: Schema.Array(TagStyleSchema).pipe(
     Schema.minItems(1),
     Schema.maxItems(100),
     Schema.filter(
       (categories) =>
-        new Set(categories.map(({ name }) => name.toLowerCase())).size === categories.length,
+        new Set(categories.map(({ name }) => tagNameKey(name))).size === categories.length,
+      { message: () => "Category names must be unique." },
     ),
   ),
 });
+export type TagTemplate = typeof TagTemplateSchema.Type;
+
+export const starterCategories: readonly TagStyle[] = [
+  { name: "Ramp", color: "sage" },
+  { name: "Card draw", color: "blue" },
+  { name: "Removal", color: "rose" },
+  { name: "Board wipes", color: "amber" },
+  { name: "Protection", color: "violet" },
+  { name: "Finishers", color: "slate" },
+];

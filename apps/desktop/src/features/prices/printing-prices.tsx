@@ -1,13 +1,12 @@
 import * as z from "zod";
-import type { MarketPrice } from "@mooligan/domain/market";
+import { finishLabels } from "@mooligan/domain/catalog";
+import { priceProviderLabels, type MarketPrice, type PriceProvider } from "@mooligan/domain/market";
 import * as stylex from "@stylexjs/stylex";
 import { useQuery } from "@tanstack/react-query";
 
 import { PriceUpdateControl } from "./price-updates";
-import { priceProviders, usePriceProviders } from "./use-price-providers";
+import { usePriceProviders } from "./use-price-providers";
 import { Link } from "@tanstack/react-router";
-
-const finishNames = { nonfoil: "Nonfoil", foil: "Foil", etched: "Etched" };
 
 export function PrintingPrices({ printingId }: { printingId: string }) {
   const { enabledProviders } = usePriceProviders();
@@ -18,12 +17,18 @@ export function PrintingPrices({ printingId }: { printingId: string }) {
   });
   const groups = new Map<
     string,
-    { market: string; finish: MarketPrice["finish"]; retail?: MarketPrice; buylist?: MarketPrice }
+    {
+      market: PriceProvider;
+      finish: MarketPrice["finish"];
+      retail?: MarketPrice;
+      buylist?: MarketPrice;
+    }
   >();
   for (const price of result.data?.prices ?? []) {
-    if (!enabledProviders.some((provider) => provider === price.market)) continue;
-    const key = `${price.market}:${price.finish}:${price.money.currency}`;
-    const group = groups.get(key) ?? { market: price.market, finish: price.finish };
+    const market = enabledProviders.find((provider) => provider === price.market);
+    if (!market) continue;
+    const key = `${market}:${price.finish}:${price.money.currency}`;
+    const group = groups.get(key) ?? { market, finish: price.finish };
     group[price.kind] = price;
     groups.set(key, group);
   }
@@ -80,10 +85,9 @@ export function PrintingPrices({ printingId }: { printingId: string }) {
               {[...groups].map(([key, group]) => (
                 <tr key={key}>
                   <th {...stylex.props(styles.cell, styles.market)} scope="row">
-                    {priceProviders.find((provider) => provider.id === group.market)?.name ??
-                      group.market}
+                    {priceProviderLabels[group.market]}
                   </th>
-                  <td {...stylex.props(styles.cell)}>{finishNames[group.finish]}</td>
+                  <td {...stylex.props(styles.cell)}>{finishLabels[group.finish]}</td>
                   <td {...stylex.props(styles.cell)}>
                     <PriceValue price={group.retail} />
                   </td>

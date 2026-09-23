@@ -1,6 +1,6 @@
 import { PrintingPrice } from "../prices/printing-price";
 import type { CatalogImageDescriptor } from "@mooligan/domain/catalog-detail";
-import type { ProfileSettings } from "@mooligan/workspace/schema";
+import type { ProfileSettings } from "@mooligan/workspace/profile-contract";
 import * as stylex from "@stylexjs/stylex";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";

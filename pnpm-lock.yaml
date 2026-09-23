@@ -729,6 +729,9 @@ importers:
       '@mooligan/domain':
         specifier: workspace:*
         version: link:../domain
+      '@mooligan/workspace':
+        specifier: workspace:*
+        version: link:../workspace
       zod:
         specifier: 'catalog:'
         version: 4.4.3

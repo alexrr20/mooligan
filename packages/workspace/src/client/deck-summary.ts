@@ -1,5 +1,7 @@
-import { deckSections, type DeckEntry } from "@mooligan/domain/decks";
+import { deckSectionLabels, deckSections } from "@mooligan/domain/decks";
 import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
+
+import type { DeckEntry } from "../deck-contract.ts";
 
 export function summarizeDeck(
   entries: readonly DeckEntry[],
@@ -78,11 +80,12 @@ export function summarizeDeck(
   const total = [...required.values()].reduce((sum, count) => sum + count, 0);
   return {
     sections: deckSections
-      .filter(({ value }) => value !== "commander")
-      .map((section) => {
-        const sectionEntries = entries.filter((entry) => displaySection(entry) === section.value);
+      .filter((value) => value !== "commander")
+      .map((value) => {
+        const sectionEntries = entries.filter((entry) => displaySection(entry) === value);
         return {
-          ...section,
+          value,
+          label: deckSectionLabels[value],
           entries: sectionEntries,
           quantity: sectionEntries.reduce((sum, entry) => sum + entry.quantity, 0),
         };
