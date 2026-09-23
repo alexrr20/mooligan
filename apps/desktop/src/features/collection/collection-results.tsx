@@ -1,5 +1,10 @@
 import { PrintingPrice } from "../prices/printing-price";
-import { cardConditions, cardLanguages, type CollectionHolding } from "@mooligan/domain/collection";
+import { finishLabels } from "@mooligan/domain/catalog";
+import {
+  cardConditionLabels,
+  cardLanguageLabels,
+  type CollectionHolding,
+} from "@mooligan/domain/collection";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -8,7 +13,7 @@ import { Button } from "../../components/ui/button";
 import { colors } from "../../styles/tokens.stylex.js";
 import { PrintingImage } from "../cards/printing-image";
 import { withCollectionOrigin, type CollectionOrigin } from "./collection-origin";
-import { cleanCollectionError, CollectionFormDialog, finishLabel } from "./collection-editor";
+import { cleanCollectionError, CollectionFormDialog } from "./collection-editor";
 import { useCollectionMutations } from "./use-collection-mutations";
 
 type CollectionResultsProps = {
@@ -75,9 +80,9 @@ export function CollectionResults({ grid, holdings, origin }: CollectionResultsP
               <HoldingIdentity holding={holding} grid={grid} origin={origin} />
               {holding.status !== "protected" ? (
                 <div {...stylex.props(styles.properties, grid && styles.tileProperties)}>
-                  <span>{finishLabel(holding.finish)}</span>
-                  <span>· {languageLabel(holding.language)}</span>
-                  <span>· {conditionLabel(holding.condition)}</span>
+                  <span>{finishLabels[holding.finish]}</span>
+                  <span>· {cardLanguageLabels[holding.language]}</span>
+                  <span>· {cardConditionLabels[holding.condition]}</span>
                 </div>
               ) : (
                 <div {...stylex.props(styles.properties, grid && styles.tileProperties)}>
@@ -265,19 +270,11 @@ function HoldingIdentity({
 }
 
 function propertySummary(holding: Exclude<CollectionHolding, { status: "protected" }>) {
-  return `${finishLabel(holding.finish)}, ${languageLabel(holding.language)}, ${conditionLabel(holding.condition)}`;
+  return `${finishLabels[holding.finish]}, ${cardLanguageLabels[holding.language]}, ${cardConditionLabels[holding.condition]}`;
 }
 
 function isEditableHolding(holding: CollectionHolding): holding is EditableHolding {
   return holding.status !== "protected" && holding.editableLotId !== null;
-}
-
-function languageLabel(value: string) {
-  return cardLanguages.find((language) => language.value === value)?.label ?? value.toUpperCase();
-}
-
-function conditionLabel(value: string) {
-  return cardConditions.find((condition) => condition.value === value)?.label ?? value;
 }
 
 const styles = stylex.create({

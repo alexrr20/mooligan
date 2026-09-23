@@ -1,4 +1,8 @@
 import type { Store } from "@livestore/livestore";
+import { Schema } from "effect";
+
+import { decksQuery } from "../decks.ts";
+import { events, workspaceSchema } from "../schema.ts";
 import {
   CardTagSchema,
   TagAssignmentSchema,
@@ -6,16 +10,15 @@ import {
   TagTemplateSchema,
   tagNameKey,
   type TagStyle,
-} from "@mooligan/domain/tags";
-import {
-  cardTagsQuery,
-  tagAssignmentsQuery,
-  tagTemplatesQuery,
-  decksQuery,
-  events,
-  workspaceSchema,
-} from "../schema.ts";
+} from "../tag-contract.ts";
+import { cardTagsQuery, tagAssignmentsQuery, tagTemplatesQuery } from "../tags.ts";
 import { materializeTagTemplates } from "./tag-state.ts";
+
+const decodeCardTag = Schema.decodeSync(CardTagSchema);
+const decodeTagChange = Schema.decodeSync(Schema.partialWith(TagStyleSchema, { exact: true }));
+const decodeTagAssignment = Schema.decodeSync(TagAssignmentSchema);
+const decodeTagTemplate = Schema.decodeSync(TagTemplateSchema);
+const decodeCategories = Schema.decodeSync(TagTemplateSchema.fields.categories);
 
 export function createTagMutations(store: Store<typeof workspaceSchema>) {
   function requireDeck(deckId: string | null) {
@@ -43,14 +46,14 @@ export function createTagMutations(store: Store<typeof workspaceSchema>) {
   }
   function create(deckId: string | null, style: TagStyle) {
     requireDeck(deckId);
-    const tag = CardTagSchema.parse({ ...style, deckId, id: crypto.randomUUID() });
+    const tag = decodeCardTag({ ...normalizeStyle(style), deckId, id: crypto.randomUUID() });
     assertUnique(tag.name, deckId);
     store.commit(events.cardTagCreated(tag));
     return tag.id;
   }
   function applyCategories(deckId: string, categories: readonly TagStyle[]) {
     requireDeck(deckId);
-    const parsed = TagTemplateSchema.pick({ categories: true }).parse({ categories }).categories;
+    const parsed = decodeCategories(categories.map(normalizeStyle));
     const names = new Set(
       store
         .query(cardTagsQuery)
@@ -71,7 +74,7 @@ export function createTagMutations(store: Store<typeof workspaceSchema>) {
     applyCategories,
     update(id: string, change: Partial<TagStyle>) {
       const tag = requireTag(id);
-      const parsed = TagStyleSchema.partial().parse(change);
+      const parsed = decodeTagChange(normalizeStyle(change));
       assertUnique(parsed.name ?? tag.name, tag.deckId, id);
       store.commit(events.cardTagChanged({ ...parsed, id }));
     },
@@ -84,11 +87,15 @@ export function createTagMutations(store: Store<typeof workspaceSchema>) {
       const ids = [...new Set(cardIds)];
       if (!ids.length) return;
       if (ids.length > 10_000) throw new Error("Tag at most 10,000 cards at once.");
-      for (const cardId of ids) TagAssignmentSchema.parse({ tagId, cardId });
+      for (const cardId of ids) decodeTagAssignment({ tagId, cardId });
       store.commit(events.cardsTagged({ tagId, cardIds: ids, assigned }));
     },
     saveTemplate(name: string, categories: readonly TagStyle[], id: string = crypto.randomUUID()) {
-      const template = TagTemplateSchema.parse({ id, name, categories });
+      const template = decodeTagTemplate({
+        id,
+        name: name.trim(),
+        categories: categories.map(normalizeStyle),
+      });
       if (
         store
           .query(tagTemplatesQuery)
@@ -137,4 +144,9 @@ export function duplicateDeckTags(
       );
   }
   if (changes.length) store.commit(...changes);
+}
+
+/** Tag names are trimmed once here, so stored names and their uniqueness keys are canonical. */
+function normalizeStyle<Style extends Partial<TagStyle>>(style: Style): Style {
+  return style.name === undefined ? style : { ...style, name: style.name.trim() };
 }

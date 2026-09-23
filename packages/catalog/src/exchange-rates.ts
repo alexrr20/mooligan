@@ -1,6 +1,8 @@
 import type { CatalogDatabase as DatabaseSync } from "./database.ts";
-import { ExchangeRatesSchema, type ExchangeRates } from "@mooligan/domain/market";
+import { ExchangeRatesSchema, priceCurrencies, type ExchangeRates } from "@mooligan/domain/market";
 import { readPriceMetadata } from "@mooligan/catalog/prices";
+
+const quoteCurrencies = priceCurrencies.filter((currency) => currency !== "EUR");
 
 export async function updateExchangeRates(database: DatabaseSync): Promise<ExchangeRates | null> {
   const saved = readPriceMetadata(database, "exchange_rates");
@@ -8,7 +10,7 @@ export async function updateExchangeRates(database: DatabaseSync): Promise<Excha
   if (cached && Date.now() - Date.parse(cached.fetchedAt) < 86_400_000) return cached;
   try {
     const response = await fetch(
-      "https://api.frankfurter.dev/v2/rates?base=EUR&quotes=USD,GBP,CAD,AUD,JPY,CHF&providers=ecb",
+      `https://api.frankfurter.dev/v2/rates?base=EUR&quotes=${quoteCurrencies.join(",")}&providers=ecb`,
       { signal: AbortSignal.timeout(10_000) },
     );
     if (!response.ok) throw new Error("Exchange rates unavailable");
@@ -17,9 +19,7 @@ export async function updateExchangeRates(database: DatabaseSync): Promise<Excha
       rates: await response.json(),
     });
     if (
-      !["USD", "GBP", "CAD", "AUD", "JPY", "CHF"].every((currency) =>
-        snapshot.rates.some(({ quote }) => quote === currency),
-      )
+      !quoteCurrencies.every((currency) => snapshot.rates.some(({ quote }) => quote === currency))
     )
       throw new Error("Incomplete exchange rates");
     database

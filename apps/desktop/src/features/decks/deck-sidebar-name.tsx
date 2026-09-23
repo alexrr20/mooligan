@@ -1,4 +1,4 @@
-import type { Deck } from "@mooligan/domain/decks";
+import type { Deck } from "@mooligan/workspace/deck-contract";
 import * as stylex from "@stylexjs/stylex";
 
 import { DeckColors } from "./deck-colors";

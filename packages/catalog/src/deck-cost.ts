@@ -1,6 +1,7 @@
-import type { DeckCost, DeckCostRequest } from "@mooligan/domain/deck-cost";
+import type { DeckCost } from "@mooligan/domain/deck-cost";
 import { MarketPriceSchema } from "@mooligan/domain/market";
 import type { SpoilerVisibilitySnapshot } from "@mooligan/domain/spoilers";
+import type { DeckCostRequest } from "@mooligan/workspace/transport";
 import * as z from "zod";
 
 import type { CatalogDatabase } from "./database.ts";

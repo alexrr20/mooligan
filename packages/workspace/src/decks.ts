@@ -1,16 +1,16 @@
 import { Events, queryDb, Schema, State } from "@livestore/livestore";
 
-import { deckMetadataSchema, deckEntrySchema } from "./deck-contract.ts";
+import {
+  DeckEntrySchema,
+  DeckMetadataSchema,
+  DeckSchema,
+  deckEntryMaxQuantity,
+} from "./deck-contract.ts";
+import { IdentifierSchema as Identifier, TimestampSchema as Timestamp } from "./primitives.ts";
 
-const {
-  id: Identifier,
-  name: Name,
-  formatId: Format,
-  notes: Notes,
-  tags: Tags,
-  updatedAt: Timestamp,
-} = deckMetadataSchema.fields;
-const { quantity: Quantity, finish: Finish, section: Section } = deckEntrySchema.fields;
+const { name: Name, formatId: Format, notes: Notes, tags: Tags } = DeckMetadataSchema.fields;
+const { quantity: Quantity, finish: Finish, section: Section } = DeckEntrySchema.fields;
+const DeckRecordSchema = DeckSchema.omit("entries");
 
 export const deckTables = {
   deckEntryIds: State.SQLite.table({
@@ -25,7 +25,7 @@ export const deckTables = {
   decks: State.SQLite.table({
     name: "decks",
     schema: Schema.Struct({
-      ...deckMetadataSchema.fields,
+      ...DeckRecordSchema.fields,
       id: Schema.String.pipe(State.SQLite.withPrimaryKey),
       tags: Schema.String,
       deleted: Schema.Boolean,
@@ -37,7 +37,7 @@ export const deckTables = {
       { name: "deck_entries_slot", columns: ["deckId", "printingId", "finish", "section"] },
     ],
     schema: Schema.Struct({
-      ...deckEntrySchema.fields,
+      ...DeckEntrySchema.fields,
       id: Schema.String.pipe(State.SQLite.withPrimaryKey),
       deckId: Identifier,
     }),
@@ -47,7 +47,7 @@ export const deckTables = {
 export const deckEvents = {
   deckCreated: Events.synced({
     name: "v1.DeckCreated",
-    schema: Schema.Struct({ deck: deckMetadataSchema }),
+    schema: Schema.Struct({ deck: DeckRecordSchema }),
   }),
   deckChanged: Events.synced({
     name: "v1.DeckChanged",
@@ -67,7 +67,7 @@ export const deckEvents = {
   }),
   deckEntryAdded: Events.synced({
     name: "v1.DeckEntryAdded",
-    schema: Schema.Struct({ deckId: Identifier, entry: deckEntrySchema, updatedAt: Timestamp }),
+    schema: Schema.Struct({ deckId: Identifier, entry: DeckEntrySchema, updatedAt: Timestamp }),
   }),
   deckEntryChanged: Events.synced({
     name: "v1.DeckEntryChanged",
@@ -150,7 +150,7 @@ export const deckMaterializers = {
       {
         sql: `UPDATE "deck_entries" SET "quantity" = "quantity" + $quantity
           WHERE "deckId" = $deckId AND "printingId" = $printingId AND "finish" = $finish AND "section" = $section
-          AND "quantity" <= 1000000 - $quantity AND ${activeDeck}`,
+          AND "quantity" <= ${deckEntryMaxQuantity} - $quantity AND ${activeDeck}`,
         bindValues,
         writeTables: entryWrites,
       },
@@ -191,7 +191,7 @@ export const deckMaterializers = {
             SELECT 1 FROM "deck_entries" AS destination WHERE destination."deckId" = $deckId AND destination."id" <> source."id"
             AND destination."printingId" = COALESCE($printingId, source."printingId")
             AND destination."finish" = COALESCE($finish, source."finish") AND destination."section" = COALESCE($section, source."section")
-            AND destination."quantity" > 1000000 - COALESCE($quantity, source."quantity")
+            AND destination."quantity" > ${deckEntryMaxQuantity} - COALESCE($quantity, source."quantity")
           )`,
         bindValues,
         writeTables: entryWrites,

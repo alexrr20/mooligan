@@ -6,7 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 import { performance } from "node:perf_hooks";
 import { test } from "node:test";
 
-import type { CollectionLot } from "@mooligan/domain/collection";
+import type { CollectionLot } from "@mooligan/workspace/collection-contract";
 
 import {
   createCollectionProjection,
@@ -232,11 +232,15 @@ void test("100,000 lots and a one-lot delta stay within the projection budget", 
 
 function lot(id: string, quantity: number): CollectionLot {
   return {
+    acquiredAt: null,
     condition: "near-mint",
     finish: "nonfoil",
     id,
     language: "en",
+    locationId: null,
+    notes: null,
     printingId: `printing-${id}`,
     quantity,
+    unitCost: null,
   };
 }

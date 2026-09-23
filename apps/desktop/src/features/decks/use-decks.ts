@@ -1,4 +1,4 @@
-import { deckEntriesQuery, decksQuery } from "@mooligan/workspace/schema";
+import { deckEntriesQuery, decksQuery } from "@mooligan/workspace/decks";
 
 import { useWorkspaceLiveStore } from "../workspace/workspace-store-context";
 import { createDeckMutations } from "@mooligan/workspace/client/deck-mutations";

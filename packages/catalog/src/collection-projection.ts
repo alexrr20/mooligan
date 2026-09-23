@@ -1,23 +1,21 @@
 import type { CatalogDatabase as DatabaseSync } from "./database.ts";
 
-import { CollectionLotSchema, type CollectionLot } from "@mooligan/domain/collection";
-import { MoneySchema } from "@mooligan/domain/market";
+import type { CollectionLot } from "@mooligan/workspace/collection-contract";
+import {
+  CollectionLotIdTransportSchema,
+  CollectionLotTransportSchema,
+} from "@mooligan/workspace/transport";
 import * as z from "zod";
 import type { JSONType } from "zod";
-
-const ProjectionLotSchema = CollectionLotSchema.extend({
-  unitCost: MoneySchema.strict().optional(),
-}).strict();
-const ProjectionLotIdSchema = z.string().trim().min(1).max(128);
 const CollectionProjectionWorkerOperationSchema = z.discriminatedUnion("type", [
   z.strictObject({
-    lots: z.array(ProjectionLotSchema).max(100_000),
+    lots: z.array(CollectionLotTransportSchema).max(100_000),
     type: z.literal("collection-projection-replace"),
   }),
   z.strictObject({
-    deletedLotIds: z.array(ProjectionLotIdSchema).max(1_000),
+    deletedLotIds: z.array(CollectionLotIdTransportSchema).max(1_000),
     type: z.literal("collection-projection-apply"),
-    upserts: z.array(ProjectionLotSchema).max(1_000),
+    upserts: z.array(CollectionLotTransportSchema).max(1_000),
   }),
 ]);
 export type CollectionProjectionWorkerOperation = z.infer<
@@ -97,13 +95,19 @@ export function createCollectionProjection(database: DatabaseSync) {
   const clear = database.prepare("DELETE FROM collection_lots");
 
   return {
-    apply({ deletedLotIds, upserts }: { deletedLotIds: string[]; upserts: CollectionLot[] }) {
+    apply({
+      deletedLotIds,
+      upserts,
+    }: {
+      deletedLotIds: readonly string[];
+      upserts: readonly CollectionLot[];
+    }) {
       transact(database, () => {
         for (const lotId of deletedLotIds) remove.run(lotId);
         for (const lot of upserts) insert.run(...collectionLotArguments(lot));
       });
     },
-    replace(lots: CollectionLot[]) {
+    replace(lots: readonly CollectionLot[]) {
       transact(database, () => {
         clear.run();
         for (const lot of lots) insert.run(...collectionLotArguments(lot));
@@ -120,11 +124,11 @@ function collectionLotArguments(lot: CollectionLot) {
     lot.language,
     lot.condition,
     lot.quantity,
-    lot.acquiredAt ?? null,
+    lot.acquiredAt,
     lot.unitCost?.amountMinor ?? null,
     lot.unitCost?.currency ?? null,
-    lot.locationId ?? null,
-    lot.notes ?? null,
+    lot.locationId,
+    lot.notes,
   ];
 }
 

@@ -1,5 +1,6 @@
 import { Tabs } from "@base-ui/react/tabs";
-import { starterCategories, tagColors, type CardTag, type TagStyle } from "@mooligan/domain/tags";
+import { starterCategories, type CardTag, type TagStyle } from "@mooligan/workspace/tag-contract";
+import { tagColorStyles, tagColors } from "@mooligan/domain/tags";
 import { tagsForDeck } from "@mooligan/workspace/client/tag-state";
 import * as stylex from "@stylexjs/stylex";
 import { useMutation } from "@tanstack/react-query";
@@ -300,7 +301,12 @@ function TagDefinitionForm({
           Tag name
           <Input value={name} onValueChange={setName} placeholder="e.g. Ramp" maxLength={80} />
         </label>
-        <DeckSelect label="Color" value={color} onChange={setColor} options={tagColors} />
+        <DeckSelect
+          label="Color"
+          value={color}
+          onChange={setColor}
+          options={tagColors.map((value) => ({ value, label: tagColorStyles[value].label }))}
+        />
         <Button type="submit" disabled={!name.trim() || save.isPending}>
           {tag ? "Save tag" : "Create tag"}
         </Button>

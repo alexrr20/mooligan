@@ -5,7 +5,7 @@ import {
   ScryfallCardDownloadSchema,
   type ScryfallCardDownload,
 } from "@mooligan/domain/catalog-download";
-import type { DeckEntry } from "@mooligan/domain/decks";
+import type { DeckEntry } from "../src/deck-contract.ts";
 import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
 import {
   analyzeDeckMana,

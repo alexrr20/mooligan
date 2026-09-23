@@ -1,18 +1,13 @@
 import { ResultsLayout } from "@/components/results-layout";
 import { useDeferredValue, useState } from "react";
 import type { CollectionHolding, CollectionListRequest } from "@mooligan/domain/collection";
-import { cardConditions, cardLanguages } from "@mooligan/domain/collection";
 import { Button, Choice, Copy, Field, Panel, Row, Screen, confirmRemoval } from "@/components/ui";
 import { CardRow } from "@/components/cards";
 import { useCatalogQuery, useWorkspace } from "@/workspace/provider";
 import { router } from "expo-router";
 
-export const finishes = [
-  { value: "nonfoil", label: "Nonfoil" },
-  { value: "foil", label: "Foil" },
-  { value: "etched", label: "Etched" },
-  { value: "glossy", label: "Glossy" },
-] as const;
+import { cardConditionOptions, cardLanguageOptions, finishOptions } from "./options";
+
 export default function CollectionScreen() {
   const { lots } = useWorkspace();
   const [request, setRequest] = useState<CollectionListRequest>({ sort: "name" });
@@ -74,7 +69,7 @@ export default function CollectionScreen() {
           <Choice
             label="Finish"
             value={request.finish ?? "all"}
-            options={[{ value: "all", label: "All finishes" }, ...finishes]}
+            options={[{ value: "all", label: "All finishes" }, ...finishOptions]}
             onChange={(finish) =>
               filter({ ...request, finish: finish === "all" ? undefined : finish })
             }
@@ -82,7 +77,7 @@ export default function CollectionScreen() {
           <Choice
             label="Language"
             value={request.language ?? "all"}
-            options={[{ value: "all", label: "All languages" }, ...cardLanguages]}
+            options={[{ value: "all", label: "All languages" }, ...cardLanguageOptions]}
             onChange={(language) =>
               filter({ ...request, language: language === "all" ? undefined : language })
             }
@@ -90,7 +85,7 @@ export default function CollectionScreen() {
           <Choice
             label="Condition"
             value={request.condition ?? "all"}
-            options={[{ value: "all", label: "All conditions" }, ...cardConditions]}
+            options={[{ value: "all", label: "All conditions" }, ...cardConditionOptions]}
             onChange={(condition) =>
               filter({ ...request, condition: condition === "all" ? undefined : condition })
             }
@@ -193,16 +188,21 @@ function EditableHolding({
         value={finish}
         options={
           holding.status === "visible"
-            ? finishes.filter((f) => holding.availableFinishes.includes(f.value))
-            : finishes.filter((f) => f.value === holding.finish)
+            ? finishOptions.filter((f) => holding.availableFinishes.includes(f.value))
+            : finishOptions.filter((f) => f.value === holding.finish)
         }
         onChange={setFinish}
       />
-      <Choice label="Language" value={language} options={cardLanguages} onChange={setLanguage} />
+      <Choice
+        label="Language"
+        value={language}
+        options={cardLanguageOptions}
+        onChange={setLanguage}
+      />
       <Choice
         label="Condition"
         value={condition}
-        options={cardConditions}
+        options={cardConditionOptions}
         onChange={setCondition}
       />
       <Row>

@@ -1,7 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { parentPort, workerData } from "node:worker_threads";
 
-import { CollectionLotSchema } from "@mooligan/domain/collection";
+import { CollectionLotTransportSchema } from "@mooligan/workspace/transport";
 import * as z from "zod";
 
 import {
@@ -31,7 +31,7 @@ const startup = z
   .strictObject({
     catalogPath: z.string().min(1),
     pricePath: z.string().min(1),
-    collectionLots: z.array(CollectionLotSchema.strict()).max(100_000),
+    collectionLots: z.array(CollectionLotTransportSchema).max(100_000),
   })
   .safeParse(workerData);
 

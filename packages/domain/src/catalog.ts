@@ -8,8 +8,15 @@ export type Color = z.infer<typeof ColorSchema>;
 export const ManaTypeSchema = z.enum(["W", "U", "B", "R", "G", "C"]);
 export type ManaType = z.infer<typeof ManaTypeSchema>;
 
-export const FinishSchema = z.enum(["nonfoil", "foil", "etched", "glossy"]);
-export type Finish = z.infer<typeof FinishSchema>;
+export const finishes = ["nonfoil", "foil", "etched", "glossy"] as const;
+export type Finish = (typeof finishes)[number];
+export const FinishSchema = z.enum(finishes);
+export const finishLabels = {
+  nonfoil: "Nonfoil",
+  foil: "Foil",
+  etched: "Etched",
+  glossy: "Glossy",
+} as const satisfies Record<Finish, string>;
 
 export const RaritySchema = z.enum(["common", "uncommon", "rare", "mythic", "special", "bonus"]);
 export type Rarity = z.infer<typeof RaritySchema>;

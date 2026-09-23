@@ -3,22 +3,24 @@ import * as z from "zod";
 import { CatalogCardDetailSchema } from "./catalog-detail.ts";
 
 export const SpoilerTargetIdSchema = z.string().trim().min(1).max(128);
-const idSchema = SpoilerTargetIdSchema;
 const uniqueIds = (ids: readonly string[]) => new Set(ids).size === ids.length;
 
-export const SpoilerPolicySchema = z.enum(["protect", "show"]);
-export type SpoilerPolicy = z.infer<typeof SpoilerPolicySchema>;
+export const spoilerPolicies = ["protect", "show"] as const;
+export type SpoilerPolicy = (typeof spoilerPolicies)[number];
+export const SpoilerPolicySchema = z.enum(spoilerPolicies);
 
-export const SpoilerRevealScopeSchema = z.enum(["printing", "release"]);
-export type SpoilerRevealScope = z.infer<typeof SpoilerRevealScopeSchema>;
+export const spoilerRevealScopes = ["printing", "release"] as const;
+export type SpoilerRevealScope = (typeof spoilerRevealScopes)[number];
+export const SpoilerRevealScopeSchema = z.enum(spoilerRevealScopes);
 
-export const SpoilerDecisionStateSchema = z.enum(["protect", "reveal"]);
-export type SpoilerDecisionState = z.infer<typeof SpoilerDecisionStateSchema>;
+export const spoilerDecisionStates = ["protect", "reveal"] as const;
+export type SpoilerDecisionState = (typeof spoilerDecisionStates)[number];
+export const SpoilerDecisionStateSchema = z.enum(spoilerDecisionStates);
 
 export const SpoilerProjectionDecisionSchema = z.strictObject({
   scope: SpoilerRevealScopeSchema,
   state: SpoilerDecisionStateSchema,
-  targetId: idSchema,
+  targetId: SpoilerTargetIdSchema,
 });
 export type SpoilerProjectionDecision = z.infer<typeof SpoilerProjectionDecisionSchema>;
 
@@ -63,14 +65,14 @@ export const SpoilerProjectionResultSchema = z.discriminatedUnion("status", [
 ]);
 export type SpoilerProjectionResult = z.infer<typeof SpoilerProjectionResultSchema>;
 
-export const CatalogSetSymbolDescriptorSchema = z.strictObject({ setId: idSchema });
+export const CatalogSetSymbolDescriptorSchema = z.strictObject({ setId: SpoilerTargetIdSchema });
 export type CatalogSetSymbolDescriptor = z.infer<typeof CatalogSetSymbolDescriptorSchema>;
 
 export const CatalogReleaseSummarySchema = z.strictObject({
   code: z.string().min(1),
   name: z.string().min(1),
   nextReleaseOn: z.iso.date(),
-  rootSetId: idSchema,
+  rootSetId: SpoilerTargetIdSchema,
   symbol: CatalogSetSymbolDescriptorSchema,
 });
 export type CatalogReleaseSummary = z.infer<typeof CatalogReleaseSummarySchema>;
@@ -79,8 +81,8 @@ export const SpoilerVisibilitySnapshotSchema = z
   .strictObject({
     currentDate: z.iso.date(),
     policy: SpoilerPolicySchema,
-    revealedPrintingIds: z.array(idSchema),
-    revealedRootSetIds: z.array(idSchema),
+    revealedPrintingIds: z.array(SpoilerTargetIdSchema),
+    revealedRootSetIds: z.array(SpoilerTargetIdSchema),
     revision: z.number().int().nonnegative(),
   })
   .refine(({ revealedPrintingIds }) => uniqueIds(revealedPrintingIds), {
@@ -95,8 +97,8 @@ export type SpoilerVisibilitySnapshot = z.infer<typeof SpoilerVisibilitySnapshot
 
 export const SpoilerStateSchema = z
   .strictObject({
-    activePrintingIds: z.array(idSchema),
-    activeRootSetIds: z.array(idSchema),
+    activePrintingIds: z.array(SpoilerTargetIdSchema),
+    activeRootSetIds: z.array(SpoilerTargetIdSchema),
     policy: SpoilerPolicySchema,
     revision: z.number().int().nonnegative(),
   })
@@ -126,7 +128,7 @@ const VisibleCatalogPrintingSchema = z.strictObject({
 });
 
 const ProtectedCatalogPrintingSchema = z.strictObject({
-  printingId: idSchema,
+  printingId: SpoilerTargetIdSchema,
   release: CatalogReleaseSummarySchema,
   releasedOn: z.iso.date(),
   status: z.literal("protected"),
@@ -141,9 +143,9 @@ export type CatalogPrintingResult = z.infer<typeof CatalogPrintingResultSchema>;
 export const SpoilerRevealSummarySchema = z.strictObject({
   detail: z.string().min(1).optional(),
   label: z.string().min(1),
-  rootSetId: idSchema.optional(),
+  rootSetId: SpoilerTargetIdSchema.optional(),
   scope: SpoilerRevealScopeSchema,
-  targetId: idSchema,
+  targetId: SpoilerTargetIdSchema,
 });
 export type SpoilerRevealSummary = z.infer<typeof SpoilerRevealSummarySchema>;
 

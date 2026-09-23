@@ -1,5 +1,6 @@
-import type { DeckEntry } from "@mooligan/domain/decks";
 import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
+
+import type { DeckEntry } from "../deck-contract.ts";
 
 export const manaTypes = [
   { value: "W", label: "White", color: "#e7dcae" },

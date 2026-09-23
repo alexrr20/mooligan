@@ -1,33 +1,20 @@
 import type { Store } from "@livestore/livestore";
+import { priceProviders } from "@mooligan/domain/market";
+
+import { workspaceBackupFormat, workspaceBackupVersion, type WorkspaceBackup } from "../backup.ts";
+import { collectionLotsQuery } from "../collection.ts";
+import { deckEntriesQuery, decksQuery } from "../decks.ts";
 import {
-  workspaceBackupFormat,
-  workspaceBackupVersion,
-  type WorkspaceBackup,
-  type WorkspaceBackupCollectionLot,
-} from "@mooligan/workspace/backup";
-import {
-  cardTagsQuery,
-  tagAssignmentsQuery,
-  tagTemplatesQuery,
-  collectionLotsQuery,
-  decksQuery,
-  deckEntriesQuery,
-  events,
-  initialSpoilerResetId,
-  profileQuery,
-  priceProviders,
   priceCurrencyQuery,
-  readPriceCurrency,
   priceProviderPreferencesQuery,
   readEnabledPriceProviders,
-  readProfile,
-  spoilerDecisionsQuery,
-  spoilerSettingsQuery,
-  workspaceSchema,
-} from "@mooligan/workspace/schema";
-
-import { materializeDecks } from "@mooligan/workspace/client/deck-state";
-
+  readPriceCurrency,
+} from "../price-preferences.ts";
+import { profileQuery, readProfile } from "../profile.ts";
+import { events, workspaceSchema } from "../schema.ts";
+import { initialSpoilerResetId, spoilerDecisionsQuery, spoilerSettingsQuery } from "../spoilers.ts";
+import { cardTagsQuery, tagAssignmentsQuery, tagTemplatesQuery } from "../tags.ts";
+import { materializeDecks } from "./deck-state.ts";
 import { materializeTagTemplates } from "./tag-state.ts";
 
 type WorkspaceLiveStore = Store<typeof workspaceSchema>;
@@ -55,7 +42,7 @@ export function createWorkspaceBackup(store: WorkspaceLiveStore): WorkspaceBacku
       .query(tagAssignmentsQuery)
       .map(({ id: _id, ...assignment }) => assignment),
     tagTemplates: materializeTagTemplates(store.query(tagTemplatesQuery)),
-    collectionLots: readBackupCollectionLots(store),
+    collectionLots: store.query(collectionLotsQuery),
     decks: readBackupDecks(store),
     format: workspaceBackupFormat,
     profile: readProfile(store.query(profileQuery)),
@@ -77,7 +64,7 @@ export async function restoreWorkspaceBackup(store: WorkspaceLiveStore, backup: 
 
   batch.push(events.profileChanged(backup.profile));
   batch.push(events.priceCurrencyChanged({ currency: backup.priceCurrency }));
-  for (const { id: provider } of priceProviders) {
+  for (const provider of priceProviders) {
     batch.push(
       events.priceProviderChanged({ provider, enabled: backup.priceProviders.includes(provider) }),
     );
@@ -145,23 +132,7 @@ export async function restoreWorkspaceBackup(store: WorkspaceLiveStore, backup: 
   }
 
   for (const lot of backup.collectionLots) {
-    batch.push(
-      events.collectionCopiesAdded({
-        additionId: crypto.randomUUID(),
-        lot: {
-          acquiredAt: lot.acquiredAt ?? null,
-          condition: lot.condition,
-          finish: lot.finish,
-          id: lot.id,
-          language: lot.language,
-          locationId: lot.locationId ?? null,
-          notes: lot.notes ?? null,
-          printingId: lot.printingId,
-          quantity: lot.quantity,
-          unitCost: lot.unitCost ?? null,
-        },
-      }),
-    );
+    batch.push(events.collectionCopiesAdded({ additionId: crypto.randomUUID(), lot }));
     if (batch.length === RESTORE_EVENT_BATCH_SIZE) {
       await commitRestoreBatch(store, batch);
       batch = [];
@@ -192,7 +163,7 @@ export async function restoreWorkspaceBackup(store: WorkspaceLiveStore, backup: 
     readPriceCurrency(store.query(priceCurrencyQuery)) !== backup.priceCurrency ||
     JSON.stringify(readEnabledPriceProviders(store.query(priceProviderPreferencesQuery))) !==
       JSON.stringify(
-        priceProviders.filter(({ id }) => backup.priceProviders.includes(id)).map(({ id }) => id),
+        priceProviders.filter((provider) => backup.priceProviders.includes(provider)),
       ) ||
     JSON.stringify(readProfile(store.query(profileQuery))) !== JSON.stringify(backup.profile) ||
     JSON.stringify(readBackupDecks(store)) !== JSON.stringify(sortedDecks(backup.decks)) ||
@@ -201,7 +172,7 @@ export async function restoreWorkspaceBackup(store: WorkspaceLiveStore, backup: 
     settings.resetGeneration !== backup.spoilers.resetGeneration ||
     JSON.stringify(readBackupDecisions(store)) !==
       JSON.stringify(sortedDecisions(backup.spoilers.decisions)) ||
-    JSON.stringify(readBackupCollectionLots(store)) !==
+    JSON.stringify(store.query(collectionLotsQuery)) !==
       JSON.stringify(sortedCollectionLots(backup.collectionLots))
   ) {
     throw new Error("The restored workspace state could not be verified.");
@@ -215,30 +186,6 @@ async function commitRestoreBatch(store: WorkspaceLiveStore, batch: readonly Res
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
   }
-}
-
-function readBackupCollectionLots(store: WorkspaceLiveStore): WorkspaceBackup["collectionLots"] {
-  return store.query(collectionLotsQuery).map((row) => {
-    const lot: WorkspaceBackupCollectionLot = {
-      acquiredAt: row.acquiredAt ?? undefined,
-      condition: row.condition,
-      finish: row.finish,
-      id: row.id,
-      language: row.language,
-      locationId: row.locationId ?? undefined,
-      notes: row.notes ?? undefined,
-      printingId: row.printingId,
-      quantity: row.quantity,
-      unitCost:
-        row.unitCostAmountMinor !== null && row.unitCostCurrency !== null
-          ? {
-              amountMinor: row.unitCostAmountMinor,
-              currency: row.unitCostCurrency,
-            }
-          : undefined,
-    };
-    return lot;
-  });
 }
 
 function readBackupDecisions(store: WorkspaceLiveStore) {

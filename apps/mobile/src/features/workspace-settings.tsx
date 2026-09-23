@@ -9,7 +9,8 @@ import {
   createWorkspaceBackup,
   restoreWorkspaceBackup,
 } from "@mooligan/workspace/client/workspace-backup";
-import { events, priceProviders, priceCurrencies } from "@mooligan/workspace/schema";
+import { events } from "@mooligan/workspace/schema";
+import { priceCurrencies, priceProviderLabels, priceProviders } from "@mooligan/domain/market";
 import { Button, Choice, Copy, Panel, Row } from "@/components/ui";
 import { useMobileAccount } from "@/account/account-provider";
 import { useCatalogQuery, useWorkspace } from "@/workspace/provider";
@@ -83,9 +84,9 @@ export function WorkspaceSettings() {
         />
         {priceProviders.map((provider) => (
           <Choice
-            key={provider.id}
-            label={provider.name}
-            value={providers.includes(provider.id) ? "enabled" : "disabled"}
+            key={provider}
+            label={priceProviderLabels[provider]}
+            value={providers.includes(provider) ? "enabled" : "disabled"}
             options={[
               { value: "enabled", label: "Enabled" },
               { value: "disabled", label: "Disabled" },
@@ -93,7 +94,7 @@ export function WorkspaceSettings() {
             onChange={(value) =>
               store.commit(
                 events.priceProviderChanged({
-                  provider: provider.id,
+                  provider,
                   enabled: value === "enabled",
                 }),
               )

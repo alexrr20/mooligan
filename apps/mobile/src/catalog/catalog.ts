@@ -31,7 +31,7 @@ import {
   type ExchangeRates,
   type PriceSnapshot,
 } from "@mooligan/domain/market";
-import type { CollectionLot } from "@mooligan/domain/collection";
+import type { CollectionLot } from "@mooligan/workspace/collection-contract";
 import { openCatalogDatabase } from "./sqlite";
 import { fileChunks, downloadPriceFeed } from "./download";
 import { catalogLines } from "./gzip-lines";

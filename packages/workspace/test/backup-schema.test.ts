@@ -13,7 +13,7 @@ const decodeBackup = Schema.decodeUnknownSync(workspaceBackupSchema, {
   onExcessProperty: "error",
 });
 
-void test("backup v8 validation is strict and rejects old versions", () => {
+void test("backup v9 validation is strict and rejects old versions", () => {
   const backup = fixture();
 
   assert.deepEqual(decodeBackup(backup), backup);
@@ -27,7 +27,7 @@ void test("backup v8 validation is strict and rejects old versions", () => {
   );
 });
 
-void test("backup v8 rejects duplicate state and invalid collection values", () => {
+void test("backup v9 rejects duplicate state and invalid collection values", () => {
   const backup = fixture();
 
   assert.throws(() =>
@@ -54,17 +54,21 @@ void test("backup v8 rejects duplicate state and invalid collection values", () 
 });
 
 void test(
-  "backup v8 round trips 100,000 lots and 100,000 spoiler decisions within 50 MiB",
+  "backup v9 round trips 100,000 lots and 100,000 spoiler decisions within 50 MiB",
   { timeout: 60_000 },
   () => {
     const largeBackup = {
       collectionLots: Array.from({ length: 100_000 }, (_, index) => ({
+        acquiredAt: null,
         condition: "near-mint" as const,
         finish: "nonfoil" as const,
         id: `lot-${index}`,
         language: "en" as const,
+        locationId: null,
+        notes: null,
         printingId: `printing-${index}`,
         quantity: 1,
+        unitCost: null,
       })),
       decks: [],
       format: "mooligan-workspace" as const,
@@ -83,7 +87,7 @@ void test(
       cardTags: [],
       tagAssignments: [],
       tagTemplates: [],
-      version: 8 as const,
+      version: 9 as const,
     } satisfies WorkspaceBackup;
     const serialized = JSON.stringify(largeBackup);
 
@@ -100,12 +104,16 @@ function fixture(): WorkspaceBackup {
   return {
     collectionLots: [
       {
+        acquiredAt: null,
         condition: "near-mint",
         finish: "nonfoil",
         id: "lot-one",
         language: "en",
+        locationId: null,
+        notes: null,
         printingId: "printing-one",
         quantity: 1,
+        unitCost: null,
       },
     ],
     decks: [],
@@ -121,6 +129,6 @@ function fixture(): WorkspaceBackup {
     cardTags: [],
     tagAssignments: [],
     tagTemplates: [],
-    version: 8,
+    version: 9,
   };
 }

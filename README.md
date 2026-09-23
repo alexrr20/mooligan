@@ -29,7 +29,7 @@ would disappear after a restart.
 
 The user-owned workspace is separate from the replaceable Scryfall catalog
 database. Motion and view preferences stay in renderer local storage on the
-current device. Workspace backup version 8 contains only materialized
+current device. Workspace backup version 9 contains only materialized
 collection lots, decks with their card entries, card tags, category templates, profile choices, price provider preferences, and spoiler state, and every restore creates a new unbound
 workspace before activation.
 
@@ -145,10 +145,10 @@ tag groups, but deck totals still count each copy once. Protected and unavailabl
 printings do not expose tags in card views. Deleting a deck removes its local
 categories and assignments; global tags and templates remain available.
 
-The workspace event schema is now version 6. Deploy the updated API alongside
-the clients to enable card tag and category template sync. Older clients must update before syncing;
-their local workspace remains available. Backup version 8 replaces version 7,
-with no backward compatibility for old backup files.
+The workspace event schema is now version 7, which stores deck text trimmed, identifiers
+without surrounding whitespace, and timestamps in UTC ISO form. Deploy the updated API alongside
+the clients. Older clients must update before syncing; their local workspace remains available.
+Backup version 9 replaces version 8, with no backward compatibility for old backup files.
 
 ## Profile
 
@@ -291,7 +291,7 @@ supported maximum. The desktop pauses sync and keeps local editing available.
 
 ### Reset development data
 
-Workspace backup version 8 is the only supported backup format. Export a backup
+Workspace backup version 9 is the only supported backup format. Export a backup
 from Settings before resetting any data you care about.
 
 For an unbound development Workspace, quit Mooligan, clear the renderer origin's

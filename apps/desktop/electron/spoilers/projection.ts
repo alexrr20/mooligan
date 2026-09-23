@@ -7,6 +7,7 @@ import type {
   SpoilerProjectionResult,
   SpoilerProjectionSnapshot,
   SpoilerVisibilitySnapshot,
+  SpoilerPolicy,
 } from "@mooligan/domain/spoilers";
 
 type ProjectionTimer = ReturnType<typeof setTimeout>;
@@ -33,7 +34,7 @@ export class SpoilerProjection {
   readonly #onChanged: () => void;
   readonly #setTimer: (callback: () => void, delayMilliseconds: number) => ProjectionTimer;
   #authorizationRevision = 0;
-  #policy: "protect" | "show" = "protect";
+  #policy: SpoilerPolicy = "protect";
   #ready = false;
   #session: ProjectionSession | undefined;
   #timer: ProjectionTimer | undefined;

@@ -1,7 +1,8 @@
 import { ResultsLayout } from "@/components/results-layout";
 import { useState } from "react";
 import { router } from "expo-router";
-import { deckFormats, type DeckMetadata } from "@mooligan/domain/decks";
+import { deckFormats } from "@mooligan/domain/decks";
+import { type DeckMetadata } from "@mooligan/workspace/deck-contract";
 import { Button, Choice, Copy, Field, Panel, Row, Screen } from "@/components/ui";
 import { useWorkspace } from "@/workspace/provider";
 

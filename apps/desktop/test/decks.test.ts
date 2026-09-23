@@ -3,13 +3,8 @@ import { test } from "node:test";
 
 import { makeInMemoryAdapter } from "@livestore/adapter-web";
 import { createStorePromise, type Store } from "@livestore/livestore";
-import {
-  deckEntriesQuery,
-  decksQuery,
-  events,
-  tables,
-  workspaceSchema,
-} from "@mooligan/workspace/schema";
+import { deckEntriesQuery, decksQuery } from "@mooligan/workspace/decks";
+import { events, tables, workspaceSchema } from "@mooligan/workspace/schema";
 import { Schema } from "effect";
 import { workspaceBackupSchema } from "@mooligan/workspace/backup";
 

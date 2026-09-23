@@ -1,5 +1,5 @@
 import { deckCostMetrics, deckCostScope } from "@mooligan/catalog/deck-cost-summary";
-import type { DeckEntry } from "@mooligan/domain/decks";
+import type { DeckEntry } from "@mooligan/workspace/deck-contract";
 import * as stylex from "@stylexjs/stylex";
 import { useQuery } from "@tanstack/react-query";
 
@@ -9,7 +9,7 @@ import { usePriceProviders } from "../prices/use-price-providers";
 import { spoilerCatalogCacheKey, useSpoilerState } from "../spoilers/use-spoilers";
 import { useWorkspaceLiveStore } from "../workspace/workspace-store-context";
 
-export function DeckCost({ entries }: { entries: DeckEntry[] }) {
+export function DeckCost({ entries }: { entries: readonly DeckEntry[] }) {
   const { enabledProviders: providers, currency } = usePriceProviders();
   const store = useWorkspaceLiveStore();
   const { state: spoilers } = useSpoilerState();
@@ -19,7 +19,7 @@ export function DeckCost({ entries }: { entries: DeckEntry[] }) {
     enabled: providers.length > 0 && entries.length > 0,
     staleTime: 3_600_000,
   });
-  const request = { entries, providers, currency, rates: rates.data ?? null };
+  const request = { entries: [...entries], providers, currency, rates: rates.data ?? null };
   const result = useQuery({
     queryKey: ["catalog", "deck-cost", store.storeId, spoilerCatalogCacheKey(spoilers), request],
     queryFn: () => window.catalog.deckCost(request),

@@ -1,12 +1,12 @@
 import { deckCostMetrics, deckCostScope } from "@mooligan/catalog/deck-cost-summary";
-import type { DeckEntry } from "@mooligan/domain/decks";
+import type { DeckEntry } from "@mooligan/workspace/deck-contract";
 
 import { Button, Copy, Panel } from "@/components/ui";
 import { useCatalogQuery, useWorkspace } from "@/workspace/provider";
 
-export function DeckCost({ entries }: { entries: DeckEntry[] }) {
+export function DeckCost({ entries }: { entries: readonly DeckEntry[] }) {
   const { providers, currency, rates } = useWorkspace();
-  const request = { entries, providers, currency, rates };
+  const request = { entries: [...entries], providers, currency, rates };
   const result = useCatalogQuery(
     ["deck-cost", JSON.stringify(request)],
     ({ catalog, visibility }) => catalog.deckCost(request, visibility),

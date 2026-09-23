@@ -1,3 +1,4 @@
+import { finishLabels } from "@mooligan/domain/catalog";
 import type { CatalogSelectedPrinting } from "@mooligan/domain/catalog-detail";
 import * as stylex from "@stylexjs/stylex";
 
@@ -39,7 +40,10 @@ function printingRows(printing: CatalogSelectedPrinting) {
         }
       : null,
     printing.finishes?.length
-      ? { label: "Finishes", value: printing.finishes.map(finishName).join(" · ") }
+      ? {
+          label: "Finishes",
+          value: printing.finishes.map((finish) => finishLabels[finish]).join(" · "),
+        }
       : null,
     printing.isPromo ? { label: "Printing", value: "Promo" } : null,
     printing.isDigital ? { label: "Medium", value: "Digital" } : null,
@@ -72,10 +76,6 @@ function languageName(value: string) {
   } catch {
     return value.toUpperCase();
   }
-}
-
-function finishName(value: string) {
-  return value === "nonfoil" ? "Nonfoil" : titleCase(value);
 }
 
 function titleCase(value: string) {

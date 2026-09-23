@@ -4,13 +4,9 @@ import type {
   SpoilerPolicy,
   SpoilerRevealScope,
 } from "@mooligan/domain/spoilers";
-import {
-  events,
-  spoilerDecisionsQuery,
-  spoilerSettingsQuery,
-  tables,
-  workspaceSchema,
-} from "@mooligan/workspace/schema";
+
+import { events, tables, workspaceSchema } from "../schema.ts";
+import { spoilerDecisionsQuery, spoilerSettingsQuery } from "../spoilers.ts";
 
 export type SpoilerAction =
   | { policy: SpoilerPolicy; type: "set-policy" }

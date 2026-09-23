@@ -2,12 +2,11 @@ import * as z from "zod";
 
 import { FinishSchema } from "./catalog.ts";
 import { CatalogImageDescriptorSchema } from "./catalog-detail.ts";
-import { MoneySchema } from "./market.ts";
 
 const identifierSchema = z.string().trim().min(1).max(128);
 const quantitySchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 
-export const CardLanguageSchema = z.enum([
+export const cardLanguages = [
   "en",
   "es",
   "fr",
@@ -25,72 +24,45 @@ export const CardLanguageSchema = z.enum([
   "ar",
   "sa",
   "ph",
-]);
-export type CardLanguage = z.infer<typeof CardLanguageSchema>;
+] as const;
+export type CardLanguage = (typeof cardLanguages)[number];
+export const CardLanguageSchema = z.enum(cardLanguages);
+export const cardLanguageLabels = {
+  en: "English",
+  es: "Spanish",
+  fr: "French",
+  de: "German",
+  it: "Italian",
+  pt: "Portuguese",
+  ja: "Japanese",
+  ko: "Korean",
+  ru: "Russian",
+  zhs: "Simplified Chinese",
+  zht: "Traditional Chinese",
+  he: "Hebrew",
+  la: "Latin",
+  grc: "Ancient Greek",
+  ar: "Arabic",
+  sa: "Sanskrit",
+  ph: "Phyrexian",
+} as const satisfies Record<CardLanguage, string>;
 
-export const cardLanguages: readonly Readonly<{ label: string; value: CardLanguage }>[] = [
-  { label: "English", value: "en" },
-  { label: "Spanish", value: "es" },
-  { label: "French", value: "fr" },
-  { label: "German", value: "de" },
-  { label: "Italian", value: "it" },
-  { label: "Portuguese", value: "pt" },
-  { label: "Japanese", value: "ja" },
-  { label: "Korean", value: "ko" },
-  { label: "Russian", value: "ru" },
-  { label: "Simplified Chinese", value: "zhs" },
-  { label: "Traditional Chinese", value: "zht" },
-  { label: "Hebrew", value: "he" },
-  { label: "Latin", value: "la" },
-  { label: "Ancient Greek", value: "grc" },
-  { label: "Arabic", value: "ar" },
-  { label: "Sanskrit", value: "sa" },
-  { label: "Phyrexian", value: "ph" },
-];
-
-export const CardConditionSchema = z.enum([
+export const cardConditions = [
   "near-mint",
   "lightly-played",
   "moderately-played",
   "heavily-played",
   "damaged",
-]);
-export type CardCondition = z.infer<typeof CardConditionSchema>;
-
-export const cardConditions: readonly Readonly<{ label: string; value: CardCondition }>[] = [
-  { label: "Near Mint", value: "near-mint" },
-  { label: "Lightly Played", value: "lightly-played" },
-  { label: "Moderately Played", value: "moderately-played" },
-  { label: "Heavily Played", value: "heavily-played" },
-  { label: "Damaged", value: "damaged" },
-];
-
-const CollectionMoneySchema = MoneySchema.extend({
-  amountMinor: z.number().int().nonnegative(),
-});
-
-/** Copies of one printing that share the same physical properties. */
-export const CollectionLotSchema = z.object({
-  acquiredAt: z.iso.datetime({ offset: true }).optional(),
-  condition: CardConditionSchema,
-  finish: FinishSchema,
-  id: identifierSchema,
-  language: CardLanguageSchema,
-  locationId: identifierSchema.optional(),
-  notes: z.string().optional(),
-  printingId: identifierSchema,
-  quantity: quantitySchema,
-  unitCost: CollectionMoneySchema.optional(),
-});
-export type CollectionLot = z.infer<typeof CollectionLotSchema>;
-
-export const CollectionHoldingKeySchema = z.strictObject({
-  condition: CardConditionSchema,
-  finish: FinishSchema,
-  language: CardLanguageSchema,
-  printingId: identifierSchema,
-});
-export type CollectionHoldingKey = z.infer<typeof CollectionHoldingKeySchema>;
+] as const;
+export type CardCondition = (typeof cardConditions)[number];
+export const CardConditionSchema = z.enum(cardConditions);
+export const cardConditionLabels = {
+  "near-mint": "Near Mint",
+  "lightly-played": "Lightly Played",
+  "moderately-played": "Moderately Played",
+  "heavily-played": "Heavily Played",
+  damaged: "Damaged",
+} as const satisfies Record<CardCondition, string>;
 
 export const CollectionSortSchema = z.enum(["name", "set", "quantity"]);
 export type CollectionSort = z.infer<typeof CollectionSortSchema>;
@@ -107,8 +79,12 @@ export const CollectionListRequestSchema = z.strictObject({
 });
 export type CollectionListRequest = z.infer<typeof CollectionListRequestSchema>;
 
-const CollectionHoldingCommonSchema = CollectionHoldingKeySchema.extend({
+const CollectionHoldingCommonSchema = z.strictObject({
+  condition: CardConditionSchema,
   editableLotId: identifierSchema.nullable(),
+  finish: FinishSchema,
+  language: CardLanguageSchema,
+  printingId: identifierSchema,
   quantity: quantitySchema,
 });
 
@@ -175,31 +151,6 @@ export const CollectionListResultSchema = z.discriminatedUnion("status", [
 ]);
 export type CollectionListResult = z.infer<typeof CollectionListResultSchema>;
 
-export const AddCollectionHoldingRequestSchema = CollectionHoldingKeySchema.extend({
-  quantity: quantitySchema,
-});
-export type AddCollectionHoldingRequest = z.infer<typeof AddCollectionHoldingRequestSchema>;
-
-export const UpdateCollectionHoldingRequestSchema = z.strictObject({
-  condition: CardConditionSchema,
-  finish: FinishSchema,
-  language: CardLanguageSchema,
-  lotId: identifierSchema,
-  quantity: quantitySchema,
-});
-export type UpdateCollectionHoldingRequest = z.infer<typeof UpdateCollectionHoldingRequestSchema>;
-
-export const RemoveCollectionHoldingRequestSchema = z.strictObject({
-  lotId: identifierSchema,
-});
-export type RemoveCollectionHoldingRequest = z.infer<typeof RemoveCollectionHoldingRequestSchema>;
-
-export const CollectionMutationResultSchema = z.strictObject({
-  holdingQuantity: quantitySchema,
-  lotId: identifierSchema,
-});
-export type CollectionMutationResult = z.infer<typeof CollectionMutationResultSchema>;
-
 export const CollectionPrintingValidationRequestSchema = z.strictObject({
   existingFinish: FinishSchema.optional(),
   finish: FinishSchema,
@@ -214,26 +165,6 @@ export const CollectionProjectionConnectionSchema = z.strictObject({
   workspaceId: z.uuid(),
 });
 export type CollectionProjectionConnection = z.infer<typeof CollectionProjectionConnectionSchema>;
-
-const StrictCollectionProjectionLotSchema = CollectionLotSchema.extend({
-  unitCost: CollectionMoneySchema.strict().optional(),
-}).strict();
-const CollectionProjectionIdentity = CollectionProjectionConnectionSchema.extend({
-  revision: z.number().int().positive(),
-});
-
-export const CollectionProjectionSnapshotSchema = CollectionProjectionIdentity.extend({
-  lots: z.array(StrictCollectionProjectionLotSchema).max(100_000),
-});
-export type CollectionProjectionSnapshot = z.infer<typeof CollectionProjectionSnapshotSchema>;
-
-export const CollectionProjectionDeltaSchema = CollectionProjectionIdentity.extend({
-  deletedLotIds: z.array(identifierSchema).max(1_000),
-  upserts: z.array(StrictCollectionProjectionLotSchema).max(1_000),
-}).refine(({ deletedLotIds, upserts }) => deletedLotIds.length + upserts.length > 0, {
-  message: "A collection projection delta must contain a change.",
-});
-export type CollectionProjectionDelta = z.infer<typeof CollectionProjectionDeltaSchema>;
 
 export const CollectionProjectionResultSchema = z.discriminatedUnion("status", [
   z.strictObject({ revision: z.number().int().positive(), status: z.literal("applied") }),

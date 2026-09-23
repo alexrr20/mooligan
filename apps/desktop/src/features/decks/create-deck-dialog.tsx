@@ -1,4 +1,4 @@
-import type { DeckMetadata } from "@mooligan/domain/decks";
+import type { DeckMetadata } from "@mooligan/workspace/deck-contract";
 import { useNavigate } from "@tanstack/react-router";
 
 import { DeckMetadataEditor } from "./deck-metadata-editor";

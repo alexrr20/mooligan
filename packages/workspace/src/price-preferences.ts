@@ -1,12 +1,8 @@
 import { Events, queryDb, Schema, State } from "@livestore/livestore";
 
-import {
-  PriceProviderSchema,
-  PriceCurrencySchema,
-  priceProviders,
-  type PriceProvider,
-} from "./price-preference-contract.ts";
-export { priceProviders, type PriceProvider } from "./price-preference-contract.ts";
+import { priceProviders, type PriceProvider } from "@mooligan/domain/market";
+
+import { PriceCurrencySchema, PriceProviderSchema } from "./price-preference-contract.ts";
 
 const preferenceSchema = Schema.Struct({ provider: PriceProviderSchema, enabled: Schema.Boolean });
 
@@ -58,7 +54,7 @@ export function readEnabledPriceProviders(
   rows: readonly (typeof pricePreferenceTables.priceProviderPreferences.Type)[],
 ): PriceProvider[] {
   const preferences = new Map(rows.map(({ provider, enabled }) => [provider, enabled]));
-  return priceProviders.filter(({ id }) => preferences.get(id) ?? true).map(({ id }) => id);
+  return priceProviders.filter((provider) => preferences.get(provider) ?? true);
 }
 
 export const priceCurrencyQuery = queryDb(pricePreferenceTables.priceCurrency, {
