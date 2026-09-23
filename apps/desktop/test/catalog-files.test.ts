@@ -1,3 +1,9 @@
+import type {
+  CatalogWorkerRequest,
+  CatalogWorkerResponse,
+  CatalogOperation,
+  CatalogOperationArguments,
+} from "../electron/catalog/operations.ts";
 import { openPriceDatabase } from "../electron/prices/database.ts";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -30,7 +36,6 @@ import {
 import { compactCatalogName, resolveCatalogSets } from "@mooligan/catalog/import";
 import {
   createCatalogQuery,
-  type CatalogQueryWorkerResponse,
   validateCatalogListRequest,
   validateCatalogUpcomingPrintingRequest,
 } from "@mooligan/catalog/query";
@@ -1157,18 +1162,30 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
       });
 
       try {
-        const response = await new Promise<CatalogQueryWorkerResponse>((resolve, reject) => {
-          worker.once("error", reject);
-          worker.once("message", resolve);
-          worker.postMessage({
-            id: 1,
-            operation: {
-              request: { query: "second" },
-              type: "list",
-              visibility: SHOW_ALL,
-            },
+        let requestId = 0;
+        function send<Operation extends CatalogOperation>(
+          operation: Operation,
+          args: CatalogOperationArguments<NoInfer<Operation>>,
+        ) {
+          return new Promise<CatalogWorkerResponse<Operation>>((resolve, reject) => {
+            const fail = (error: Error) => {
+              worker.off("message", done);
+              reject(error);
+            };
+            const done = (response: CatalogWorkerResponse<Operation>) => {
+              worker.off("error", fail);
+              resolve(response);
+            };
+            worker.once("error", fail);
+            worker.once("message", done);
+            worker.postMessage({
+              id: ++requestId,
+              operation,
+              args,
+            } satisfies CatalogWorkerRequest<Operation>);
           });
-        });
+        }
+        const response = await send("list", [{ query: "second" }, SHOW_ALL]);
 
         assert.deepEqual(response, {
           id: 1,
@@ -1201,18 +1218,7 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
           },
         });
 
-        const detailResponse = await new Promise<CatalogQueryWorkerResponse>((resolve, reject) => {
-          worker.once("error", reject);
-          worker.once("message", resolve);
-          worker.postMessage({
-            id: 2,
-            operation: {
-              printingId: "printing-1",
-              type: "detail",
-              visibility: SHOW_ALL,
-            },
-          });
-        });
+        const detailResponse = await send("detail", ["printing-1", SHOW_ALL]);
         assert.equal(detailResponse.id, 2);
         assert.equal(detailResponse.operation, "detail");
         assert.ok(!("error" in detailResponse));
@@ -1223,66 +1229,52 @@ void test("a gzipped Scryfall JSONL archive becomes a validated local catalog", 
           "printing-1",
         );
 
-        const imageResponse = await new Promise<CatalogQueryWorkerResponse>((resolve, reject) => {
-          worker.once("error", reject);
-          worker.once("message", resolve);
-          worker.postMessage({
-            id: 3,
-            operation: {
-              image: { faceIndex: 0, printingId: "printing-1", size: "small" },
-              type: "image-source",
-              visibility: SHOW_ALL,
-            },
-          });
-        });
+        const imageResponse = await send("image-source", [
+          { faceIndex: 0, printingId: "printing-1", size: "small" },
+          SHOW_ALL,
+        ]);
         assert.deepEqual(imageResponse, {
           id: 3,
           operation: "image-source",
           result: "https://cards.scryfall.io/small/front/1.jpg",
         });
 
-        const malformedResponse = await new Promise<unknown>((resolve, reject) => {
-          worker.once("error", reject);
-          worker.once("message", resolve);
-          worker.postMessage({
-            id: 4,
-            operation: { printingId: { value: "printing-1" }, type: "detail" },
-          });
-        });
-        assert.deepEqual(malformedResponse, {
-          error: "Invalid catalog query request.",
-          id: null,
-          operation: "invalid",
-        });
-
-        const unknownOperationResponse = await new Promise<unknown>((resolve, reject) => {
-          worker.once("error", reject);
-          worker.once("message", resolve);
-          worker.postMessage({ id: 5, operation: { type: "unknown" } });
-        });
-        assert.deepEqual(unknownOperationResponse, {
-          error: "Invalid catalog query request.",
-          id: null,
-          operation: "invalid",
-        });
-
-        const oversizedImageIdResponse = await new Promise<unknown>((resolve, reject) => {
-          worker.once("error", reject);
-          worker.once("message", resolve);
-          worker.postMessage({
-            id: 6,
-            operation: {
-              image: { faceIndex: 0, printingId: "x".repeat(129), size: "small" },
-              type: "image-source",
-              visibility: SHOW_ALL,
+        const projection = await send("collection-projection-replace", [
+          [
+            {
+              id: "lot-one",
+              printingId: "printing-1",
+              quantity: 2,
+              finish: "nonfoil",
+              language: "en",
+              condition: "near-mint",
+              acquiredAt: null,
+              locationId: null,
+              notes: null,
+              unitCost: null,
             },
-          });
-        });
-        assert.deepEqual(oversizedImageIdResponse, {
-          error: "Invalid catalog query request.",
-          id: null,
-          operation: "invalid",
-        });
+          ],
+        ]);
+        assert.ok("result" in projection);
+        const collection = await send("collection-list", [{}, SHOW_ALL]);
+        assert.ok("result" in collection);
+        assert.equal(collection.result.total.copies, 2);
+        const applied = await send("collection-projection-apply", [
+          { deletedLotIds: ["lot-one"], upserts: [] },
+        ]);
+        assert.ok("result" in applied);
+        const empty = await send("collection-list", [{}, SHOW_ALL]);
+        assert.ok("result" in empty);
+        assert.equal(empty.result.total.copies, 0);
+
+        const writer = new DatabaseSync(destination);
+        writer.prepare("UPDATE cards SET json = '{}' WHERE id = 'printing-1'").run();
+        writer.close();
+        const failed = await send("detail", ["printing-1", SHOW_ALL]);
+        assert.ok("error" in failed, "stored data validation errors return to the caller");
+        assert.equal(failed.operation, "detail");
+        const subsequent = await send("detail", ["printing-2", SHOW_ALL]);
+        assert.ok("result" in subsequent, "one failed query does not stop the worker");
       } finally {
         await worker.terminate();
       }

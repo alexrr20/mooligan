@@ -2,7 +2,6 @@ import { UuidSchema } from "@mooligan/domain/schema";
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import { SpoilerTargetIdSchema } from "@mooligan/domain/spoilers";
 import { CatalogListPageSchema } from "@mooligan/domain/catalog-search";
-import { DeckCostRequestSchema } from "@mooligan/workspace/transport";
 import { DeckCostSchema } from "@mooligan/domain/deck-cost";
 import {
   ExchangeRatesSchema,
@@ -67,10 +66,7 @@ export const desktopApi = {
   catalog: {
     deckCost: async (request) =>
       Schema.decodeUnknownSync(DeckCostSchema)(
-        await ipcRenderer.invoke(
-          "catalog:deck-cost",
-          Schema.decodeUnknownSync(DeckCostRequestSchema)(request),
-        ),
+        await ipcRenderer.invoke("catalog:deck-cost", request),
       ),
     colors: (printingIds) => ipcRenderer.invoke("catalog:colors", printingIds),
     cancelQuery: (requestId) => ipcRenderer.invoke("catalog:cancel-query", decodeUuid(requestId)),

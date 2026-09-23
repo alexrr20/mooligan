@@ -7,14 +7,14 @@ export function catalogVisibilitySqlFor(table: "cards" | "newer" | "sibling") {
   const releaseDate = `${table}.effective_released_at`;
   return `(
   ${releaseDate} IS NULL
-  OR ${releaseDate} <= ?
-  OR ? = 'show'
+  OR ${releaseDate} <= $visibilityDate
+  OR $visibilityPolicy = 'show'
   OR EXISTS (
-    SELECT 1 FROM json_each(?) AS revealed_printings
+    SELECT 1 FROM json_each($revealedPrintingIds) AS revealed_printings
     WHERE revealed_printings.value = ${table}.id
   )
   OR EXISTS (
-    SELECT 1 FROM json_each(?) AS revealed_releases
+    SELECT 1 FROM json_each($revealedRootSetIds) AS revealed_releases
     WHERE revealed_releases.value = ${table}.root_set_id
   )
 )`;
@@ -24,10 +24,10 @@ export const catalogVisibilitySql = catalogVisibilitySqlFor("cards");
 
 export function createCatalogVisibilityQuery(database: CatalogDatabase) {
   const select = database.prepare(
-    `SELECT 1 FROM cards WHERE cards.id = ? AND ${catalogVisibilitySql}`,
+    `SELECT 1 FROM cards WHERE cards.id = $printingId AND ${catalogVisibilitySql}`,
   );
   return (printingId: string, snapshot: SpoilerVisibilitySnapshot) =>
-    select.get(printingId, ...catalogVisibilityArguments(snapshot)) !== undefined;
+    select.get({ $printingId: printingId, ...catalogVisibilityParameters(snapshot) }) !== undefined;
 }
 
 export type CatalogVisibilityFacts = {
@@ -36,15 +36,13 @@ export type CatalogVisibilityFacts = {
   rootSetId: string;
 };
 
-export function catalogVisibilityArguments(
-  snapshot: SpoilerVisibilitySnapshot,
-): readonly [string, string, string, string] {
-  return [
-    snapshot.currentDate,
-    snapshot.policy,
-    JSON.stringify(snapshot.revealedPrintingIds),
-    JSON.stringify(snapshot.revealedRootSetIds),
-  ];
+export function catalogVisibilityParameters(snapshot: SpoilerVisibilitySnapshot) {
+  return {
+    $visibilityDate: snapshot.currentDate,
+    $visibilityPolicy: snapshot.policy,
+    $revealedPrintingIds: JSON.stringify(snapshot.revealedPrintingIds),
+    $revealedRootSetIds: JSON.stringify(snapshot.revealedRootSetIds),
+  };
 }
 
 export function catalogVisibilityReason(

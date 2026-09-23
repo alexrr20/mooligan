@@ -1,62 +1,5 @@
 import type { CatalogDatabase as DatabaseSync } from "./database.ts";
-
 import type { CollectionLot } from "@mooligan/workspace/collection-contract";
-import { type JsonValue, StrictStruct } from "@mooligan/domain/schema";
-import { CollectionLotSchema } from "@mooligan/workspace/collection-contract";
-import { IdentifierSchema } from "@mooligan/workspace/primitives";
-import { Option, Schema } from "effect";
-const CollectionProjectionWorkerOperationSchema = Schema.Union(
-  StrictStruct({
-    lots: Schema.Array(CollectionLotSchema).pipe(Schema.maxItems(100_000)),
-    type: Schema.Literal("collection-projection-replace"),
-  }),
-  StrictStruct({
-    deletedLotIds: Schema.Array(IdentifierSchema).pipe(Schema.maxItems(1_000)),
-    type: Schema.Literal("collection-projection-apply"),
-    upserts: Schema.Array(CollectionLotSchema).pipe(Schema.maxItems(1_000)),
-  }),
-);
-export type CollectionProjectionWorkerOperation =
-  typeof CollectionProjectionWorkerOperationSchema.Type;
-
-const workerRequestIdSchema = Schema.Int.pipe(Schema.positive());
-const CollectionProjectionWorkerRequestSchema = StrictStruct({
-  id: workerRequestIdSchema,
-  operation: CollectionProjectionWorkerOperationSchema,
-});
-export type CollectionProjectionWorkerRequest = typeof CollectionProjectionWorkerRequestSchema.Type;
-
-const collectionProjectionOperationTypeSchema = Schema.Literal(
-  "collection-projection-replace",
-  "collection-projection-apply",
-);
-const CollectionProjectionWorkerResponseSchema = Schema.Union(
-  StrictStruct({
-    id: workerRequestIdSchema,
-    operation: collectionProjectionOperationTypeSchema,
-    status: Schema.Literal("applied"),
-  }),
-  StrictStruct({
-    error: Schema.NonEmptyString,
-    id: workerRequestIdSchema,
-    operation: collectionProjectionOperationTypeSchema,
-  }),
-);
-
-const decodeWorkerRequest = Schema.decodeUnknownOption(CollectionProjectionWorkerRequestSchema);
-const decodeWorkerResponse = Schema.decodeUnknownOption(CollectionProjectionWorkerResponseSchema);
-
-export function parseCollectionProjectionWorkerRequest(value: JsonValue) {
-  return Option.getOrNull(decodeWorkerRequest(value));
-}
-
-export function parseCollectionProjectionWorkerResponse(
-  value: JsonValue,
-  expectedOperation: CollectionProjectionWorkerOperation["type"],
-) {
-  const response = Option.getOrNull(decodeWorkerResponse(value));
-  return response?.operation === expectedOperation ? response : null;
-}
 
 export function createCollectionProjection(database: DatabaseSync) {
   database.exec(`
@@ -97,19 +40,19 @@ export function createCollectionProjection(database: DatabaseSync) {
   const clear = database.prepare("DELETE FROM collection_lots");
 
   return {
-    apply({
-      deletedLotIds,
-      upserts,
-    }: {
-      deletedLotIds: readonly string[];
-      upserts: readonly CollectionLot[];
-    }) {
+    apply(
+      this: void,
+      {
+        deletedLotIds,
+        upserts,
+      }: { deletedLotIds: readonly string[]; upserts: readonly CollectionLot[] },
+    ) {
       transact(database, () => {
         for (const lotId of deletedLotIds) remove.run(lotId);
         for (const lot of upserts) insert.run(...collectionLotArguments(lot));
       });
     },
-    replace(lots: readonly CollectionLot[]) {
+    replace(this: void, lots: readonly CollectionLot[]) {
       transact(database, () => {
         clear.run();
         for (const lot of lots) insert.run(...collectionLotArguments(lot));
@@ -126,11 +69,11 @@ function collectionLotArguments(lot: CollectionLot) {
     lot.language,
     lot.condition,
     lot.quantity,
-    lot.acquiredAt,
+    lot.acquiredAt ?? null,
     lot.unitCost?.amountMinor ?? null,
     lot.unitCost?.currency ?? null,
-    lot.locationId,
-    lot.notes,
+    lot.locationId ?? null,
+    lot.notes ?? null,
   ];
 }
 

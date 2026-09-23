@@ -18,7 +18,7 @@ import { Option, Schema } from "effect";
 
 import { createCatalogReleaseSummaryQuery } from "@mooligan/catalog/release";
 import {
-  catalogVisibilityArguments,
+  catalogVisibilityParameters,
   catalogVisibilityReason,
   catalogVisibilitySql,
   effectiveReleaseDateSql,
@@ -58,7 +58,7 @@ export function createCatalogDetailQuery(database: DatabaseSync) {
             ${effectiveReleaseDateSql} AS releasedOn,
             cards.root_set_id AS rootSetId
      FROM cards
-     WHERE cards.id = ? AND ${catalogVisibilitySql}`,
+     WHERE cards.id = $printingId AND ${catalogVisibilitySql}`,
   );
   const selectProtectedPrinting = database.prepare(
     `SELECT cards.id AS printingId,
@@ -70,7 +70,7 @@ export function createCatalogDetailQuery(database: DatabaseSync) {
   const selectRelated = database.prepare(
     `SELECT cards.json
      FROM cards
-     WHERE cards.oracle_id = ? AND ${catalogVisibilitySql}`,
+     WHERE cards.oracle_id = $oracleId AND ${catalogVisibilitySql}`,
   );
   const queryReleaseSummary = createCatalogReleaseSummaryQuery(database);
 
@@ -78,8 +78,11 @@ export function createCatalogDetailQuery(database: DatabaseSync) {
     printingId: string,
     visibility: SpoilerVisibilitySnapshot,
   ): CatalogPrintingResult | null => {
-    const visibilityArguments = catalogVisibilityArguments(visibility);
-    const selectedValue = selectVisiblePrinting.get(printingId, ...visibilityArguments);
+    const visibilityParameters = catalogVisibilityParameters(visibility);
+    const selectedValue = selectVisiblePrinting.get({
+      $printingId: printingId,
+      ...visibilityParameters,
+    });
     const selectedRow = decodeVisibleRecordRow(selectedValue);
 
     if (Option.isNone(selectedRow)) {
@@ -111,7 +114,7 @@ export function createCatalogDetailQuery(database: DatabaseSync) {
     const selected = decodeCatalogRecord(selectedRow.value.json);
     const related = selectedRow.value.oracleId
       ? decodeRelatedRecordRows(
-          selectRelated.all(selectedRow.value.oracleId, ...visibilityArguments),
+          selectRelated.all({ $oracleId: selectedRow.value.oracleId, ...visibilityParameters }),
         )
           .map((row) => decodeCatalogRecord(row.json))
           .sort(comparePrintings)
@@ -140,11 +143,14 @@ export function createCatalogImageSourceQuery(database: DatabaseSync) {
   const selectPrinting = database.prepare(
     `SELECT cards.json
      FROM cards
-     WHERE cards.id = ? AND ${catalogVisibilitySql}`,
+     WHERE cards.id = $printingId AND ${catalogVisibilitySql}`,
   );
 
   return (input: CatalogImageDescriptor, visibility: SpoilerVisibilitySnapshot): string | null => {
-    const value = selectPrinting.get(input.printingId, ...catalogVisibilityArguments(visibility));
+    const value = selectPrinting.get({
+      $printingId: input.printingId,
+      ...catalogVisibilityParameters(visibility),
+    });
     if (value === undefined) {
       return null;
     }

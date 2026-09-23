@@ -257,6 +257,37 @@ void test("collection reads separate visible, protected, and unavailable Holding
     assert.equal(firstBatch.holdings[0]?.status, "visible");
     assert.equal(secondBatch.holdings[0]?.status, "unavailable");
 
+    const beyondPage = list({ offset: 100 }, visibility);
+    assert.deepEqual(beyondPage.holdings, []);
+    assert.equal(beyondPage.hasMore, false);
+    assert.deepEqual(beyondPage.total, page.total);
+    assert.equal(beyondPage.protectedCopies, 3);
+    const revealed = list(
+      { setCode: "fut", sort: "set" },
+      { ...visibility, revealedPrintingIds: ["future-printing"] },
+    );
+    assert.equal(revealed.protectedCopies, 0);
+    assert.equal(revealed.filtered.copies, 3);
+    assert.equal(revealed.holdings[0]?.status, "visible");
+
+    database
+      .prepare(
+        "UPDATE cards SET json = json_set(json, '$.finishes', json('[42]')) WHERE id = 'visible-printing'",
+      )
+      .run();
+    assert.throws(() => list({}, visibility));
+    assert.equal(
+      database.isTransaction,
+      false,
+      "a failed row validation rolls back the read transaction",
+    );
+    projection.replace([]);
+    const empty = list({}, visibility);
+    assert.deepEqual(empty.holdings, []);
+    assert.deepEqual(empty.total, { cards: 0, copies: 0, holdings: 0 });
+    assert.deepEqual(empty.filtered, empty.total);
+    assert.deepEqual(empty.sets, []);
+
     database.close();
   } finally {
     await rm(directory, { force: true, recursive: true });

@@ -8,10 +8,7 @@ import { test } from "node:test";
 
 import type { CollectionLot } from "@mooligan/workspace/collection-contract";
 
-import {
-  createCollectionProjection,
-  parseCollectionProjectionWorkerRequest,
-} from "@mooligan/catalog/collection-projection";
+import { createCollectionProjection } from "@mooligan/catalog/collection-projection";
 import { CollectionProjection } from "../electron/collection/projection.ts";
 import { diffCollectionLots } from "../src/features/workspace/collection-projection-diff.ts";
 
@@ -21,15 +18,8 @@ void test("Holding edits and removals send valid catalog worker deltas without r
   const projected = new Map<string, CollectionLot>();
   const projection = new CollectionProjection(() => workspaceId, {
     applyDelta: (delta) => {
-      const request = parseCollectionProjectionWorkerRequest({
-        id: 1,
-        operation: { ...delta, type: "collection-projection-apply" },
-      });
-      assert.ok(request, "The catalog worker must accept the collection delta.");
-      assert.equal(request.operation.type, "collection-projection-apply");
-      if (request.operation.type !== "collection-projection-apply") assert.fail();
-      for (const lotId of request.operation.deletedLotIds) projected.delete(lotId);
-      for (const lot of request.operation.upserts) projected.set(lot.id, lot);
+      for (const lotId of delta.deletedLotIds) projected.delete(lotId);
+      for (const lot of delta.upserts) projected.set(lot.id, lot);
       return Promise.resolve();
     },
     replace: (lots) => {
