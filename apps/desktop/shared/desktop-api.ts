@@ -1,4 +1,4 @@
-import type { CatalogSnapshot, Color } from "@mooligan/domain/catalog";
+import { CatalogSnapshotSchema, type Color } from "@mooligan/domain/catalog";
 import type { DeckCost } from "@mooligan/domain/deck-cost";
 import type { ExchangeRates, PriceStatus, PrintingPrices } from "@mooligan/domain/market";
 import type {
@@ -18,16 +18,6 @@ import type {
   CollectionProjectionSnapshot,
   DeckCostRequest,
 } from "@mooligan/workspace/transport";
-import {
-  CollectionListResultSchema,
-  CollectionPrintingValidationRequestSchema,
-  CollectionProjectionConnectionSchema,
-  CollectionProjectionResultSchema,
-} from "@mooligan/domain/collection";
-import {
-  CollectionProjectionDeltaSchema,
-  CollectionProjectionSnapshotSchema,
-} from "@mooligan/workspace/transport";
 import type {
   CatalogPrintingResult,
   CatalogReleaseSummary,
@@ -36,14 +26,7 @@ import type {
   SpoilerProjectionSnapshot,
   SpoilerRevealSummaries,
 } from "@mooligan/domain/spoilers";
-import {
-  SpoilerProjectionConnectionSchema,
-  SpoilerProjectionDeltaSchema,
-  SpoilerProjectionResultSchema,
-  SpoilerProjectionSnapshotSchema,
-} from "@mooligan/domain/spoilers";
 import type { WorkspaceBackup } from "@mooligan/workspace/backup";
-import type { JsonValue } from "@mooligan/domain/schema";
 import { Schema } from "effect";
 
 export type { WorkspaceBackup } from "@mooligan/workspace/backup";
@@ -63,61 +46,25 @@ export type {
   WorkspaceSyncSession,
   WorkspaceSyncIssue,
   WorkspaceRuntime,
-  AuthStatus,
-  AuthUser,
-  AuthSnapshot,
 } from "@mooligan/account/runtime";
 import type { WorkspaceBootstrap, WorkspaceRuntime, AuthSnapshot } from "@mooligan/account/runtime";
 
-export function validateCollectionListResult(value: JsonValue) {
-  return Schema.decodeUnknownSync(CollectionListResultSchema)(value);
-}
+export const CatalogProgressSchema = Schema.Struct({
+  completedBytes: Schema.NonNegativeInt,
+  completedCards: Schema.NonNegativeInt,
+  totalBytes: Schema.NonNegativeInt,
+});
+export type CatalogProgress = typeof CatalogProgressSchema.Type;
 
-export function validateCollectionPrintingRequest(value: JsonValue) {
-  return Schema.decodeUnknownSync(CollectionPrintingValidationRequestSchema)(value);
-}
-
-export function validateCollectionProjectionConnection(value: JsonValue) {
-  return Schema.decodeUnknownSync(CollectionProjectionConnectionSchema)(value);
-}
-
-export function validateCollectionProjectionDelta(value: JsonValue) {
-  return Schema.decodeUnknownSync(CollectionProjectionDeltaSchema)(value);
-}
-
-export function validateCollectionProjectionResult(value: JsonValue) {
-  return Schema.decodeUnknownSync(CollectionProjectionResultSchema)(value);
-}
-
-export function validateCollectionProjectionSnapshot(value: JsonValue) {
-  return Schema.decodeUnknownSync(CollectionProjectionSnapshotSchema)(value);
-}
-
-export function validateSpoilerProjectionConnection(value: JsonValue) {
-  return Schema.decodeUnknownSync(SpoilerProjectionConnectionSchema)(value);
-}
-
-export function validateSpoilerProjectionDelta(value: JsonValue) {
-  return Schema.decodeUnknownSync(SpoilerProjectionDeltaSchema)(value);
-}
-
-export function validateSpoilerProjectionResult(value: JsonValue) {
-  return Schema.decodeUnknownSync(SpoilerProjectionResultSchema)(value);
-}
-
-export function validateSpoilerProjectionSnapshot(value: JsonValue) {
-  return Schema.decodeUnknownSync(SpoilerProjectionSnapshotSchema)(value);
-}
-
-export type CatalogProgress = {
-  completedBytes: number;
-  completedCards: number;
-  totalBytes: number;
-};
-
-export type CatalogStatus =
-  | { installed: false }
-  | (CatalogSnapshot & { installed: true; updateAvailable: boolean });
+export const CatalogStatusSchema = Schema.Union(
+  Schema.Struct({ installed: Schema.Literal(false) }),
+  Schema.Struct({
+    ...CatalogSnapshotSchema.fields,
+    installed: Schema.Literal(true),
+    updateAvailable: Schema.Boolean,
+  }),
+);
+export type CatalogStatus = typeof CatalogStatusSchema.Type;
 
 export type DesktopApi = {
   prices: {

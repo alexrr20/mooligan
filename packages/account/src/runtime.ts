@@ -69,21 +69,25 @@ export const validateWorkspaceBootstrap: (value: JsonValue) => WorkspaceBootstra
 export const validateWorkspaceRuntime: (value: JsonValue) => WorkspaceRuntime =
   Schema.decodeUnknownSync(WorkspaceRuntimeSchema);
 
-export type AuthStatus =
-  | "signed-out"
-  | "signed-in"
-  | "session-unavailable"
-  | "protected-storage-unavailable";
+export const AuthStatusSchema = Schema.Literal(
+  "signed-out",
+  "signed-in",
+  "session-unavailable",
+  "protected-storage-unavailable",
+);
+export type AuthStatus = typeof AuthStatusSchema.Type;
 
-export type AuthUser = {
-  email: string;
-  id: string;
-  image: string | null;
-  name: string;
-};
+export const AuthUserSchema = Schema.Struct({
+  email: Schema.String,
+  id: Schema.String,
+  image: Schema.NullOr(Schema.String),
+  name: Schema.String,
+});
+export type AuthUser = typeof AuthUserSchema.Type;
 
-export type AuthSnapshot = {
-  pendingAuth: boolean;
-  status: AuthStatus;
-  user: AuthUser | null;
-};
+export const AuthSnapshotSchema = Schema.Struct({
+  pendingAuth: Schema.Boolean,
+  status: AuthStatusSchema,
+  user: Schema.NullOr(AuthUserSchema),
+});
+export type AuthSnapshot = typeof AuthSnapshotSchema.Type;

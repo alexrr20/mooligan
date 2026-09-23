@@ -1,3 +1,4 @@
+import { editorStyles } from "../../components/ui/editor-controls";
 import type { Deck, DeckEntry } from "@mooligan/workspace/deck-contract";
 import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
 import * as stylex from "@stylexjs/stylex";
@@ -8,20 +9,21 @@ import { Button } from "../../components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "../../components/ui/toggle-group";
 import { useCatalogImageLoading } from "../catalog/catalog-image-loading";
 import { DeckCardPicker } from "./deck-card-picker";
-import { deckStyles } from "./deck-controls";
+
 import { DeckCardItem } from "./deck-card-item";
 import "./deck-cards.css";
-import { summarizeDeck } from "@mooligan/workspace/client/deck-summary";
+import { groupDeckEntries } from "@mooligan/workspace/client/deck-summary";
 import {
   cardIdentity,
   tagsForDeck,
   indexCardTags,
   groupEntriesByTag,
+  filterEntriesByTag,
 } from "@mooligan/workspace/client/tag-state";
-import { CardTagBadge, tagStyles } from "./card-tag-controls";
-import { CardTagEditor } from "./card-tag-editor";
-import { CardTagManager } from "./card-tag-manager";
-import { useCardTags } from "./use-card-tags";
+import { CardTagBadge, tagStyles } from "../tags/card-tag-controls";
+import { CardTagEditor } from "../tags/card-tag-editor";
+import { CardTagManager } from "../tags/card-tag-manager";
+import { useCardTags } from "../tags/use-card-tags";
 import { useViewPreference } from "../preferences/use-view-preference";
 
 export function DeckCards({
@@ -46,19 +48,14 @@ export function DeckCards({
   const [selection, setSelection] = useState<Set<string>>(new Set());
   const available = tagsForDeck(tags, deck.id, includeGlobal);
   const byCard = indexCardTags(available, assignments);
-  const activeFilter =
-    filter === "untagged" || available.some(({ id }) => id === filter) ? filter : "all";
-  const filtered = deck.entries.filter((entry) => {
-    const identity = cardIdentity(printings.get(entry.printingId));
-    const assigned = identity ? (byCard.get(identity) ?? []) : [];
-    return (
-      activeFilter === "all" ||
-      (activeFilter === "untagged"
-        ? !assigned.length
-        : assigned.some(({ id }) => id === activeFilter))
-    );
-  });
-  const summary = summarizeDeck(filtered, [], printings);
+  const { activeFilter, entries: filtered } = filterEntriesByTag(
+    deck.entries,
+    printings,
+    available,
+    assignments,
+    filter,
+  );
+  const summary = groupDeckEntries(filtered, printings);
   const allIds = new Set(
     deck.entries.flatMap((entry) => cardIdentity(printings.get(entry.printingId)) ?? []),
   );
@@ -239,9 +236,9 @@ export function DeckCards({
         </p>
       ) : null}
       {!deck.entries.length ? (
-        <p {...stylex.props(deckStyles.muted)}>No cards yet. Add cards to start building.</p>
+        <p {...stylex.props(editorStyles.muted)}>No cards yet. Add cards to start building.</p>
       ) : !filtered.length ? (
-        <p {...stylex.props(deckStyles.muted)}>No cards match this filter.</p>
+        <p {...stylex.props(editorStyles.muted)}>No cards match this filter.</p>
       ) : null}
       {summary.sections
         .filter(({ quantity }) => quantity > 0)

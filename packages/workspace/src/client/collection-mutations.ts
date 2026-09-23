@@ -56,14 +56,13 @@ export function createCollectionMutations(
         }),
       );
 
-      const target = store
-        .query(collectionLotsQuery)
-        .find((lot) => sameHolding(lot, request) && isUnattributedLot(lot));
-      if (!target) throw new Error("The Collection quantity is too large.");
-      return { holdingQuantity: target.quantity, lotId: target.id };
+      return {
+        holdingQuantity: (existing?.quantity ?? 0) + request.quantity,
+        lotId: existing?.id ?? lotId,
+      };
     },
 
-    async remove(request: RemoveCollectionHoldingRequest) {
+    remove(request: RemoveCollectionHoldingRequest) {
       request = decodeRemoveRequest(request);
       const source = store.query(collectionLotsQuery).find(({ id }) => id === request.lotId);
       if (!source || !isUnattributedLot(source)) {
@@ -72,9 +71,6 @@ export function createCollectionMutations(
       store.commit(
         events.collectionLotRemoved({ lotId: request.lotId, removalId: crypto.randomUUID() }),
       );
-      if (store.query(collectionLotsQuery).some(({ id }) => id === request.lotId)) {
-        throw new Error("This Collection holding could not be removed.");
-      }
     },
 
     async update(request: UpdateCollectionHoldingRequest): Promise<CollectionMutationResult> {
@@ -88,14 +84,19 @@ export function createCollectionMutations(
         finish: request.finish,
         printingId: source.printingId,
       });
-      const existingTarget = store
-        .query(collectionLotsQuery)
-        .find(
-          (lot) =>
-            lot.id !== source.id &&
-            sameHolding(lot, { ...request, printingId: source.printingId }) &&
-            isUnattributedLot(lot),
+      const lots = store.query(collectionLotsQuery);
+      const current = lots.find(({ id }) => id === source.id);
+      if (!current || !isUnattributedLot(current) || current.finish !== source.finish) {
+        throw new Error(
+          "This Collection holding changed while its printing was being checked. Try again.",
         );
+      }
+      const existingTarget = lots.find(
+        (lot) =>
+          lot.id !== source.id &&
+          sameHolding(lot, { ...request, printingId: source.printingId }) &&
+          isUnattributedLot(lot),
+      );
       if (existingTarget && !Number.isSafeInteger(existingTarget.quantity + request.quantity)) {
         throw new Error("The Collection quantity is too large.");
       }
@@ -110,15 +111,10 @@ export function createCollectionMutations(
         }),
       );
 
-      const target = store
-        .query(collectionLotsQuery)
-        .find(
-          (lot) =>
-            sameHolding(lot, { ...request, printingId: source.printingId }) &&
-            isUnattributedLot(lot),
-        );
-      if (!target) throw new Error("The Collection quantity is too large.");
-      return { holdingQuantity: target.quantity, lotId: target.id };
+      return {
+        holdingQuantity: (existingTarget?.quantity ?? 0) + request.quantity,
+        lotId: existingTarget?.id ?? source.id,
+      };
     },
   };
 }

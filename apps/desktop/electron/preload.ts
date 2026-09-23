@@ -1,7 +1,33 @@
+import { ColorSchema } from "@mooligan/domain/catalog";
+import { AuthSnapshotSchema } from "@mooligan/account/runtime";
+import {
+  CollectionListResultSchema,
+  CollectionPrintingValidationRequestSchema,
+  CollectionProjectionConnectionSchema,
+  CollectionProjectionResultSchema,
+} from "@mooligan/domain/collection";
+import {
+  CollectionProjectionDeltaSchema,
+  CollectionProjectionSnapshotSchema,
+} from "@mooligan/workspace/transport";
+import {
+  SpoilerProjectionConnectionSchema,
+  SpoilerProjectionDeltaSchema,
+  SpoilerProjectionResultSchema,
+  SpoilerProjectionSnapshotSchema,
+} from "@mooligan/domain/spoilers";
 import { UuidSchema } from "@mooligan/domain/schema";
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
-import { SpoilerTargetIdSchema } from "@mooligan/domain/spoilers";
-import { CatalogListPageSchema } from "@mooligan/domain/catalog-search";
+import {
+  SpoilerTargetIdSchema,
+  CatalogPrintingResultSchema,
+  CatalogReleaseSummarySchema,
+  SpoilerRevealSummariesSchema,
+} from "@mooligan/domain/spoilers";
+import {
+  CatalogListPageSchema,
+  CatalogUpcomingPrintingPageSchema,
+} from "@mooligan/domain/catalog-search";
 import { DeckCostSchema } from "@mooligan/domain/deck-cost";
 import {
   ExchangeRatesSchema,
@@ -10,20 +36,12 @@ import {
 } from "@mooligan/domain/market";
 import { Schema } from "effect";
 
+import type { AuthSnapshot } from "@mooligan/account/runtime";
 import {
-  validateCollectionListResult,
-  validateCollectionPrintingRequest,
-  validateCollectionProjectionConnection,
-  validateCollectionProjectionDelta,
-  validateCollectionProjectionResult,
-  validateCollectionProjectionSnapshot,
-  validateSpoilerProjectionConnection,
-  validateSpoilerProjectionDelta,
-  validateSpoilerProjectionResult,
-  validateSpoilerProjectionSnapshot,
+  CatalogProgressSchema,
+  CatalogStatusSchema,
   validateWorkspaceBootstrap,
   validateWorkspaceRuntime,
-  type AuthSnapshot,
   type CatalogProgress,
   type DesktopApi,
 } from "../shared/desktop-api";
@@ -58,7 +76,7 @@ export const desktopApi = {
   },
   collection: {
     list: async (request, requestId) =>
-      validateCollectionListResult(
+      Schema.decodeUnknownSync(CollectionListResultSchema)(
         unwrapCatalogRequest(await ipcRenderer.invoke("collection:list", request, requestId)),
       ),
   },
@@ -68,53 +86,74 @@ export const desktopApi = {
       Schema.decodeUnknownSync(DeckCostSchema)(
         await ipcRenderer.invoke("catalog:deck-cost", request),
       ),
-    colors: (printingIds) => ipcRenderer.invoke("catalog:colors", printingIds),
+    colors: async (printingIds) =>
+      Schema.decodeUnknownSync(Schema.NullOr(Schema.mutable(Schema.Array(ColorSchema))))(
+        await ipcRenderer.invoke("catalog:colors", printingIds),
+      ),
     cancelQuery: (requestId) => ipcRenderer.invoke("catalog:cancel-query", decodeUuid(requestId)),
-    detail: (printingId) => ipcRenderer.invoke("catalog:detail", printingId),
-    download: () => ipcRenderer.invoke("catalog:download"),
+    detail: async (printingId) =>
+      Schema.decodeUnknownSync(Schema.NullOr(CatalogPrintingResultSchema))(
+        await ipcRenderer.invoke("catalog:detail", printingId),
+      ),
+    download: async () =>
+      Schema.decodeUnknownSync(CatalogStatusSchema)(await ipcRenderer.invoke("catalog:download")),
     list: async (request, requestId) =>
       Schema.decodeUnknownSync(CatalogListPageSchema)(
         unwrapCatalogRequest(await ipcRenderer.invoke("catalog:list", request, requestId)),
       ),
     onProgress: (callback: (progress: CatalogProgress) => void) =>
-      subscribe("catalog:progress", callback),
-    resolveRootSetId: (targetId) =>
-      ipcRenderer.invoke(
-        "catalog:root-set",
-        Schema.decodeUnknownSync(SpoilerTargetIdSchema)(targetId),
+      subscribe("catalog:progress", (value) =>
+        callback(Schema.decodeUnknownSync(CatalogProgressSchema)(value)),
       ),
-    spoilerRevealSummaries: () => ipcRenderer.invoke("catalog:spoiler-reveals"),
-    status: () => ipcRenderer.invoke("catalog:status"),
-    upcoming: () => ipcRenderer.invoke("catalog:upcoming"),
-    upcomingPrintings: (request) => ipcRenderer.invoke("catalog:upcoming-printings", request),
+    resolveRootSetId: async (targetId) =>
+      Schema.decodeUnknownSync(Schema.NullOr(SpoilerTargetIdSchema))(
+        await ipcRenderer.invoke(
+          "catalog:root-set",
+          Schema.decodeUnknownSync(SpoilerTargetIdSchema)(targetId),
+        ),
+      ),
+    spoilerRevealSummaries: async () =>
+      Schema.decodeUnknownSync(SpoilerRevealSummariesSchema)(
+        await ipcRenderer.invoke("catalog:spoiler-reveals"),
+      ),
+    status: async () =>
+      Schema.decodeUnknownSync(CatalogStatusSchema)(await ipcRenderer.invoke("catalog:status")),
+    upcoming: async () =>
+      Schema.decodeUnknownSync(Schema.mutable(Schema.Array(CatalogReleaseSummarySchema)))(
+        await ipcRenderer.invoke("catalog:upcoming"),
+      ),
+    upcomingPrintings: async (request) =>
+      Schema.decodeUnknownSync(CatalogUpcomingPrintingPageSchema)(
+        await ipcRenderer.invoke("catalog:upcoming-printings", request),
+      ),
     validateCollectionPrinting: (request) =>
       ipcRenderer.invoke(
         "catalog:validate-collection-printing",
-        validateCollectionPrintingRequest(request),
+        Schema.decodeUnknownSync(CollectionPrintingValidationRequestSchema)(request),
       ),
   },
 
   workspaceProjection: {
     applyCollectionDelta: async (delta) =>
-      validateCollectionProjectionResult(
+      Schema.decodeUnknownSync(CollectionProjectionResultSchema)(
         await ipcRenderer.invoke(
           "workspace-projection:collection-apply",
-          validateCollectionProjectionDelta(delta),
+          Schema.decodeUnknownSync(CollectionProjectionDeltaSchema)(delta),
         ),
       ),
     applySpoilerDelta: async (delta) =>
-      validateSpoilerProjectionResult(
+      Schema.decodeUnknownSync(SpoilerProjectionResultSchema)(
         await ipcRenderer.invoke(
           "workspace-projection:spoilers-apply",
-          validateSpoilerProjectionDelta(delta),
+          Schema.decodeUnknownSync(SpoilerProjectionDeltaSchema)(delta),
         ),
       ),
     connectSpoilers: async (workspaceId) =>
-      validateSpoilerProjectionConnection(
+      Schema.decodeUnknownSync(SpoilerProjectionConnectionSchema)(
         await ipcRenderer.invoke("workspace-projection:spoilers-connect", decodeUuid(workspaceId)),
       ),
     connectCollection: async (workspaceId) =>
-      validateCollectionProjectionConnection(
+      Schema.decodeUnknownSync(CollectionProjectionConnectionSchema)(
         await ipcRenderer.invoke(
           "workspace-projection:collection-connect",
           decodeUuid(workspaceId),
@@ -124,17 +163,17 @@ export const desktopApi = {
       subscribe("workspace-projection:collection-resync-required", callback),
     onSpoilersChanged: (callback) => subscribe("workspace-projection:spoilers-changed", callback),
     replaceCollection: async (snapshot) =>
-      validateCollectionProjectionResult(
+      Schema.decodeUnknownSync(CollectionProjectionResultSchema)(
         await ipcRenderer.invoke(
           "workspace-projection:collection-replace",
-          validateCollectionProjectionSnapshot(snapshot),
+          Schema.decodeUnknownSync(CollectionProjectionSnapshotSchema)(snapshot),
         ),
       ),
     replaceSpoilers: async (snapshot) =>
-      validateSpoilerProjectionResult(
+      Schema.decodeUnknownSync(SpoilerProjectionResultSchema)(
         await ipcRenderer.invoke(
           "workspace-projection:spoilers-replace",
-          validateSpoilerProjectionSnapshot(snapshot),
+          Schema.decodeUnknownSync(SpoilerProjectionSnapshotSchema)(snapshot),
         ),
       ),
   },
@@ -148,8 +187,10 @@ export const desktopApi = {
       validateWorkspaceBootstrap(await ipcRenderer.invoke("workspace:bootstrap")),
     cancelRestore: (workspaceId) =>
       ipcRenderer.invoke("workspace:cancel-restore", decodeUuid(workspaceId)),
-    exportBackup: (backup) =>
-      ipcRenderer.invoke("workspace:export", validateWorkspaceBackup(backup)),
+    exportBackup: async (backup) =>
+      Schema.decodeUnknownSync(Schema.Literal("cancelled", "exported"))(
+        await ipcRenderer.invoke("workspace:export", validateWorkspaceBackup(backup)),
+      ),
     onChanged: (callback) => subscribe("workspace:changed", callback),
     refreshSync: async () =>
       validateWorkspaceRuntime(await ipcRenderer.invoke("workspace:refresh-sync")),
@@ -162,12 +203,20 @@ export const desktopApi = {
   },
 
   auth: {
-    onChanged: (callback: (snapshot: AuthSnapshot) => void) => subscribe("auth:changed", callback),
-    onError: (callback: (message: string) => void) => subscribe("auth:error", callback),
-    read: () => ipcRenderer.invoke("auth:read"),
-    refresh: () => ipcRenderer.invoke("auth:refresh"),
-    signIn: () => ipcRenderer.invoke("auth:sign-in"),
-    signOut: () => ipcRenderer.invoke("auth:sign-out"),
+    onChanged: (callback: (snapshot: AuthSnapshot) => void) =>
+      subscribe("auth:changed", (value) =>
+        callback(Schema.decodeUnknownSync(AuthSnapshotSchema)(value)),
+      ),
+    onError: (callback: (message: string) => void) =>
+      subscribe("auth:error", (value) => callback(Schema.decodeUnknownSync(Schema.String)(value))),
+    read: async () =>
+      Schema.decodeUnknownSync(AuthSnapshotSchema)(await ipcRenderer.invoke("auth:read")),
+    refresh: async () =>
+      Schema.decodeUnknownSync(AuthSnapshotSchema)(await ipcRenderer.invoke("auth:refresh")),
+    signIn: async () =>
+      Schema.decodeUnknownSync(AuthSnapshotSchema)(await ipcRenderer.invoke("auth:sign-in")),
+    signOut: async () =>
+      Schema.decodeUnknownSync(AuthSnapshotSchema)(await ipcRenderer.invoke("auth:sign-out")),
   },
 } satisfies DesktopApi;
 

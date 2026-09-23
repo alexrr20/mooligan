@@ -1,3 +1,4 @@
+import { EditorSelect, EditorMessage, editorStyles } from "../../components/ui/editor-controls";
 import { PrintingPrice } from "../prices/printing-price";
 import type { CatalogCardDetail } from "@mooligan/domain/catalog-detail";
 import type { DeckSection } from "@mooligan/domain/decks";
@@ -11,13 +12,7 @@ import { Form } from "../../components/ui/form";
 import { Input } from "../../components/ui/input";
 import { listCatalog } from "../catalog/catalog-request";
 import { useCatalogCardDetail } from "../cards/use-card-detail";
-import {
-  DeckMessage,
-  DeckQuantity,
-  DeckSelect,
-  deckSectionOptions,
-  deckStyles,
-} from "./deck-controls";
+import { DeckQuantity, deckSectionOptions, deckStyles } from "./deck-controls";
 import { useDeckMutations, useDecks } from "./use-decks";
 
 export function DeckCardPicker({ deckId }: { deckId: string }) {
@@ -29,7 +24,7 @@ export function DeckCardPicker({ deckId }: { deckId: string }) {
         Add cards
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent style={deckStyles.dialog}>
+        <DialogContent style={editorStyles.dialog}>
           <DialogTitle>Add cards</DialogTitle>
           <DialogDescription>Search by name or query, then choose a printing.</DialogDescription>
           <DeckCardSearch onSelect={setSelected} />
@@ -64,8 +59,8 @@ export function DeckCardSearch({
   });
   return (
     <section {...stylex.props(deckStyles.section)} aria-label="Add cards">
-      <div {...stylex.props(deckStyles.toolbar)}>
-        <label {...stylex.props(deckStyles.field, deckStyles.grow)}>
+      <div {...stylex.props(editorStyles.toolbar)}>
+        <label {...stylex.props(editorStyles.field, deckStyles.grow)}>
           <Input
             aria-label="Search cards"
             value={input}
@@ -90,19 +85,19 @@ export function DeckCardSearch({
           Search
         </Button>
       </div>
-      {results.isFetching ? <DeckMessage>Searching…</DeckMessage> : null}
+      {results.isFetching ? <EditorMessage>Searching…</EditorMessage> : null}
       {results.error || results.data?.queryError ? (
-        <DeckMessage error>{results.error?.message ?? results.data?.queryError}</DeckMessage>
+        <EditorMessage error>{results.error?.message ?? results.data?.queryError}</EditorMessage>
       ) : null}
       {search.query && results.data && !results.data.cards.length && !results.data.queryError ? (
-        <DeckMessage>No visible cards match this search.</DeckMessage>
+        <EditorMessage>No visible cards match this search.</EditorMessage>
       ) : null}
       <ul {...stylex.props(deckStyles.list)}>
         {results.data?.cards.map((card) => (
           <li key={card.id} {...stylex.props(deckStyles.row)}>
             <div {...stylex.props(deckStyles.grow)}>
               <strong>{card.name}</strong>
-              <p {...stylex.props(deckStyles.muted)}>
+              <p {...stylex.props(editorStyles.muted)}>
                 {card.setName} · {card.setCode.toUpperCase()} {card.collectorNumber}
                 {card.isDigital ? " · Digital" : ""}
               </p>
@@ -120,7 +115,7 @@ export function DeckCardSearch({
         ))}
       </ul>
       {search.offset > 0 || results.data?.hasMore ? (
-        <div {...stylex.props(deckStyles.toolbar)}>
+        <div {...stylex.props(editorStyles.toolbar)}>
           <Button
             type="button"
             disabled={disabled || search.offset === 0 || results.isFetching}
@@ -160,17 +155,17 @@ function SelectedCardDialog({
         if (!open) onClose();
       }}
     >
-      <DialogContent style={deckStyles.dialog}>
+      <DialogContent style={editorStyles.dialog}>
         <DialogTitle>Add card to deck</DialogTitle>
         <DialogDescription>Choose the quantity, finish, and section.</DialogDescription>
         {card.result?.status === "visible" ? (
           <AddDeckCardForm detail={card.result.detail} deckId={deckId} onAdded={onClose} />
         ) : (
-          <DeckMessage error={!card.loading}>
+          <EditorMessage error={!card.loading}>
             {card.loading
               ? "Reading printing…"
               : card.error || "This printing is unavailable or protected."}
-          </DeckMessage>
+          </EditorMessage>
         )}
       </DialogContent>
     </Dialog>
@@ -185,7 +180,7 @@ export function AddToDeckButton({ detail }: { detail: CatalogCardDetail }) {
         Add to deck
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent style={deckStyles.dialog}>
+        <DialogContent style={editorStyles.dialog}>
           <DialogTitle>Add to deck</DialogTitle>
           <DialogDescription>Plan cards without changing your collection.</DialogDescription>
           {open ? (
@@ -232,7 +227,7 @@ function AddDeckCardForm({
   });
   return (
     <Form
-      style={deckStyles.fields}
+      style={editorStyles.fields}
       onSubmit={(event) => {
         event.preventDefault();
         add.mutate();
@@ -244,7 +239,7 @@ function AddDeckCardForm({
       </p>
       <PrintingPrice printingId={detail.selectedPrinting.id} finish={finish} />
       {!deckId ? (
-        <DeckSelect
+        <EditorSelect
           label="Deck"
           options={decks.map((deck) => ({ label: deck.name, value: deck.id }))}
           value={selectedDeck}
@@ -252,15 +247,15 @@ function AddDeckCardForm({
           disabled={add.isPending}
         />
       ) : null}
-      {!decks.length ? <DeckMessage>Create a deck on the Decks page first.</DeckMessage> : null}
-      <DeckSelect
+      {!decks.length ? <EditorMessage>Create a deck on the Decks page first.</EditorMessage> : null}
+      <EditorSelect
         label="Section"
         options={deckSectionOptions}
         value={section}
         onChange={setSection}
         disabled={add.isPending}
       />
-      <DeckSelect
+      <EditorSelect
         label="Finish"
         options={finishes.map((value) => ({ label: value, value }))}
         value={finish}
@@ -268,7 +263,7 @@ function AddDeckCardForm({
         disabled={add.isPending}
       />
       <DeckQuantity value={quantity} onChange={setQuantity} disabled={add.isPending} />
-      {add.error ? <DeckMessage error>{add.error.message}</DeckMessage> : null}
+      {add.error ? <EditorMessage error>{add.error.message}</EditorMessage> : null}
       <Button
         type="submit"
         disabled={

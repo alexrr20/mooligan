@@ -8,7 +8,7 @@ import { colors } from "../../styles/tokens.stylex.js";
 import { useCatalogImageLoading } from "../catalog/catalog-image-loading";
 import { CatalogSetSymbol } from "../catalog/catalog-set-symbol";
 import { PrintingImage } from "../cards/printing-image";
-import { type CatalogSearchOrigin, withCatalogSearchOrigin } from "./catalog-search-origin";
+import { type CatalogSearchOrigin, withCardDetailOrigin } from "../cards/card-detail-origin";
 import { formatSpoilerReleaseDate } from "../spoilers/spoiler-ui-state";
 import { AddToCollectionButton } from "../collection/collection-editor";
 
@@ -177,7 +177,7 @@ function CatalogResults({
               <Link
                 {...stylex.props(styles.cardRow, grid && styles.cardTile)}
                 params={{ printingId }}
-                state={withCatalogSearchOrigin(origin)}
+                state={withCardDetailOrigin(origin)}
                 to="/cards/$printingId"
               >
                 <PrintingImage

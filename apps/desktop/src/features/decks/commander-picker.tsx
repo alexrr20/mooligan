@@ -1,10 +1,11 @@
+import { EditorMessage, editorStyles } from "../../components/ui/editor-controls";
 import type { CatalogCardDetail } from "@mooligan/domain/catalog-detail";
 import * as stylex from "@stylexjs/stylex";
 import { useMutation } from "@tanstack/react-query";
 
 import { Button } from "../../components/ui/button";
 import { DeckCardSearch } from "./deck-card-picker";
-import { DeckMessage, deckStyles } from "./deck-controls";
+import { deckStyles } from "./deck-controls";
 
 export function CommanderPicker({
   value,
@@ -26,13 +27,13 @@ export function CommanderPicker({
     },
   });
   return (
-    <section {...stylex.props(deckStyles.field)} aria-label="Commander">
+    <section {...stylex.props(editorStyles.field)} aria-label="Commander">
       <span>Commander</span>
       {value ? (
         <div {...stylex.props(deckStyles.row)}>
           <div {...stylex.props(deckStyles.grow)}>
             <strong>{value.card.name}</strong>
-            <p {...stylex.props(deckStyles.muted)}>
+            <p {...stylex.props(editorStyles.muted)}>
               {value.selectedPrinting.setCode.toUpperCase()}{" "}
               {value.selectedPrinting.collectorNumber}
             </p>
@@ -54,8 +55,8 @@ export function CommanderPicker({
           }}
         />
       )}
-      {selection.isPending ? <DeckMessage>Reading printing…</DeckMessage> : null}
-      {selection.error ? <DeckMessage error>{selection.error.message}</DeckMessage> : null}
+      {selection.isPending ? <EditorMessage>Reading printing…</EditorMessage> : null}
+      {selection.error ? <EditorMessage error>{selection.error.message}</EditorMessage> : null}
     </section>
   );
 }

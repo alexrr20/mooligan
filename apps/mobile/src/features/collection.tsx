@@ -229,8 +229,8 @@ function EditableHolding({
             confirmRemoval(
               "Delete this holding?",
               "All copies in this holding will be removed from your collection on every synced device.",
-              async () => {
-                await collection.remove({ lotId: holding.editableLotId! });
+              () => {
+                collection.remove({ lotId: holding.editableLotId! });
                 onDone();
               },
             )

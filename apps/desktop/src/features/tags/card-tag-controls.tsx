@@ -1,5 +1,5 @@
 import { Checkbox } from "@base-ui/react/checkbox";
-import { tagColorStyles } from "@mooligan/domain/tags";
+import { tagColorStyles } from "@mooligan/presentation/tags";
 import { type CardTag } from "@mooligan/workspace/tag-contract";
 import * as stylex from "@stylexjs/stylex";
 import { useId, type ReactNode } from "react";

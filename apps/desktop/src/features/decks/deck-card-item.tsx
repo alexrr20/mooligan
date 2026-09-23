@@ -3,7 +3,7 @@ import { PreviewCard } from "@base-ui/react/preview-card";
 import type { CatalogImageDescriptor } from "@mooligan/domain/catalog-detail";
 import type { Deck, DeckEntry } from "@mooligan/workspace/deck-contract";
 import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
-import { tagColorStyles } from "@mooligan/domain/tags";
+import { tagColorStyles } from "@mooligan/presentation/tags";
 import { type CardTag } from "@mooligan/workspace/tag-contract";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -13,8 +13,8 @@ import { OracleText } from "../cards/oracle-text";
 import { PrintingImage } from "../cards/printing-image";
 import type { CardView } from "../preferences/use-view-preference";
 import { PrintingPrice } from "../prices/printing-price";
-import { CardTagBadge, TagCheckbox } from "./card-tag-controls";
-import { withDeckOrigin } from "./deck-origin";
+import { CardTagBadge, TagCheckbox } from "../tags/card-tag-controls";
+import { withCardDetailOrigin } from "../cards/card-detail-origin";
 
 export function DeckCardItem({
   deck,
@@ -66,7 +66,7 @@ export function DeckCardItem({
     <Link
       to="/cards/$printingId"
       params={{ printingId: entry.printingId }}
-      state={withDeckOrigin({ deckId: deck.id })}
+      state={withCardDetailOrigin({ kind: "deck", deckId: deck.id })}
       search={{}}
       className="deck-card-name"
       aria-label={`View ${name}`}
@@ -207,7 +207,7 @@ export function DeckCardItem({
           <Link
             to="/cards/$printingId"
             params={{ printingId: entry.printingId }}
-            state={withDeckOrigin({ deckId: deck.id })}
+            state={withCardDetailOrigin({ kind: "deck", deckId: deck.id })}
             search={{}}
             className="deck-card-artwork"
             aria-label={`View ${name}, ${entry.quantity} ${entry.quantity === 1 ? "copy" : "copies"}`}

@@ -10,7 +10,8 @@
     "./registry": "./src/registry.ts"
   },
   "scripts": {
-    "build": "tsc --noEmit"
+    "build": "tsc --noEmit",
+    "test": "node --test test/*.test.ts"
   },
   "dependencies": {
     "@mooligan/domain": "workspace:*",

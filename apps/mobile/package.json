@@ -19,6 +19,7 @@
     "@mooligan/account": "workspace:*",
     "@mooligan/catalog": "workspace:*",
     "@mooligan/domain": "workspace:*",
+    "@mooligan/presentation": "workspace:*",
     "@mooligan/workspace": "workspace:*",
     "@react-native-async-storage/async-storage": "catalog:",
     "@streamparser/json": "catalog:",

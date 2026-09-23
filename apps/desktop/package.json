@@ -29,6 +29,7 @@
     "@mooligan/account": "workspace:*",
     "@mooligan/catalog": "workspace:*",
     "@mooligan/domain": "workspace:*",
+    "@mooligan/presentation": "workspace:*",
     "@mooligan/workspace": "workspace:*",
     "@streamparser/json-node": "catalog:",
     "@stylexjs/stylex": "catalog:",

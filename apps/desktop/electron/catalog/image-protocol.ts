@@ -1,3 +1,4 @@
+import { unavailableResponse } from "./remote-asset-cache.ts";
 import { maxCatalogPrintingIdLength } from "@mooligan/catalog/detail";
 import { readFile } from "node:fs/promises";
 import { Either, Schema } from "effect";
@@ -102,11 +103,4 @@ export function parseCatalogImageUrl(value: string): CatalogImageDescriptor | nu
     size: parts[2],
   });
   return Either.isRight(parsed) ? parsed.right : null;
-}
-
-function unavailableResponse(status: number) {
-  return new Response(null, {
-    headers: { "Cache-Control": "no-store" },
-    status,
-  });
 }

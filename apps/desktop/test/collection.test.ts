@@ -9,11 +9,12 @@ import { makeInMemoryAdapter } from "@livestore/adapter-web";
 import { createStorePromise } from "@livestore/livestore";
 import type { SpoilerVisibilitySnapshot } from "@mooligan/domain/spoilers";
 import { collectionLotsQuery } from "@mooligan/workspace/collection";
-import { workspaceSchema } from "@mooligan/workspace/schema";
+import { events, workspaceSchema } from "@mooligan/workspace/schema";
 
 import { createCollectionProjection } from "@mooligan/catalog/collection-projection";
 import { createCollectionQuery } from "@mooligan/catalog/collection-query";
-import { validateCollectionPrintingRequest } from "../shared/desktop-api.ts";
+import { Schema } from "effect";
+import { CollectionPrintingValidationRequestSchema } from "@mooligan/domain/collection";
 import { createCollectionMutations } from "@mooligan/workspace/client/collection-mutations";
 
 const visibility: SpoilerVisibilitySnapshot = {
@@ -33,7 +34,7 @@ void test("collection mutations merge Holding collisions and preserve the target
   });
   const validatedPrintingIds: string[] = [];
   const collection = createCollectionMutations(store, (request) => {
-    const validated = validateCollectionPrintingRequest(request);
+    const validated = Schema.decodeUnknownSync(CollectionPrintingValidationRequestSchema)(request);
     validatedPrintingIds.push(validated.printingId);
     return Promise.resolve();
   });
@@ -86,9 +87,9 @@ void test("collection mutations merge Holding collisions and preserve the target
     );
     assert.equal(store.query(collectionLotsQuery).length, 1);
 
-    await collection.remove({ lotId: target.lotId });
+    collection.remove({ lotId: target.lotId });
     assert.deepEqual(store.query(collectionLotsQuery), []);
-    await assert.rejects(collection.remove({ lotId: target.lotId }), /cannot be removed/);
+    assert.throws(() => collection.remove({ lotId: target.lotId }), /cannot be removed/);
     assert.deepEqual(validatedPrintingIds, [
       "printing-1",
       "printing-1",
@@ -291,5 +292,68 @@ void test("collection reads separate visible, protected, and unavailable Holding
     database.close();
   } finally {
     await rm(directory, { force: true, recursive: true });
+  }
+});
+
+void test("collection updates reject a lot removed during catalog validation", async () => {
+  const store = await createStorePromise({
+    adapter: makeInMemoryAdapter({ clientId: "collection-validation-client" }),
+    disableDevtools: true,
+    schema: workspaceSchema,
+    storeId: "collection-validation",
+  });
+  let removeDuringValidation: string | undefined;
+  const collection = createCollectionMutations(store, async () => {
+    if (removeDuringValidation) {
+      store.commit(
+        events.collectionLotRemoved({
+          lotId: removeDuringValidation,
+          removalId: "concurrent-removal",
+        }),
+      );
+    }
+  });
+  try {
+    const request = {
+      condition: "near-mint",
+      finish: "foil",
+      language: "en",
+      printingId: "printing",
+      quantity: 1,
+    } as const;
+    const added = await collection.add(request);
+    removeDuringValidation = added.lotId;
+    await assert.rejects(
+      collection.update({
+        lotId: added.lotId,
+        condition: "near-mint",
+        finish: "foil",
+        language: "en",
+        quantity: 2,
+      }),
+      /changed while/,
+    );
+    assert.deepEqual(store.query(collectionLotsQuery), []);
+    removeDuringValidation = undefined;
+    const maximum = await collection.add({ ...request, quantity: Number.MAX_SAFE_INTEGER });
+    await assert.rejects(collection.add(request), /too large/);
+    const source = await collection.add({ ...request, condition: "damaged" });
+    await assert.rejects(
+      collection.update({
+        lotId: source.lotId,
+        condition: "near-mint",
+        finish: "foil",
+        language: "en",
+        quantity: 1,
+      }),
+      /too large/,
+    );
+    assert.equal(
+      store.query(collectionLotsQuery).find(({ id }) => id === maximum.lotId)?.quantity,
+      Number.MAX_SAFE_INTEGER,
+    );
+    assert.equal(store.query(collectionLotsQuery).length, 2);
+  } finally {
+    await store.shutdownPromise();
   }
 });

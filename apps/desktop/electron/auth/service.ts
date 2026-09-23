@@ -9,7 +9,8 @@ import {
 import { type JsonValue, JsonValueSchema, StrictStruct } from "@mooligan/domain/schema";
 import { Either, Option, Schema } from "effect";
 
-import type { AuthSnapshot, AuthStatus, AuthUser } from "../../shared/desktop-api.ts";
+import type { AuthSnapshot, AuthStatus, AuthUser } from "@mooligan/account/runtime";
+
 import {
   type AsyncSafeStorage,
   type AuthStateStorage,
@@ -58,10 +59,7 @@ const isCallbackCandidate = Schema.is(Schema.String);
 const decodeProfileImage = Schema.decodeUnknownOption(Schema.String.pipe(Schema.maxLength(2_048)));
 
 type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
-export type AccountWorkspaceApiPath =
-  | "/api/workspace"
-  | "/api/workspace/bind"
-  | "/api/workspace/sync-credential";
+import type { AccountWorkspaceApiPath } from "@mooligan/account/workspace";
 
 export interface DesktopAuthOptions {
   filePath: string;

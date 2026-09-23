@@ -17,6 +17,8 @@ import type {
   AuthSnapshot as AuthSnapshotType,
   AuthStatus as AuthStatusType,
   AuthUser as AuthUserType,
+} from "@mooligan/account/runtime";
+import type {
   CatalogProgress as CatalogProgressType,
   CatalogStatus as CatalogStatusType,
   DesktopApi,

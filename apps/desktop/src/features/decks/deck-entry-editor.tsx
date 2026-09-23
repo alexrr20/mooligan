@@ -1,3 +1,4 @@
+import { EditorSelect, EditorMessage, editorStyles } from "../../components/ui/editor-controls";
 import type { DeckEntry } from "@mooligan/workspace/deck-contract";
 import type { DeckSection } from "@mooligan/domain/decks";
 import * as stylex from "@stylexjs/stylex";
@@ -8,13 +9,7 @@ import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../components/ui/dialog";
 import { Form } from "../../components/ui/form";
 import { useCatalogCardDetail } from "../cards/use-card-detail";
-import {
-  DeckMessage,
-  DeckQuantity,
-  DeckSelect,
-  deckSectionOptions,
-  deckStyles,
-} from "./deck-controls";
+import { DeckQuantity, deckSectionOptions } from "./deck-controls";
 import { useDeckMutations } from "./use-decks";
 
 export function DeckEntryEditor({
@@ -58,21 +53,21 @@ export function DeckEntryEditor({
         if (!open) onClose();
       }}
     >
-      <DialogContent style={deckStyles.dialog}>
+      <DialogContent style={editorStyles.dialog}>
         <DialogTitle>Edit deck card</DialogTitle>
         <DialogDescription>
           {detail?.card.name ??
             "Printing details are unavailable. You can still change its quantity or section."}
         </DialogDescription>
         <Form
-          style={deckStyles.fields}
+          style={editorStyles.fields}
           onSubmit={(event) => {
             event.preventDefault();
             save.mutate();
           }}
         >
           {printings.length ? (
-            <DeckSelect
+            <EditorSelect
               label="Printing"
               options={printings.map((printing) => ({
                 value: printing.id,
@@ -83,7 +78,7 @@ export function DeckEntryEditor({
               disabled={save.isPending}
             />
           ) : null}
-          <DeckSelect
+          <EditorSelect
             label="Finish"
             options={[...new Set([...finishes, finish])].map((value) => ({ label: value, value }))}
             value={finish}
@@ -91,9 +86,9 @@ export function DeckEntryEditor({
             disabled={!detail || save.isPending}
           />
           {!finishes.includes(finish) ? (
-            <DeckMessage error>Choose a finish supported by this printing.</DeckMessage>
+            <EditorMessage error>Choose a finish supported by this printing.</EditorMessage>
           ) : null}
-          <DeckSelect
+          <EditorSelect
             label="Section"
             options={deckSectionOptions}
             value={section}
@@ -101,8 +96,8 @@ export function DeckEntryEditor({
             disabled={save.isPending}
           />
           <DeckQuantity value={quantity} onChange={setQuantity} disabled={save.isPending} />
-          {save.error ? <DeckMessage error>{save.error.message}</DeckMessage> : null}
-          <div {...stylex.props(deckStyles.toolbar)}>
+          {save.error ? <EditorMessage error>{save.error.message}</EditorMessage> : null}
+          <div {...stylex.props(editorStyles.toolbar)}>
             <Button
               type="submit"
               disabled={

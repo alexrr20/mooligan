@@ -7,14 +7,10 @@ import {
   ScryfallCardDownloadSchema,
   type ScryfallCardDownload,
 } from "@mooligan/domain/catalog-download";
+import { summarizeDeck, groupDeckEntries } from "../src/client/deck-summary.ts";
 import type { DeckEntry } from "../src/deck-contract.ts";
 import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
-import {
-  analyzeDeckMana,
-  drawProbability,
-  manaDrawStats,
-  manaDrawTargets,
-} from "../src/client/deck-mana.ts";
+import { analyzeDeckMana, drawProbability, manaDrawStats } from "../src/client/deck-mana.ts";
 
 function printing(id: string, fields: Partial<ScryfallCardDownload> = {}): CatalogPrintingResult {
   return {
@@ -80,12 +76,12 @@ void test("catalog production reaches analysis; quantities, sections and command
   assert.equal(analysis.manaTotal, 72);
   assert.equal(analysis.averageMana, 72 / 37);
   assert.equal(analysis.averageWithLands, 72 / 61);
-  assert.deepEqual(analysis.curve[1], { label: "1", total: 4, permanents: 0, nonpermanents: 4 });
+  assert.deepEqual(analysis.curve[1], { value: 1, total: 4, permanents: 0, nonpermanents: 4 });
   assert.equal(analysis.curve[4]?.permanents, 1);
   assert.equal(analysis.colors.find((color) => color.value === "G")?.pips, 34);
   assert.equal(analysis.colors.find((color) => color.value === "G")?.sources, 56);
   assert.equal(analysis.colors.find((color) => color.value === "G")?.landSources, 24);
-  assert.equal(manaDrawTargets(analysis).find((target) => target.label === "bolt")?.quantity, 4);
+  assert.equal(analysis.cards.find((card) => card.name === "bolt")?.quantity, 4);
   assert.ok(!analysis.cards.some((card) => card.id === "leader"));
   assert.equal(analyzeDeckMana([entry("forest", 20), entry("elf", 40)], printings).lands, 20);
 });
@@ -134,15 +130,21 @@ void test("modal land backs count as land options; transform backs and Adventure
       { name: "Two", type_line: "Sorcery", mana_cost: "{1}{W}{W}" },
     ],
   });
-  const analysis = analyzeDeckMana(
-    [entry("modal", 2), entry("transform"), entry("adventure"), entry("split")],
-    new Map([
-      ["modal", modal],
-      ["transform", transform],
-      ["adventure", adventure],
-      ["split", split],
-    ]),
-  );
+  const entries = [entry("modal", 2), entry("transform"), entry("adventure"), entry("split")];
+  const printings = new Map([
+    ["modal", modal],
+    ["transform", transform],
+    ["adventure", adventure],
+    ["split", split],
+  ]);
+  const analysis = analyzeDeckMana(entries, printings);
+  const summary = summarizeDeck(entries, [], printings);
+  const groups = groupDeckEntries(entries, printings);
+  assert.deepEqual(groups.mainboardGroups, summary.mainboardGroups);
+  assert.equal(summary.cardTypes.find(({ type }) => type === "Land")?.quantity, analysis.lands);
+  assert.deepEqual(groups.mainboardGroups.find(({ type }) => type === "Land")?.entries, [
+    entry("modal", 2),
+  ]);
   assert.equal(analysis.lands, 2);
   assert.equal(analysis.modalLands, 2);
   assert.equal(analysis.nonlandSources, 1);

@@ -15,7 +15,7 @@ import { Button, Choice, Copy, Panel, Row } from "@/components/ui";
 import { useMobileAccount } from "@/account/account-provider";
 import { useCatalogQuery, useWorkspace } from "@/workspace/provider";
 import { readDocument, shareDocument } from "@/workspace/files";
-import { CatalogSetup } from "./search";
+import { CatalogSetup } from "./catalog/catalog-setup";
 
 export function WorkspaceSettings() {
   const { account } = useMobileAccount();

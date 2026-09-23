@@ -113,8 +113,6 @@ void test("collection coverage allocates exact copies once across sections and i
   );
   assert.equal(summary.total, 6);
   assert.equal(summary.missing, 1);
-  assert.equal(summary.spells, 4);
-  assert.equal(summary.averageMana, 1);
 });
 
 void test("commanders belong to the main deck display and stats without counting copies twice", () => {
@@ -146,7 +144,6 @@ void test("commanders belong to the main deck display and stats without counting
     summary.sections[0]?.entries.map(({ id }) => id),
     ["main", "commander", "partner"],
   );
-  assert.equal(summary.spells, 99);
   assert.deepEqual(
     summary.mainboardGroups.map(({ type, quantity, entries }) => [
       type,
@@ -171,8 +168,6 @@ void test("commanders belong to the main deck display and stats without counting
       ["Land", 0],
     ],
   );
-  assert.equal(summary.unknown, 1);
-  assert.equal(summary.averageMana, 1);
   assert.equal(summary.total, 103);
   assert.equal(summary.missing, 4);
   assert.equal(entries.find(({ id }) => id === "commander")?.section, "commander");
@@ -204,7 +199,6 @@ void test("type counts include each front-face type and ignore back faces and su
       { type: "Artifact", quantity: 3 },
     ],
   );
-  assert.equal(summary.lands, 0);
   assert.deepEqual(
     summary.mainboardGroups.map(({ type }) => type),
     ["Creature"],

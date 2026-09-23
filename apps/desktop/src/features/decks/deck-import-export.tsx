@@ -1,3 +1,4 @@
+import { EditorMessage, editorStyles } from "../../components/ui/editor-controls";
 import type { Deck } from "@mooligan/workspace/deck-contract";
 import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
 import * as stylex from "@stylexjs/stylex";
@@ -6,7 +7,7 @@ import { useState, type RefObject } from "react";
 
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../components/ui/dialog";
-import { DeckMessage, deckStyles } from "./deck-controls";
+import { deckStyles } from "./deck-controls";
 import { exportDeckText, resolveDeckText } from "@mooligan/workspace/client/deck-transfer";
 import { useDeckMutations } from "./use-decks";
 
@@ -42,14 +43,14 @@ export function DeckImportExport({
         if (!open && !preview.isPending) onClose();
       }}
     >
-      <DialogContent finalFocus={finalFocus} style={deckStyles.dialog}>
+      <DialogContent finalFocus={finalFocus} style={editorStyles.dialog}>
         <DialogTitle>{mode === "import" ? "Import cards" : "Export deck"}</DialogTitle>
         <DialogDescription>
           {mode === "import"
             ? "Paste a deck list with quantities and section headings. Imported cards are added to the deck."
             : "This list includes exact printing and finish references. Use a workspace backup to preserve card tags and templates."}
         </DialogDescription>
-        <label {...stylex.props(deckStyles.field)}>
+        <label {...stylex.props(editorStyles.field)}>
           {mode === "import" ? "Deck list" : "Exported deck list"}
           <textarea
             {...stylex.props(deckStyles.textarea)}
@@ -67,30 +68,30 @@ export function DeckImportExport({
         </label>
         {mode === "import" ? (
           <>
-            <p {...stylex.props(deckStyles.muted)}>
+            <p {...stylex.props(editorStyles.muted)}>
               For example: 4 Lightning Bolt. Optional edition: 4 Lightning Bolt (M11) 146. Supported
               sections: main deck, sideboard, commander, companion, maybeboard.
             </p>
             {preview.error || apply.error ? (
-              <DeckMessage error>{(preview.error ?? apply.error)?.message}</DeckMessage>
+              <EditorMessage error>{(preview.error ?? apply.error)?.message}</EditorMessage>
             ) : null}
             {preview.data ? (
               <>
-                <DeckMessage>
+                <EditorMessage>
                   {preview.data.entries.reduce((total, entry) => total + entry.quantity, 0)} copies
                   resolved.
-                </DeckMessage>
+                </EditorMessage>
                 {preview.data.errors.map((error) => (
-                  <DeckMessage key={error} error>
+                  <EditorMessage key={error} error>
                     {error}
-                  </DeckMessage>
+                  </EditorMessage>
                 ))}
                 {preview.data.warnings.map((warning) => (
-                  <DeckMessage key={warning}>{warning}</DeckMessage>
+                  <EditorMessage key={warning}>{warning}</EditorMessage>
                 ))}
               </>
             ) : null}
-            <div {...stylex.props(deckStyles.toolbar)}>
+            <div {...stylex.props(editorStyles.toolbar)}>
               <Button disabled={!text.trim() || preview.isPending} onClick={() => preview.mutate()}>
                 {preview.isPending ? "Reading local catalog…" : "Check import"}
               </Button>
@@ -108,7 +109,7 @@ export function DeckImportExport({
             </div>
           </>
         ) : (
-          <div {...stylex.props(deckStyles.toolbar)}>
+          <div {...stylex.props(editorStyles.toolbar)}>
             <Button
               onClick={() => {
                 void navigator.clipboard.writeText(exported).then(
@@ -134,7 +135,7 @@ export function DeckImportExport({
             >
               Save text file
             </Button>
-            {message ? <DeckMessage>{message}</DeckMessage> : null}
+            {message ? <EditorMessage>{message}</EditorMessage> : null}
           </div>
         )}
       </DialogContent>

@@ -496,6 +496,9 @@ importers:
       '@mooligan/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@mooligan/presentation':
+        specifier: workspace:*
+        version: link:../../packages/presentation
       '@mooligan/workspace':
         specifier: workspace:*
         version: link:../../packages/workspace
@@ -595,6 +598,9 @@ importers:
       '@mooligan/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@mooligan/presentation':
+        specifier: workspace:*
+        version: link:../../packages/presentation
       '@mooligan/workspace':
         specifier: workspace:*
         version: link:../../packages/workspace
@@ -747,6 +753,22 @@ importers:
         specifier: 'catalog:'
         version: 7.0.2
 
+  packages/presentation:
+    dependencies:
+      '@mooligan/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@mooligan/workspace':
+        specifier: workspace:*
+        version: link:../workspace
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.20.1
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+
   packages/workspace:
     dependencies:
       '@livestore/livestore':
@@ -763,6 +785,9 @@ importers:
         version: 14.0.1
     devDependencies:
       '@livestore/adapter-web':
+        specifier: 'catalog:'
+        version: 0.4.0(4e3e7a1661c1db9a2e1f288c35c89191)
+      '@livestore/common':
         specifier: 'catalog:'
         version: 0.4.0(4e3e7a1661c1db9a2e1f288c35c89191)
       '@types/node':

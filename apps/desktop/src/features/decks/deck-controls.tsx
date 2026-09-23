@@ -1,6 +1,5 @@
 import { deckSectionLabels, deckSections } from "@mooligan/domain/decks";
 import * as stylex from "@stylexjs/stylex";
-import type { ReactNode } from "react";
 
 import {
   NumberField,
@@ -9,59 +8,11 @@ import {
   NumberFieldIncrement,
   NumberFieldInput,
 } from "../../components/ui/number-field";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../components/ui/select";
 
 export const deckSectionOptions = deckSections.map((value) => ({
   value,
   label: value === "commander" ? "Main deck · Commander" : deckSectionLabels[value],
 }));
-
-export function DeckSelect<T extends string>({
-  label,
-  options,
-  value,
-  onChange,
-  disabled = false,
-  hideLabel = false,
-}: {
-  label: string;
-  options: readonly { label: string; value: T }[];
-  value: T;
-  onChange: (value: T) => void;
-  disabled?: boolean;
-  hideLabel?: boolean;
-}) {
-  return (
-    <div {...stylex.props(deckStyles.field)}>
-      {hideLabel ? null : <span>{label}</span>}
-      <Select<T>
-        items={options}
-        value={value}
-        onValueChange={(next) => {
-          if (next !== null) onChange(next);
-        }}
-        disabled={disabled}
-      >
-        <SelectTrigger aria-label={label} size="sm" style={deckStyles.control}>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent alignItemWithTrigger={false}>
-          {options.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}
 
 export function DeckQuantity({
   label = "Quantity",
@@ -99,17 +50,6 @@ export function DeckQuantity({
   );
 }
 
-export function DeckMessage({ children, error = false }: { children: ReactNode; error?: boolean }) {
-  return (
-    <p
-      {...stylex.props(deckStyles.message, error && deckStyles.error)}
-      role={error ? "alert" : "status"}
-    >
-      {children}
-    </p>
-  );
-}
-
 export const deckStyles = stylex.create({
   page: {
     display: "grid",
@@ -128,11 +68,7 @@ export const deckStyles = stylex.create({
   },
   title: { margin: 0, fontSize: "24px", fontWeight: 500, overflowWrap: "anywhere" },
   sectionTitle: { margin: 0, fontSize: "18px", fontWeight: 500 },
-  toolbar: { display: "flex", alignItems: "end", flexWrap: "wrap", gap: "8px" },
-  field: { display: "grid", gap: "4px", minWidth: 0, fontSize: "12px" },
   searchField: { flex: "0 1 360px" },
-  control: { height: "28px", fontSize: "13px" },
-  fields: { display: "grid", gap: "16px" },
   section: { display: "grid", gap: "16px", minWidth: 0 },
   panel: {
     display: "grid",
@@ -156,11 +92,8 @@ export const deckStyles = stylex.create({
     borderBottomColor: "#34362f",
   },
   grow: { flex: "1 1 200px", minWidth: 0, overflowWrap: "anywhere" },
-  muted: { color: "#a6a89d", margin: 0 },
   commanderLabel: { marginInlineStart: "8px", fontSize: "11px", color: "#c4ef8c" },
   link: { color: "#c4ef8c", textDecoration: "underline", textUnderlineOffset: "3px" },
-  message: { margin: 0, color: "#a6a89d", overflowWrap: "anywhere" },
-  error: { color: "#ffaaa3" },
   quantity: { width: "132px" },
   textarea: {
     width: "100%",
@@ -175,6 +108,5 @@ export const deckStyles = stylex.create({
     font: "inherit",
     resize: "vertical",
   },
-  dialog: { maxWidth: "min(680px, calc(100% - 32px))", maxHeight: "85vh", overflowY: "auto" },
   notes: { whiteSpace: "pre-wrap", overflowWrap: "anywhere", margin: 0 },
 });

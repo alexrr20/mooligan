@@ -1,19 +1,30 @@
-export type UniverseFilter = "beyond" | "within";
+import type { JsonValue } from "@mooligan/domain/schema";
+import { Option, Schema } from "effect";
+import { optionalSearchParam, searchText } from "./search-params.ts";
 
-export type CatalogSearchState = {
-  adCards?: true;
-  artSeries?: true;
-  digital?: true;
-  grid?: true;
-  mode?: "upcoming";
-  query?: string;
-  tokens?: true;
-  uniqueCards?: true;
-  universe?: UniverseFilter;
-};
+const UniverseFilterSchema = Schema.Literal("beyond", "within");
+export type UniverseFilter = typeof UniverseFilterSchema.Type;
 
-type CatalogSearchInput = CatalogSearchState | JsonValue;
-type JsonObject = Readonly<Record<string, JsonValue>>;
+const CatalogSearchInputSchema = Schema.Struct({
+  adCards: optionalSearchParam(Schema.Literal(true)),
+  artSeries: optionalSearchParam(Schema.Literal(true)),
+  digital: optionalSearchParam(Schema.Literal(true)),
+  grid: optionalSearchParam(Schema.Literal(true)),
+  mode: optionalSearchParam(Schema.Literal("upcoming")),
+  query: optionalSearchParam(searchText(500)),
+  tokens: optionalSearchParam(Schema.Literal(true)),
+  uniqueCards: optionalSearchParam(Schema.Literal(true)),
+  universe: optionalSearchParam(UniverseFilterSchema),
+});
+
+export const CatalogSearchStateSchema = Schema.typeSchema(CatalogSearchInputSchema).annotations({
+  parseOptions: { onExcessProperty: "error" },
+});
+export type CatalogSearchState = typeof CatalogSearchStateSchema.Type;
+
+export function validateCatalogSearch(search: CatalogSearchState | JsonValue): CatalogSearchState {
+  return Option.getOrElse(Schema.decodeUnknownOption(CatalogSearchInputSchema)(search), () => ({}));
+}
 
 export function reconcileCatalogSearchDraft(
   draft: string,
@@ -22,45 +33,3 @@ export function reconcileCatalogSearchDraft(
 ) {
   return draft.trim() === previousActiveQuery ? activeQuery : draft;
 }
-
-export function validateCatalogSearch(search: CatalogSearchInput): CatalogSearchState {
-  const input = isJsonObject(search) ? search : {};
-  const query = isString(input.query) ? input.query.trim().slice(0, 500) : "";
-
-  return {
-    ...(input.adCards === true && { adCards: true as const }),
-    ...(input.artSeries === true && { artSeries: true as const }),
-    ...(input.digital === true && { digital: true as const }),
-    ...(input.grid === true && { grid: true as const }),
-    ...(input.mode === "upcoming" && { mode: "upcoming" as const }),
-    ...(query && { query }),
-    ...(input.tokens === true && { tokens: true as const }),
-    ...(input.uniqueCards === true && { uniqueCards: true as const }),
-    ...((input.universe === "beyond" || input.universe === "within") && {
-      universe: input.universe,
-    }),
-  };
-}
-
-export function isCatalogSearchState(value: CatalogSearchInput): value is CatalogSearchState {
-  if (!isJsonObject(value)) return false;
-
-  const search = validateCatalogSearch(value);
-  const entries = Object.entries(value);
-  return (
-    entries.length === Object.keys(search).length &&
-    Object.entries(search).every(([key, entry]) =>
-      entries.some(([candidateKey, candidate]) => candidateKey === key && candidate === entry),
-    )
-  );
-}
-
-function isJsonObject(value: CatalogSearchInput): value is CatalogSearchInput & JsonObject {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isString(value: JsonValue | undefined): value is string {
-  return typeof value === "string";
-}
-
-import type { JsonValue } from "@mooligan/domain/schema";

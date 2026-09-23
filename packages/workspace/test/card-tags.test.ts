@@ -8,7 +8,12 @@ import { cardTagsQuery, tagAssignmentsQuery, tagTemplatesQuery } from "@mooligan
 import { events, workspaceSchema, workspaceSyncedEventSchema } from "@mooligan/workspace/schema";
 import { createDeckMutations } from "@mooligan/workspace/client/deck-mutations";
 import { createTagMutations } from "@mooligan/workspace/client/tag-mutations";
-import { cardIdentity, groupEntriesByTag, tagsForDeck } from "@mooligan/workspace/client/tag-state";
+import {
+  cardIdentity,
+  groupEntriesByTag,
+  tagsForDeck,
+  filterEntriesByTag,
+} from "@mooligan/workspace/client/tag-state";
 import {
   createWorkspaceBackup,
   restoreWorkspaceBackup,
@@ -127,6 +132,35 @@ void test("tag groups share rules identity, count copies once per category, and 
     ]),
     tags,
     assignments,
+  );
+  const printings = new Map([
+    ["first", first],
+    ["second", second],
+    ["hidden", protectedCard],
+  ]);
+  assert.deepEqual(
+    filterEntriesByTag(entries, printings, tags, assignments, "all").entries,
+    entries,
+  );
+  assert.deepEqual(
+    filterEntriesByTag(entries, printings, tags, assignments, "ramp").entries,
+    entries.slice(0, 2),
+  );
+  assert.deepEqual(
+    filterEntriesByTag(entries, printings, tags, assignments, "untagged").entries,
+    entries.slice(2),
+  );
+  assert.equal(
+    filterEntriesByTag(entries, printings, tags, assignments, "deleted").activeFilter,
+    "all",
+  );
+  const localTags = tagsForDeck(tags, "deck", false);
+  const hiddenGlobalFilter = filterEntriesByTag(entries, printings, localTags, assignments, "ramp");
+  assert.equal(hiddenGlobalFilter.activeFilter, "all");
+  assert.deepEqual(hiddenGlobalFilter.entries, entries);
+  assert.deepEqual(
+    filterEntriesByTag(entries, printings, [], assignments, "untagged").entries,
+    entries,
   );
   assert.equal(cardIdentity(first), cardIdentity(second));
   assert.equal(cardIdentity(protectedCard), null);

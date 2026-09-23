@@ -1,3 +1,4 @@
+import { assertPrintingCanUseFinish } from "@mooligan/domain/collection";
 import { createContext, useContext, useEffect, useSyncExternalStore, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { AppState } from "react-native";
@@ -105,14 +106,7 @@ function useWorkspaceData(store: WorkspaceStore) {
   const detail = async (id: string) => reference.catalog.detail(id, visibility);
   const collection = createCollectionMutations(store, async (request) => {
     const result = await detail(request.printingId);
-    if (!result || result.status !== "visible") {
-      if (request.existingFinish === request.finish) return;
-      throw new Error("Choose a visible printing from the local catalog.");
-    }
-    if (result.detail.selectedPrinting.isDigital)
-      throw new Error("Only paper printings belong in your collection.");
-    if (!result.detail.selectedPrinting.finishes?.includes(request.finish))
-      throw new Error("Choose a finish available for this printing.");
+    assertPrintingCanUseFinish(result, request);
   });
   return {
     ...reference,

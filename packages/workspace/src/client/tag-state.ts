@@ -47,6 +47,31 @@ export function indexCardTags(tags: readonly CardTag[], assignments: readonly Ta
   return byCard;
 }
 
+export function filterEntriesByTag(
+  entries: readonly DeckEntry[],
+  printings: ReadonlyMap<string, CatalogPrintingResult | null>,
+  tags: readonly CardTag[],
+  assignments: readonly TagAssignment[],
+  filter: string,
+) {
+  const activeFilter =
+    filter === "untagged" || tags.some(({ id }) => id === filter) ? filter : "all";
+  const byCard = indexCardTags(tags, assignments);
+  return {
+    activeFilter,
+    entries: entries.filter((entry) => {
+      const identity = cardIdentity(printings.get(entry.printingId));
+      const assigned = identity ? (byCard.get(identity) ?? []) : [];
+      return (
+        activeFilter === "all" ||
+        (activeFilter === "untagged"
+          ? assigned.length === 0
+          : assigned.some(({ id }) => id === activeFilter))
+      );
+    }),
+  };
+}
+
 export function groupEntriesByTag(
   entries: readonly DeckEntry[],
   printings: ReadonlyMap<string, CatalogPrintingResult | null>,

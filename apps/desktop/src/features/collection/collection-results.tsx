@@ -12,7 +12,7 @@ import { useState } from "react";
 import { Button } from "../../components/ui/button";
 import { colors } from "../../styles/tokens.stylex.js";
 import { PrintingImage } from "../cards/printing-image";
-import { withCollectionOrigin, type CollectionOrigin } from "./collection-origin";
+import { withCardDetailOrigin, type CollectionOrigin } from "../cards/card-detail-origin";
 import { cleanCollectionError, CollectionFormDialog } from "./collection-editor";
 import { useCollectionMutations } from "./use-collection-mutations";
 
@@ -29,24 +29,20 @@ type EditableHolding = Exclude<CollectionHolding, { status: "protected" }> & {
 export function CollectionResults({ grid, holdings, origin }: CollectionResultsProps) {
   const collection = useCollectionMutations();
   const [editing, setEditing] = useState<EditableHolding | null>(null);
-  const [pendingLotId, setPendingLotId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
-  async function remove(holding: EditableHolding) {
+  function remove(holding: EditableHolding) {
     const label = holding.status === "visible" ? holding.name : holding.label;
     const confirmed = window.confirm(
       `Remove ${holding.quantity.toLocaleString()} ${propertySummary(holding)} ${label} ${holding.quantity === 1 ? "copy" : "copies"} from your Collection?`,
     );
     if (!confirmed) return;
 
-    setPendingLotId(holding.editableLotId);
     setError("");
     try {
-      await collection.remove({ lotId: holding.editableLotId });
+      collection.remove({ lotId: holding.editableLotId });
     } catch (cause) {
       setError(cleanCollectionError(cause));
-    } finally {
-      setPendingLotId(null);
     }
   }
 
@@ -100,7 +96,6 @@ export function CollectionResults({ grid, holdings, origin }: CollectionResultsP
                       style={styles.action}
                       variant="ghost"
                       size="sm"
-                      disabled={pendingLotId === editable.editableLotId}
                       type="button"
                       onClick={() => setEditing(editable)}
                     >
@@ -110,9 +105,8 @@ export function CollectionResults({ grid, holdings, origin }: CollectionResultsP
                       style={[styles.action, styles.removeAction]}
                       variant="ghost"
                       size="sm"
-                      disabled={pendingLotId === editable.editableLotId}
                       type="button"
-                      onClick={() => void remove(editable)}
+                      onClick={() => remove(editable)}
                     >
                       Remove
                     </Button>
@@ -197,7 +191,7 @@ function HoldingArtwork({
       <Link
         {...stylex.props(styles.artwork)}
         params={{ printingId: holding.printingId }}
-        state={withCollectionOrigin(origin)}
+        state={withCardDetailOrigin(origin)}
         to="/cards/$printingId"
       >
         {artwork}
@@ -209,7 +203,7 @@ function HoldingArtwork({
       <Link
         {...stylex.props(styles.artwork)}
         params={{ printingId: holding.routePrintingId }}
-        state={withCollectionOrigin(origin)}
+        state={withCardDetailOrigin(origin)}
         to="/cards/$printingId"
       >
         {artwork}
@@ -234,7 +228,7 @@ function HoldingIdentity({
         <Link
           {...stylex.props(styles.name)}
           params={{ printingId: holding.printingId }}
-          state={withCollectionOrigin(origin)}
+          state={withCardDetailOrigin(origin)}
           to="/cards/$printingId"
         >
           {holding.name}
@@ -252,7 +246,7 @@ function HoldingIdentity({
         <Link
           {...stylex.props(styles.name)}
           params={{ printingId: holding.routePrintingId }}
-          state={withCollectionOrigin(origin)}
+          state={withCardDetailOrigin(origin)}
           to="/cards/$printingId"
         >
           {holding.label}
