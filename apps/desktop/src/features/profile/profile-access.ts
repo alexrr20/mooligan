@@ -1,4 +1,5 @@
-import type { AuthSnapshot, WorkspaceRuntime } from "../../../shared/desktop-api.ts";
+import type { AuthSnapshot } from "@mooligan/account/runtime";
+import type { WorkspaceRuntime } from "../../../shared/desktop-api.ts";
 
 export function canAccessProfile(auth: AuthSnapshot, runtime: WorkspaceRuntime) {
   return (

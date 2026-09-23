@@ -2,6 +2,7 @@ import { deckSectionLabels, deckSections } from "@mooligan/domain/decks";
 import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
 
 import type { DeckEntry } from "../deck-contract.ts";
+import { deckCardTypes } from "./deck-mana.ts";
 
 export function summarizeDeck(
   entries: readonly DeckEntry[],
@@ -14,11 +15,23 @@ export function summarizeDeck(
     owned.set(key, (owned.get(key) ?? 0) + lot.quantity);
   }
   const required = new Map<string, number>();
-  let lands = 0;
-  let spells = 0;
-  let manaTotal = 0;
-  let manaCount = 0;
-  let unknown = 0;
+  for (const entry of entries) {
+    if (entry.section === "maybeboard") continue;
+    const key = ownershipKey(entry);
+    required.set(key, (required.get(key) ?? 0) + entry.quantity);
+  }
+  const missing = [...required].reduce(
+    (sum, [key, count]) => sum + Math.max(0, count - (owned.get(key) ?? 0)),
+    0,
+  );
+  const total = [...required.values()].reduce((sum, count) => sum + count, 0);
+  return { owned, required, missing, total, ...groupDeckEntries(entries, printings) };
+}
+
+export function groupDeckEntries(
+  entries: readonly DeckEntry[],
+  printings: ReadonlyMap<string, CatalogPrintingResult | null>,
+) {
   const cardTypes = (
     [
       "Planeswalker",
@@ -38,16 +51,9 @@ export function summarizeDeck(
     },
   );
   for (const entry of entries) {
-    if (entry.section !== "maybeboard") {
-      const key = ownershipKey(entry);
-      required.set(key, (required.get(key) ?? 0) + entry.quantity);
-    }
     if (displaySection(entry) !== "mainboard") continue;
     const printing = printings.get(entry.printingId);
-    const types =
-      printing?.status === "visible"
-        ? (printing.detail.card.faces[0]?.typeLine ?? "").split("—")[0]!.split(/\s+/u)
-        : [];
+    const types = printing?.status === "visible" ? deckCardTypes(printing.detail.card) : [];
     const groupType =
       entry.section === "commander"
         ? "Commander"
@@ -57,27 +63,10 @@ export function summarizeDeck(
     const group = mainboardGroups.find(({ type }) => type === groupType)!;
     group.entries.push(entry);
     group.quantity += entry.quantity;
-    if (printing?.status !== "visible") {
-      unknown += entry.quantity;
-      continue;
-    }
     for (const count of cardTypes) {
       if (types.includes(count.type)) count.quantity += entry.quantity;
     }
-    if (types.includes("Land")) lands += entry.quantity;
-    else {
-      spells += entry.quantity;
-      if (printing.detail.card.manaValue !== undefined) {
-        manaTotal += printing.detail.card.manaValue * entry.quantity;
-        manaCount += entry.quantity;
-      }
-    }
   }
-  const missing = [...required].reduce(
-    (sum, [key, count]) => sum + Math.max(0, count - (owned.get(key) ?? 0)),
-    0,
-  );
-  const total = [...required.values()].reduce((sum, count) => sum + count, 0);
   return {
     sections: deckSections
       .filter((value) => value !== "commander")
@@ -90,16 +79,8 @@ export function summarizeDeck(
           quantity: sectionEntries.reduce((sum, entry) => sum + entry.quantity, 0),
         };
       }),
-    owned,
-    required,
-    missing,
-    total,
-    lands,
-    spells,
-    unknown,
     cardTypes,
     mainboardGroups: mainboardGroups.filter(({ quantity }) => quantity > 0),
-    averageMana: manaCount ? manaTotal / manaCount : null,
   };
 }
 

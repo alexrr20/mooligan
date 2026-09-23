@@ -12,7 +12,6 @@ import {
   SearchUniverseFilter,
 } from "../features/search/search-controls";
 import { SearchResults, UpcomingSearchResults } from "../features/search/search-results";
-import { createCatalogSearchOrigin } from "../features/search/catalog-search-origin";
 import { type CatalogSearchState, validateCatalogSearch } from "../features/search/search-state";
 import { useCatalogSearch } from "../features/search/use-catalog-search";
 import { useCatalogUpcomingPrintings } from "../features/search/use-catalog-upcoming-printings";
@@ -139,7 +138,7 @@ function SearchPage() {
             hasMore={catalog.hasMore}
             imagesReady={catalog.imagesReady}
             loading={catalog.loading}
-            origin={createCatalogSearchOrigin(searchState)}
+            origin={{ kind: "search", search: searchState }}
             queryError={catalog.queryError}
             total={catalog.total}
             onLoadMore={catalog.loadMore}
@@ -172,7 +171,7 @@ function SearchPage() {
             hasMore={upcomingCards.hasMore}
             imagesReady={upcomingCards.imagesReady}
             loading={upcomingCards.loading}
-            origin={createCatalogSearchOrigin(searchState)}
+            origin={{ kind: "search", search: searchState }}
             printings={upcomingCards.printings}
             total={upcomingCards.total}
             onLoadMore={upcomingCards.loadMore}

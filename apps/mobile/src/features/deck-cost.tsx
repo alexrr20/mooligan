@@ -1,4 +1,4 @@
-import { deckCostMetrics, deckCostScope } from "@mooligan/catalog/deck-cost-summary";
+import { deckCostMetrics, deckCostScope } from "@mooligan/presentation/deck-cost";
 import type { DeckEntry } from "@mooligan/workspace/deck-contract";
 
 import { Button, Copy, Panel } from "@/components/ui";

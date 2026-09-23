@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { unavailableResponse } from "./remote-asset-cache.ts";
 import { Either, Schema } from "effect";
 import {
   CatalogSetSymbolDescriptorSchema,
@@ -5,7 +7,7 @@ import {
 } from "@mooligan/domain/spoilers";
 import type { Session } from "electron";
 
-import { readCachedCatalogSetSymbol, type CatalogSetSymbolCache } from "./set-symbol-cache.ts";
+import type { CatalogSetSymbolCache } from "./set-symbol-cache.ts";
 
 export const catalogSetSymbolScheme = "mooligan-set-symbol";
 
@@ -36,7 +38,7 @@ export function registerCatalogSetSymbolProtocol(
     }
 
     try {
-      return new Response(await readCachedCatalogSetSymbol(cached.path), {
+      return new Response(new Uint8Array(await readFile(cached.path)), {
         headers: {
           "Cache-Control": "no-store",
           "Content-Type": "image/svg+xml",
@@ -78,8 +80,4 @@ export function parseCatalogSetSymbolUrl(value: string): CatalogSetSymbolDescrip
   }
   const parsed = Schema.decodeUnknownEither(CatalogSetSymbolDescriptorSchema)({ setId });
   return Either.isRight(parsed) ? parsed.right : null;
-}
-
-function unavailableResponse(status: number) {
-  return new Response(null, { headers: { "Cache-Control": "no-store" }, status });
 }

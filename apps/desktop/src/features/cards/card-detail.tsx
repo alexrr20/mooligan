@@ -194,11 +194,7 @@ export function ReturnNavigation({ origin }: { origin: CardDetailOrigin | null }
   if (origin?.kind === "deck") {
     return (
       <nav {...stylex.props(styles.returnRow)} aria-label="Card detail return">
-        <Link
-          {...stylex.props(styles.returnLink)}
-          search={{ deck: origin.value.deckId }}
-          to="/decks"
-        >
+        <Link {...stylex.props(styles.returnLink)} search={{ deck: origin.deckId }} to="/decks">
           <span {...stylex.props(styles.returnArrow)} aria-hidden="true">
             ←
           </span>
@@ -210,7 +206,7 @@ export function ReturnNavigation({ origin }: { origin: CardDetailOrigin | null }
   if (origin?.kind === "collection") {
     return (
       <nav {...stylex.props(styles.returnRow)} aria-label="Card detail return">
-        <Link {...stylex.props(styles.returnLink)} search={origin.value.search} to="/collection">
+        <Link {...stylex.props(styles.returnLink)} search={origin.search} to="/collection">
           <span {...stylex.props(styles.returnArrow)} aria-hidden="true">
             ←
           </span>
@@ -222,7 +218,7 @@ export function ReturnNavigation({ origin }: { origin: CardDetailOrigin | null }
 
   return (
     <nav {...stylex.props(styles.returnRow)} aria-label="Card detail return">
-      <Link {...stylex.props(styles.returnLink)} search={origin?.value.search ?? {}} to="/search">
+      <Link {...stylex.props(styles.returnLink)} search={origin?.search ?? {}} to="/search">
         <span {...stylex.props(styles.returnArrow)} aria-hidden="true">
           ←
         </span>

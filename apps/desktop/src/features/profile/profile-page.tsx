@@ -5,7 +5,8 @@ import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
-import type { AuthUser } from "../../../shared/desktop-api";
+import type { AuthUser } from "@mooligan/account/runtime";
+
 import { Button } from "../../components/ui/button";
 import { PrintingImage } from "../cards/printing-image";
 import { useCatalogCardDetail } from "../cards/use-card-detail";

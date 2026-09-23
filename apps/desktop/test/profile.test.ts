@@ -10,7 +10,8 @@ import { emptyProfile } from "@mooligan/workspace/profile-contract";
 import { events, workspaceSchema, workspaceSyncedEventSchema } from "@mooligan/workspace/schema";
 import { profileQuery, readProfile } from "@mooligan/workspace/profile";
 
-import type { AuthSnapshot, WorkspaceRuntime } from "../shared/desktop-api.ts";
+import type { AuthSnapshot } from "@mooligan/account/runtime";
+import type { WorkspaceRuntime } from "../shared/desktop-api.ts";
 import { canAccessProfile } from "../src/features/profile/profile-access.ts";
 import {
   changeProfileBanner,

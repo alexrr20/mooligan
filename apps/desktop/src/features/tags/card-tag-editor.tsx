@@ -1,12 +1,13 @@
+import { EditorSelect, EditorMessage, editorStyles } from "../../components/ui/editor-controls";
 import * as stylex from "@stylexjs/stylex";
-import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { tagsForDeck } from "@mooligan/workspace/client/tag-state";
+import { useAction } from "../../hooks/use-action";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../components/ui/dialog";
 import { Input } from "../../components/ui/input";
 import { Form } from "../../components/ui/form";
-import { DeckMessage, DeckSelect, deckStyles } from "./deck-controls";
+
 import { CardTagBadge, TagCheckbox, tagStyles } from "./card-tag-controls";
 import { useCardTags } from "./use-card-tags";
 
@@ -28,7 +29,7 @@ export function CardTagEditor({
   const matching = available.filter((tag) =>
     tag.name.toLowerCase().includes(search.trim().toLowerCase()),
   );
-  const action = useMutation({ mutationFn: async (run: () => void) => run() });
+  const action = useAction();
   const ids = new Set(cardIds);
   const counts = new Map<string, number>();
   for (const assignment of assignments) {
@@ -42,17 +43,17 @@ export function CardTagEditor({
         if (!open) onClose();
       }}
     >
-      <DialogContent style={deckStyles.dialog}>
+      <DialogContent style={editorStyles.dialog}>
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>
           Give cards more than one role. Global tags follow every printing across your decks.
           Changes save immediately.
         </DialogDescription>
         <Form
-          style={deckStyles.fields}
+          style={editorStyles.fields}
           onSubmit={(event) => {
             event.preventDefault();
-            action.mutate(() => {
+            action.run(() => {
               const tagId = actions.create(scope === "global" ? null : deckId, {
                 name: search,
                 color: "sage",
@@ -78,9 +79,7 @@ export function CardTagEditor({
                   label={tag.name + (tag.deckId === null ? ", global" : ", this deck")}
                   checked={count === ids.size && ids.size > 0}
                   indeterminate={count > 0 && count < ids.size}
-                  onChange={(checked) =>
-                    action.mutate(() => actions.assign(tag.id, cardIds, checked))
-                  }
+                  onChange={(checked) => action.run(() => actions.assign(tag.id, cardIds, checked))}
                 >
                   <CardTagBadge tag={tag} />
                   {ids.size > 1 ? (
@@ -99,8 +98,8 @@ export function CardTagEditor({
               </p>
             ) : null}
           </div>
-          <div {...stylex.props(deckStyles.toolbar)}>
-            <DeckSelect
+          <div {...stylex.props(editorStyles.toolbar)}>
+            <EditorSelect
               label="New tag scope"
               value={scope}
               onChange={setScope}
@@ -114,7 +113,6 @@ export function CardTagEditor({
               variant="secondary"
               disabled={
                 !search.trim() ||
-                action.isPending ||
                 available.some(
                   (tag) =>
                     tag.deckId === (scope === "global" ? null : deckId) &&
@@ -125,7 +123,7 @@ export function CardTagEditor({
               Create and apply
             </Button>
           </div>
-          {action.error ? <DeckMessage error>{action.error.message}</DeckMessage> : null}
+          {action.error ? <EditorMessage error>{action.error.message}</EditorMessage> : null}
         </Form>
         <Button onClick={onClose}>Done</Button>
       </DialogContent>

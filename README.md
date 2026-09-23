@@ -11,6 +11,8 @@ prerequisite for using the desktop app.
 - `packages/domain`: shared catalog, collection, deck, list, and market types
 - `packages/catalog`: shared offline catalog SQL, validation, and price import logic
 - `packages/workspace`: shared LiveStore events, state, and backup schema
+- `packages/account`: shared Account binding, sync credentials, and Workspace registry
+- `packages/presentation`: shared display labels, palettes, and formatting for both apps
 
 Node.js 22.18 or newer is required.
 

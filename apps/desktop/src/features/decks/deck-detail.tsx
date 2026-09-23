@@ -1,11 +1,13 @@
+import { EditorMessage } from "../../components/ui/editor-controls";
 import type { Deck, DeckEntry } from "@mooligan/workspace/deck-contract";
 import { Tabs } from "@base-ui/react/tabs";
 import { analyzeDeckMana } from "@mooligan/workspace/client/deck-mana";
 import { collectionLotsQuery } from "@mooligan/workspace/collection";
 import * as stylex from "@stylexjs/stylex";
-import { useMutation, useQueries } from "@tanstack/react-query";
+import { useQueries } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 
+import { useAction } from "../../hooks/use-action";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../components/ui/dialog";
 import { catalogCardDetailQueryOptions } from "../cards/use-card-detail";
@@ -13,7 +15,7 @@ import { useWorkspaceLiveStore } from "../workspace/workspace-store-context";
 import { DeckActions } from "./deck-actions";
 import { DeckCards } from "./deck-cards";
 import { commanderArt } from "./deck-art";
-import { DeckMessage, deckStyles } from "./deck-controls";
+import { deckStyles } from "./deck-controls";
 import { DeckEntryEditor } from "./deck-entry-editor";
 import { DeckImportExport } from "./deck-import-export";
 import { DeckHeader } from "./deck-header";
@@ -39,7 +41,7 @@ export function DeckDetail({
   const [deleting, setDeleting] = useState(false);
   const actionsRef = useRef<HTMLButtonElement>(null);
   const mutations = useDeckMutations();
-  const action = useMutation({ mutationFn: async (run: () => void) => run() });
+  const action = useAction();
   const ids = [...new Set(deck.entries.map(({ printingId }) => printingId))];
   const queries = useQueries({
     queries: ids.map((id) => catalogCardDetailQueryOptions(window.catalog.detail, id)),
@@ -55,23 +57,23 @@ export function DeckDetail({
           triggerRef={actionsRef}
           archived={deck.archived}
           onEdit={() => setEditing(true)}
-          onDuplicate={() => action.mutate(() => onOpenDeck(mutations.duplicate(deck.id)))}
+          onDuplicate={() => action.run(() => onOpenDeck(mutations.duplicate(deck.id)))}
           onArchive={() =>
-            action.mutate(() => mutations.update(deck.id, { archived: !deck.archived }))
+            action.run(() => mutations.update(deck.id, { archived: !deck.archived }))
           }
           onImport={() => setTransfer("import")}
           onExport={() => setTransfer("export")}
           onDelete={() => setDeleting(true)}
         />
       </DeckHeader>
-      {action.error ? <DeckMessage error>{action.error.message}</DeckMessage> : null}
+      {action.error ? <EditorMessage error>{action.error.message}</EditorMessage> : null}
       {deck.notes ? <p {...stylex.props(deckStyles.notes, styles.notes)}>{deck.notes}</p> : null}
       <div {...stylex.props(styles.overview)}>
         <DeckStats summary={summary} />
         <DeckCost entries={deck.entries} />
       </div>
       {queries.some((query) => query.isError) ? (
-        <DeckMessage error>
+        <EditorMessage error>
           Some local card details could not be read.{" "}
           <Button
             variant="secondary"
@@ -81,7 +83,7 @@ export function DeckDetail({
           >
             Retry
           </Button>
-        </DeckMessage>
+        </EditorMessage>
       ) : null}
       <Tabs.Root defaultValue="cards" {...stylex.props(styles.tabs)}>
         <Tabs.List aria-label="Deck view" {...stylex.props(styles.tabList)}>
@@ -97,7 +99,7 @@ export function DeckDetail({
             deck={deck}
             printings={printings}
             onEdit={setEntry}
-            onRemove={(entry) => action.mutate(() => mutations.removeEntry(deck.id, entry.id))}
+            onRemove={(entry) => action.run(() => mutations.removeEntry(deck.id, entry.id))}
           />
         </Tabs.Panel>
         <Tabs.Panel value="mana">
@@ -138,7 +140,7 @@ export function DeckDetail({
           <Button
             variant="destructive"
             onClick={() =>
-              action.mutate(() => {
+              action.run(() => {
                 mutations.remove(deck.id);
                 onDeleted();
               })

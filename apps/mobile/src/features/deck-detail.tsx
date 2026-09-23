@@ -20,15 +20,16 @@ import { Button, Choice, Copy, Field, Panel, Row, Screen, confirmRemoval } from 
 import { CardRow } from "@/components/cards";
 import { useCatalogQuery, useWorkspace } from "@/workspace/provider";
 import { readDocument, shareDocument } from "@/workspace/files";
-import { CatalogSearch } from "./search";
-import { DeckMetadataForm } from "./decks";
-import { AddDeckCard } from "./card-detail";
+import { CatalogSearch } from "./search/catalog-search";
+import { DeckMetadataForm } from "./decks/deck-metadata-form";
+import { AddDeckCard } from "./decks/add-deck-card";
 import { deckSectionOptions, finishOptions } from "./options";
 import {
   cardIdentity,
   tagsForDeck,
   indexCardTags,
   groupEntriesByTag,
+  filterEntriesByTag,
 } from "@mooligan/workspace/client/tag-state";
 import { CardTagBadges, CardTagEditor, CardTagManager } from "./card-tags";
 import { DeckCost } from "./deck-cost";
@@ -61,10 +62,6 @@ function DeckEditor({ deck }: { deck: Deck }) {
   const [tagging, setTagging] = useState<{ title: string; cardIds: string[] } | null>(null);
   const availableTags = tagsForDeck(cardTags, deck.id, tagScope === "all");
   const byCard = indexCardTags(availableTags, tagAssignments);
-  const activeTagFilter =
-    tagFilter === "untagged" || availableTags.some(({ id }) => id === tagFilter)
-      ? tagFilter
-      : "all";
   const ids = [...new Set(deck.entries.map((entry) => entry.printingId))];
   const { data: printings } = useCatalogQuery(
     ["deck-printings", JSON.stringify(ids)],
@@ -75,16 +72,18 @@ function DeckEditor({ deck }: { deck: Deck }) {
     ({ catalog, visibility }) => (selected ? catalog.detail(selected, visibility) : null),
   );
   const summary = summarizeDeck(deck.entries, lots, printings ?? new Map());
-  const entries = deck.entries.filter((entry) => {
+  const mana = analyzeDeckMana(deck.entries, printings ?? new Map());
+  const { activeFilter: activeTagFilter, entries: taggedEntries } = filterEntriesByTag(
+    deck.entries,
+    printings ?? new Map(),
+    availableTags,
+    tagAssignments,
+    tagFilter,
+  );
+  const entries = taggedEntries.filter((entry) => {
     const result = printings?.get(entry.printingId);
     const name = result?.status === "visible" ? result.detail.card.name : "";
-    const identity = cardIdentity(result);
-    const assigned = identity ? (byCard.get(identity) ?? []) : [];
     return (
-      (activeTagFilter === "all" ||
-        (activeTagFilter === "untagged"
-          ? !assigned.length
-          : assigned.some(({ id }) => id === activeTagFilter))) &&
       (section === "all" || entry.section === section) &&
       name.toLowerCase().includes(query.toLowerCase())
     );
@@ -123,13 +122,11 @@ function DeckEditor({ deck }: { deck: Deck }) {
       <Panel>
         <Copy>
           {summary.total - summary.missing} owned · {summary.missing} missing
-          {summary.unknown
-            ? `\n${summary.unknown} cards with protected or unavailable details`
-            : ""}
+          {mana.unknown ? `\n${mana.unknown} cards with protected or unavailable details` : ""}
         </Copy>
         <Copy>
-          {summary.lands} lands · {summary.spells} nonlands · average mana{" "}
-          {summary.averageMana?.toFixed(2) ?? "unavailable"}
+          {mana.lands} lands · {mana.spellCount} nonlands · average mana{" "}
+          {mana.averageMana?.toFixed(2) ?? "unavailable"}
         </Copy>
         {deck.notes && <Copy>{deck.notes}</Copy>}
         {deck.tags.length > 0 && <Copy>{deck.tags.join(" · ")}</Copy>}
@@ -153,9 +150,7 @@ function DeckEditor({ deck }: { deck: Deck }) {
         }}
       />
       {mode === "tags" && <CardTagManager deckId={deck.id} />}
-      {mode === "mana" && (
-        <DeckManaAnalysis analysis={analyzeDeckMana(deck.entries, printings ?? new Map())} />
-      )}
+      {mode === "mana" && <DeckManaAnalysis analysis={mana} />}
       {mode === "edit" && (
         <DeckMetadataForm initial={deck} submit="Save deck" onSave={saveMetadata} />
       )}

@@ -1,17 +1,15 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
 import { Schema } from "effect";
 import type { JsonValue } from "@mooligan/domain/schema";
 import { workspaceEventSchemaVersion } from "@mooligan/workspace";
 
-import type { AuthSnapshot } from "../shared/desktop-api.ts";
-import type { AccountWorkspaceApiPath } from "../electron/auth/service.ts";
+import type { AuthSnapshot } from "../src/runtime.ts";
+import type { AccountWorkspaceApiPath } from "../src/workspace.ts";
 import { AccountWorkspace, type AccountWorkspaceAuth } from "@mooligan/account/workspace";
-import { WorkspaceRegistry } from "../electron/workspace/registry.ts";
+import { WorkspaceRegistry } from "../src/registry.ts";
 
 const now = 1_000_000;
 
@@ -399,12 +397,10 @@ function jsonResponse(body: JsonValue, status = 200) {
 }
 
 async function withRegistry(run: (registry: WorkspaceRegistry) => Promise<void>) {
-  const directory = await mkdtemp(join(tmpdir(), "mooligan-account-workspace-"));
-  const registry = new WorkspaceRegistry(directory);
+  const registry = new WorkspaceRegistry(new DatabaseSync(":memory:"), randomUUID);
   try {
     await run(registry);
   } finally {
     registry.close();
-    await rm(directory, { force: true, recursive: true });
   }
 }

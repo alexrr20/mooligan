@@ -8,7 +8,8 @@ import { PageFrame } from "../components/page-frame";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { DeckDetail } from "../features/decks/deck-detail";
-import { DeckSelect, deckStyles } from "../features/decks/deck-controls";
+import { deckStyles } from "../features/decks/deck-controls";
+import { EditorSelect, editorStyles } from "../components/ui/editor-controls";
 import { DeckGrid } from "../features/decks/deck-grid";
 import { CreateDeckDialog } from "../features/decks/create-deck-dialog";
 import { useDecks } from "../features/decks/use-decks";
@@ -81,7 +82,7 @@ function DecksPage() {
         <header {...stylex.props(deckStyles.header)}>
           <div>
             <h1 {...stylex.props(deckStyles.title)}>Decks</h1>
-            <p {...stylex.props(deckStyles.muted)}>
+            <p {...stylex.props(editorStyles.muted)}>
               Plan cards for play. Your decks are saved in this workspace.
             </p>
           </div>
@@ -89,12 +90,12 @@ function DecksPage() {
             Create deck
           </Button>
         </header>
-        <div {...stylex.props(deckStyles.toolbar)}>
-          <label {...stylex.props(deckStyles.field, deckStyles.searchField)}>
+        <div {...stylex.props(editorStyles.toolbar)}>
+          <label {...stylex.props(editorStyles.field, deckStyles.searchField)}>
             Search decks
             <Input value={filter} onValueChange={setFilter} placeholder="Name, labels, or notes" />
           </label>
-          <DeckSelect
+          <EditorSelect
             label="Status"
             options={[
               { label: "Active", value: "active" },
@@ -104,13 +105,13 @@ function DecksPage() {
             value={status}
             onChange={setStatus}
           />
-          <DeckSelect
+          <EditorSelect
             label="Format"
             options={[{ label: "All formats", value: "all" }, ...formats]}
             value={format}
             onChange={setFormat}
           />
-          <DeckSelect
+          <EditorSelect
             label="Sort"
             options={[
               { label: "Recently updated", value: "updated" },
@@ -120,7 +121,7 @@ function DecksPage() {
             onChange={setSort}
           />
         </div>
-        <p {...stylex.props(deckStyles.muted)}>
+        <p {...stylex.props(editorStyles.muted)}>
           {shown.length} {shown.length === 1 ? "deck" : "decks"}
         </p>
         {!shown.length ? (
@@ -128,7 +129,7 @@ function DecksPage() {
             <h2 {...stylex.props(deckStyles.sectionTitle)}>
               {decks.length ? "No matching decks" : "Build your first deck"}
             </h2>
-            <p {...stylex.props(deckStyles.muted)}>
+            <p {...stylex.props(editorStyles.muted)}>
               {decks.length
                 ? "Change the search or filters to find your decks."
                 : "Create a deck, then find cards in the local catalog or import a deck list. No account is required."}

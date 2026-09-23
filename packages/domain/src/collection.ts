@@ -1,3 +1,4 @@
+import type { CatalogPrintingResult } from "./spoilers.ts";
 import { Schema } from "effect";
 
 import { FinishSchema } from "./catalog.ts";
@@ -174,3 +175,25 @@ export const CollectionProjectionResultSchema = Schema.Union(
   StrictStruct({ status: Schema.Literal("resync-required") }),
 );
 export type CollectionProjectionResult = typeof CollectionProjectionResultSchema.Type;
+
+export function assertPrintingCanUseFinish(
+  result: CatalogPrintingResult | null,
+  request: {
+    existingFinish?: typeof FinishSchema.Type;
+    finish: typeof FinishSchema.Type;
+  },
+) {
+  if (!result) {
+    if (request.existingFinish === request.finish) return;
+    throw new Error("This printing is not present in the installed catalog.");
+  }
+  if (result.status === "protected") {
+    throw new Error("Reveal this printing before adding it to the Collection.");
+  }
+  if (result.detail.selectedPrinting.isDigital) {
+    throw new Error("Digital printings cannot be added to the Collection.");
+  }
+  if (!result.detail.selectedPrinting.finishes?.includes(request.finish)) {
+    throw new Error("This finish is not available for the selected printing.");
+  }
+}

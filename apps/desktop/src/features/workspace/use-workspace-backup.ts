@@ -5,8 +5,8 @@ import {
   createWorkspaceBackup,
   restoreWorkspaceBackup,
 } from "@mooligan/workspace/client/workspace-backup";
-import { createLiveStoreRegistry, localWorkspaceStoreOptions } from "../workspace/workspace-store";
-import { useWorkspaceLiveStore } from "../workspace/workspace-store-context";
+import { createLiveStoreRegistry, localWorkspaceStoreOptions } from "./workspace-store";
+import { useWorkspaceLiveStore } from "./workspace-store-context";
 
 export function useWorkspaceBackup() {
   const store = useWorkspaceLiveStore();

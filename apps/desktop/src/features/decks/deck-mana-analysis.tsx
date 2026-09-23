@@ -1,12 +1,17 @@
+import {
+  drawComparisons,
+  formatProbability,
+  manaDrawTargets,
+  manaTypeStyles,
+  manaCurveLabel,
+} from "@mooligan/presentation/deck-mana";
+import { EditorSelect } from "../../components/ui/editor-controls";
 import { useState, type ReactNode } from "react";
 import * as stylex from "@stylexjs/stylex";
 import type { DeckManaAnalysis } from "@mooligan/workspace/client/deck-mana";
 import {
-  drawComparisons,
   drawProbability,
-  formatProbability,
   manaDrawStats,
-  manaDrawTargets,
   type DrawComparison,
 } from "@mooligan/workspace/client/deck-mana";
 
@@ -19,7 +24,6 @@ import {
 } from "../../components/ui/number-field";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import { ManaSymbol } from "../cards/oracle-text";
-import { DeckSelect } from "./deck-controls";
 
 export function DeckManaAnalysis({ analysis }: { analysis: DeckManaAnalysis }) {
   const [production, setProduction] = useState("lands");
@@ -99,8 +103,8 @@ export function DeckManaAnalysis({ analysis }: { analysis: DeckManaAnalysis }) {
               <div
                 {...stylex.props(styles.column)}
                 role="listitem"
-                key={bucket.label}
-                aria-label={`Mana value ${bucket.label}: ${bucket.total} cards, ${bucket.permanents} permanents, ${bucket.nonpermanents} instants and sorceries`}
+                key={manaCurveLabel(bucket.value)}
+                aria-label={`Mana value ${manaCurveLabel(bucket.value)}: ${bucket.total} cards, ${bucket.permanents} permanents, ${bucket.nonpermanents} instants and sorceries`}
               >
                 <span {...stylex.props(styles.columnValue)}>{bucket.total || ""}</span>
                 <div {...stylex.props(styles.track)} aria-hidden="true">
@@ -117,7 +121,7 @@ export function DeckManaAnalysis({ analysis }: { analysis: DeckManaAnalysis }) {
                     )}
                   />
                 </div>
-                <span {...stylex.props(styles.columnLabel)}>{bucket.label}</span>
+                <span {...stylex.props(styles.columnLabel)}>{manaCurveLabel(bucket.value)}</span>
               </div>
             ))}
           </div>
@@ -126,7 +130,7 @@ export function DeckManaAnalysis({ analysis }: { analysis: DeckManaAnalysis }) {
           title="Colors"
           info="Share of colored cost pips compared with share of color sources. Each source counts once per color it can produce, including conditional abilities. Fetch targets and token production are not inferred. Hybrid pips split between colors; Phyrexian pips count as colored. Generic costs are excluded."
           aside={
-            <DeckSelect
+            <EditorSelect
               label="Count sources"
               hideLabel
               value={production}
@@ -157,14 +161,18 @@ export function DeckManaAnalysis({ analysis }: { analysis: DeckManaAnalysis }) {
                   key={color.value}
                   role="listitem"
                   {...stylex.props(styles.colorRow)}
-                  aria-label={`${color.label}: ${formatCount(color.pips)} pips, ${Math.round(cost * 100)}% of cost; ${color[sourceKey]} sources, ${Math.round(sources * 100)}% of sources`}
+                  aria-label={`${manaTypeStyles[color.value].label}: ${formatCount(color.pips)} pips, ${Math.round(cost * 100)}% of cost; ${color[sourceKey]} sources, ${Math.round(sources * 100)}% of sources`}
                 >
                   <ManaSymbol token={`{${color.value}}`} />
                   <div {...stylex.props(styles.colorBars)} aria-hidden="true">
-                    <span {...stylex.props(styles.colorBar(cost * 100, color.color))} />
                     <span
                       {...stylex.props(
-                        styles.colorBar(sources * 100, color.color),
+                        styles.colorBar(cost * 100, manaTypeStyles[color.value].color),
+                      )}
+                    />
+                    <span
+                      {...stylex.props(
+                        styles.colorBar(sources * 100, manaTypeStyles[color.value].color),
                         styles.sourceBar,
                       )}
                     />
@@ -218,7 +226,7 @@ export function DeckManaAnalysis({ analysis }: { analysis: DeckManaAnalysis }) {
           title="Lands on curve"
           info="Chance to have drawn N lands by turn N. Choose “On the draw” for multiplayer Commander or being on the draw. Assumes one draw per turn, no mulligans or extra draw. These are draw odds, not casting odds: colors, tapped lands, ramp, and land sequencing are not modeled."
           aside={
-            <DeckSelect
+            <EditorSelect
               label="First turn"
               hideLabel
               value={drawTiming}
@@ -254,7 +262,7 @@ export function DeckManaAnalysis({ analysis }: { analysis: DeckManaAnalysis }) {
         info="Cards seen includes your opening hand. Commanders, companions, sideboard, and maybeboard stay outside the library. Color-source odds mean drawing that source, not having its mana available."
       >
         <div {...stylex.props(styles.calculator)}>
-          <DeckSelect
+          <EditorSelect
             label="Draw"
             hideLabel
             value={comparison}
@@ -267,7 +275,7 @@ export function DeckManaAnalysis({ analysis }: { analysis: DeckManaAnalysis }) {
             onChange={setWanted}
             max={Math.max(1, analysis.librarySize)}
           />
-          <DeckSelect
+          <EditorSelect
             label="Of"
             hideLabel
             value={selected.value}

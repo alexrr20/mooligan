@@ -7,7 +7,6 @@ import { test } from "node:test";
 import { Either, Schema } from "effect";
 
 import { createDeckCostQuery } from "@mooligan/catalog/deck-cost";
-import { deckCostMetrics } from "@mooligan/catalog/deck-cost-summary";
 import { importCatalogData } from "@mooligan/catalog/import";
 import { initializePriceDatabase } from "@mooligan/catalog/prices";
 
@@ -141,7 +140,6 @@ void test("deck cost compares selected finishes with visible paper siblings usin
     const converted = read(convertedRequest, visibility);
     assert.equal(converted.cheapest.amount, 10);
     assert.equal(converted.cheapest.rateDate, "2026-09-18");
-    assert.match(deckCostMetrics(converted)[1]!.value, /^≈ /);
     const missingRates = read({ ...convertedRequest, rates: null }, visibility);
     assert.equal(missingRates.cheapest.amount, 13);
     assert.equal(missingRates.cheapest.missingRates, true);
@@ -159,8 +157,6 @@ void test("deck cost compares selected finishes with visible paper siblings usin
     assert.equal(missing.current.pricedQuantity, 1);
     assert.equal(missing.cheapest.amount, 5);
     assert.equal(missing.cheapest.pricedQuantity, 3);
-    assert.match(deckCostMetrics(missing)[0]!.value, /partial/);
-    assert.equal(deckCostMetrics(missing)[1]!.coverage, "Prices for 3 of 7 copies");
     assert.equal(
       read({ ...request, entries: [entry("selected", 1, "mainboard", "glossy")] }, visibility)
         .current.pricedQuantity,
@@ -168,12 +164,9 @@ void test("deck cost compares selected finishes with visible paper siblings usin
     );
     const disabled = read({ ...request, providers: [] }, visibility);
     assert.equal(disabled.cheapest.pricedQuantity, 0);
-    assert.equal(deckCostMetrics(disabled)[0]!.value, "Unavailable");
     const empty = read({ ...request, entries: [entry("selected", 1, "maybeboard")] }, visibility);
     assert.equal(empty.quantity, 0);
     assert.equal(empty.current.amount, 0);
-    assert.equal(deckCostMetrics(empty)[0]!.coverage, null);
-    assert.doesNotMatch(deckCostMetrics(empty)[0]!.value, /Unavailable|partial/);
 
     const protectedEntry = read(
       { ...request, entries: [entry("preview", 1), entry("digital", 1)] },

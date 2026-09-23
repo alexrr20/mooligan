@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Text, View } from "react-native";
 import { starterCategories, type CardTag, type TagStyle } from "@mooligan/workspace/tag-contract";
-import { tagColorStyles, tagColors } from "@mooligan/domain/tags";
+import { tagColors } from "@mooligan/domain/tags";
+import { tagColorStyles } from "@mooligan/presentation/tags";
 import { tagsForDeck } from "@mooligan/workspace/client/tag-state";
 import { Button, Choice, Copy, Field, Panel, Row, confirmRemoval } from "@/components/ui";
 import { useWorkspace } from "@/workspace/provider";

@@ -1,3 +1,4 @@
+import { editorStyles } from "../../components/ui/editor-controls";
 import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getCatalogFormatName, type CatalogImageDescriptor } from "@mooligan/domain/catalog-detail";
@@ -44,7 +45,7 @@ export function DeckHeader({
           <DeckColors deck={deck} />
           <span {...stylex.props(styles.compactTitle)}>{deck.name}</span>
         </div>
-        <div {...stylex.props(deckStyles.toolbar)}>{children}</div>
+        <div {...stylex.props(editorStyles.toolbar)}>{children}</div>
       </header>
       <div {...stylex.props(styles.hero)} data-reduced-motion={reduceMotion}>
         {art.length ? (
@@ -76,7 +77,7 @@ export function DeckHeader({
           >
             {deck.name}
           </motion.h1>
-          <p {...stylex.props(deckStyles.muted)}>
+          <p {...stylex.props(editorStyles.muted)}>
             {getCatalogFormatName(deck.formatId)}
             {deck.archived ? " · Archived" : ""}
             {deck.tags.length ? ` · ${deck.tags.join(", ")}` : ""}

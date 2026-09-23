@@ -20,6 +20,7 @@
   },
   "devDependencies": {
     "@livestore/adapter-web": "catalog:",
+    "@livestore/common": "catalog:",
     "@types/node": "catalog:",
     "typescript": "catalog:"
   }

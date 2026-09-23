@@ -9,6 +9,7 @@ import {
   UuidV4Schema,
 } from "../src/schema.ts";
 
+import type { CatalogPrintingResult } from "../src/spoilers.ts";
 import { CatalogCardDetailSchema, normalizeScryfallCardDetail } from "../src/catalog-detail.ts";
 import {
   CatalogReleaseSchema,
@@ -18,6 +19,7 @@ import {
   type ScryfallCardDownload,
 } from "../src/catalog-download.ts";
 import {
+  assertPrintingCanUseFinish,
   CardLanguageSchema,
   CollectionHoldingSchema,
   CollectionListRequestSchema,
@@ -449,5 +451,58 @@ void test("Scryfall legalities map boundary spelling and preserve unknown format
       ["vintage", "Vintage", "restricted"],
       ["wildly_new_format", "Wildly New Format", "legal"],
     ],
+  );
+});
+
+void test("collection finish validation shares missing, protected, digital and unsupported rules", () => {
+  const visible: CatalogPrintingResult = {
+    status: "visible",
+    visibility: { reason: "released" },
+    detail: normalizeScryfallCardDetail(
+      scryfallCard({ finishes: ["nonfoil", "foil"], digital: false }),
+    ),
+  };
+  assert.doesNotThrow(() => assertPrintingCanUseFinish(visible, { finish: "foil" }));
+  assert.throws(
+    () => assertPrintingCanUseFinish(visible, { finish: "etched" }),
+    /finish is not available/,
+  );
+  assert.doesNotThrow(() =>
+    assertPrintingCanUseFinish(null, { finish: "foil", existingFinish: "foil" }),
+  );
+  assert.throws(() => assertPrintingCanUseFinish(null, { finish: "foil" }), /not present/);
+  assert.throws(
+    () => assertPrintingCanUseFinish(null, { finish: "foil", existingFinish: "nonfoil" }),
+    /not present/,
+  );
+  assert.throws(
+    () =>
+      assertPrintingCanUseFinish(
+        {
+          ...visible,
+          detail: {
+            ...visible.detail,
+            selectedPrinting: { ...visible.detail.selectedPrinting, isDigital: true },
+          },
+        },
+        { finish: "foil" },
+      ),
+    /Digital printings/,
+  );
+  const protectedPrinting: CatalogPrintingResult = {
+    status: "protected",
+    printingId: "preview",
+    releasedOn: "2030-01-01",
+    release: {
+      code: "tst",
+      name: "Test",
+      rootSetId: "set",
+      nextReleaseOn: "2030-01-01",
+      symbol: { setId: "set" },
+    },
+  };
+  assert.throws(
+    () => assertPrintingCanUseFinish(protectedPrinting, { finish: "foil", existingFinish: "foil" }),
+    /Reveal this printing/,
   );
 });

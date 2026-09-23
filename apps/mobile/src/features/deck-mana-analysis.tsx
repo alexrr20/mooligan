@@ -1,11 +1,15 @@
+import {
+  drawComparisons,
+  formatProbability,
+  manaDrawTargets,
+  manaTypeStyles,
+  manaCurveLabel,
+} from "@mooligan/presentation/deck-mana";
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import {
-  drawComparisons,
   drawProbability,
-  formatProbability,
   manaDrawStats,
-  manaDrawTargets,
   type DeckManaAnalysis,
   type DrawComparison,
 } from "@mooligan/workspace/client/deck-mana";
@@ -80,10 +84,10 @@ export function DeckManaAnalysis({ analysis }: { analysis: DeckManaAnalysis }) {
           muted bars show instants and sorceries.
         </Copy>
         {analysis.curve.map((bucket) => (
-          <View key={bucket.label}>
+          <View key={manaCurveLabel(bucket.value)}>
             <Copy>
-              Mana value {bucket.label}: {bucket.total} cards · {bucket.permanents} permanents ·{" "}
-              {bucket.nonpermanents} instants and sorceries
+              Mana value {manaCurveLabel(bucket.value)}: {bucket.total} cards · {bucket.permanents}{" "}
+              permanents · {bucket.nonpermanents} instants and sorceries
             </Copy>
             <View style={[styles.track, { backgroundColor: palette.border }]} accessible={false}>
               <View
@@ -121,7 +125,7 @@ export function DeckManaAnalysis({ analysis }: { analysis: DeckManaAnalysis }) {
         {analysis.colors.map((color) => (
           <View key={color.value}>
             <Copy>
-              {color.label}: {Number(color.pips.toFixed(1))} pips ·{" "}
+              {manaTypeStyles[color.value].label}: {Number(color.pips.toFixed(1))} pips ·{" "}
               {Math.round(pipTotal ? (color.pips / pipTotal) * 100 : 0)}% of costs.{" "}
               {color[sourceKey]} sources ·{" "}
               {Math.round(sourceTotal ? (color[sourceKey] / sourceTotal) * 100 : 0)}% of sources.
@@ -130,7 +134,7 @@ export function DeckManaAnalysis({ analysis }: { analysis: DeckManaAnalysis }) {
               <View
                 style={{
                   width: `${pipTotal ? (color.pips / pipTotal) * 100 : 0}%`,
-                  backgroundColor: color.color,
+                  backgroundColor: manaTypeStyles[color.value].color,
                 }}
               />
             </View>
@@ -138,7 +142,7 @@ export function DeckManaAnalysis({ analysis }: { analysis: DeckManaAnalysis }) {
               <View
                 style={{
                   width: `${sourceTotal ? (color[sourceKey] / sourceTotal) * 100 : 0}%`,
-                  backgroundColor: color.color,
+                  backgroundColor: manaTypeStyles[color.value].color,
                   opacity: 0.45,
                 }}
               />

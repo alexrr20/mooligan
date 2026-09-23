@@ -64,6 +64,13 @@ void test("set symbol cache accepts only bounded SVGs from the trusted host", as
       new Response(bytes, { headers: { "content-type": "image/png" } }),
       new Response(new Uint8Array(), { headers: { "content-type": "image/svg+xml" } }),
       responseWithUrl(bytes, "https://svgs.scryfall.io/sets/redirected.svg"),
+      new Response(bytes, {
+        headers: { "content-length": "invalid", "content-type": "image/svg+xml" },
+      }),
+      new Response(bytes, { headers: { "content-length": "-1", "content-type": "image/svg+xml" } }),
+      new Response(new Uint8Array(9), {
+        headers: { "content-length": "1", "content-type": "image/svg+xml" },
+      }),
       new Response(new Uint8Array(9), {
         headers: { "content-length": "9", "content-type": "image/svg+xml" },
       }),

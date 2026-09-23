@@ -1,3 +1,4 @@
+import { EditorSelect, EditorMessage, editorStyles } from "../../components/ui/editor-controls";
 import { type CatalogCardDetail, getCatalogFormatName } from "@mooligan/domain/catalog-detail";
 import { deckFormats } from "@mooligan/domain/decks";
 import { type DeckEntry, type DeckMetadata } from "@mooligan/workspace/deck-contract";
@@ -9,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../com
 import { Form } from "../../components/ui/form";
 import { Input } from "../../components/ui/input";
 import { CommanderPicker } from "./commander-picker";
-import { DeckMessage, DeckSelect, deckStyles } from "./deck-controls";
+import { deckStyles } from "./deck-controls";
 
 export function DeckMetadataEditor({
   finalFocus,
@@ -54,11 +55,11 @@ export function DeckMetadataEditor({
         if (!open) onClose();
       }}
     >
-      <DialogContent finalFocus={finalFocus} style={deckStyles.dialog}>
+      <DialogContent finalFocus={finalFocus} style={editorStyles.dialog}>
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>Save a planned deck in this workspace.</DialogDescription>
         <Form
-          style={deckStyles.fields}
+          style={editorStyles.fields}
           onSubmit={(event) => {
             event.preventDefault();
             if (commanderPending) return;
@@ -100,11 +101,11 @@ export function DeckMetadataEditor({
             }
           }}
         >
-          <label {...stylex.props(deckStyles.field)}>
+          <label {...stylex.props(editorStyles.field)}>
             Name
             <Input autoFocus required maxLength={200} value={name} onValueChange={setName} />
           </label>
-          <DeckSelect
+          <EditorSelect
             label="Format"
             options={formats}
             value={formatId}
@@ -122,11 +123,11 @@ export function DeckMetadataEditor({
               onPendingChange={setCommanderPending}
             />
           ) : null}
-          <label {...stylex.props(deckStyles.field)}>
+          <label {...stylex.props(editorStyles.field)}>
             Deck labels, separated by commas
             <Input value={tags} onValueChange={setTags} />
           </label>
-          <label {...stylex.props(deckStyles.field)}>
+          <label {...stylex.props(editorStyles.field)}>
             Notes
             <textarea
               {...stylex.props(deckStyles.textarea)}
@@ -135,8 +136,8 @@ export function DeckMetadataEditor({
               onChange={(event) => setNotes(event.target.value)}
             />
           </label>
-          {error ? <DeckMessage error>{error}</DeckMessage> : null}
-          <div {...stylex.props(deckStyles.toolbar)}>
+          {error ? <EditorMessage error>{error}</EditorMessage> : null}
+          <div {...stylex.props(editorStyles.toolbar)}>
             <Button type="submit" disabled={!name.trim() || commanderPending}>
               Save deck
             </Button>

@@ -1,16 +1,18 @@
+import { EditorSelect, EditorMessage, editorStyles } from "../../components/ui/editor-controls";
 import { Tabs } from "@base-ui/react/tabs";
 import { starterCategories, type CardTag, type TagStyle } from "@mooligan/workspace/tag-contract";
-import { tagColorStyles, tagColors } from "@mooligan/domain/tags";
+import { tagColors } from "@mooligan/domain/tags";
+import { tagColorStyles } from "@mooligan/presentation/tags";
 import { tagsForDeck } from "@mooligan/workspace/client/tag-state";
 import * as stylex from "@stylexjs/stylex";
-import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
+import { useAction } from "../../hooks/use-action";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../components/ui/dialog";
 import { Form } from "../../components/ui/form";
 import { Input } from "../../components/ui/input";
 import { CardTagBadge, tagStyles } from "./card-tag-controls";
-import { DeckMessage, DeckSelect, deckStyles } from "./deck-controls";
+
 import { useCardTags } from "./use-card-tags";
 
 export function CardTagManager({ deckId, onClose }: { deckId: string; onClose: () => void }) {
@@ -20,7 +22,7 @@ export function CardTagManager({ deckId, onClose }: { deckId: string; onClose: (
   const [removing, setRemoving] = useState<CardTag | null>(null);
   const [templateName, setTemplateName] = useState("");
   const [notice, setNotice] = useState("");
-  const action = useMutation({ mutationFn: async (run: () => void) => run() });
+  const action = useAction();
   const local = tagsForDeck(tags, deckId, false);
   const listed =
     tab === "global" ? tagsForDeck(tags, deckId).filter((tag) => tag.deckId === null) : local;
@@ -32,7 +34,7 @@ export function CardTagManager({ deckId, onClose }: { deckId: string; onClose: (
         if (!open) onClose();
       }}
     >
-      <DialogContent style={deckStyles.dialog}>
+      <DialogContent style={editorStyles.dialog}>
         <DialogTitle>Tags & categories</DialogTitle>
         <DialogDescription>
           Organize cards by what they do. Save your deck categories as a template to reuse in
@@ -45,7 +47,7 @@ export function CardTagManager({ deckId, onClose }: { deckId: string; onClose: (
             setEditing(null);
             setRemoving(null);
             setNotice("");
-            action.reset();
+            action.clearError();
           }}
         >
           <Tabs.List aria-label="Tag settings" {...stylex.props(styles.tabs)}>
@@ -61,7 +63,7 @@ export function CardTagManager({ deckId, onClose }: { deckId: string; onClose: (
           </Tabs.List>
           {["deck", "global"].map((scope) => (
             <Tabs.Panel key={scope} value={scope}>
-              <div {...stylex.props(deckStyles.fields)}>
+              <div {...stylex.props(editorStyles.fields)}>
                 <p {...stylex.props(tagStyles.caption)}>
                   {scope === "deck"
                     ? "These categories apply only to cards in this deck. Group by tags to see each role and its card count."
@@ -79,7 +81,7 @@ export function CardTagManager({ deckId, onClose }: { deckId: string; onClose: (
                 />
                 {!listed.length ? (
                   <div {...stylex.props(styles.empty)}>
-                    <p {...stylex.props(deckStyles.muted)}>
+                    <p {...stylex.props(editorStyles.muted)}>
                       {scope === "deck"
                         ? "Make room for every role in your deck."
                         : "Tag a card once. Find its role in every deck."}
@@ -88,7 +90,7 @@ export function CardTagManager({ deckId, onClose }: { deckId: string; onClose: (
                       <Button
                         variant="secondary"
                         onClick={() =>
-                          action.mutate(() => {
+                          action.run(() => {
                             actions.applyCategories(deckId, starterCategories);
                             setNotice(
                               "Added six starter categories. Assign cards from the deck view.",
@@ -140,11 +142,11 @@ export function CardTagManager({ deckId, onClose }: { deckId: string; onClose: (
                       {removing.deckId === null ? "across all decks" : "in this deck"}? Cards stay
                       in your decks.
                     </p>
-                    <div {...stylex.props(deckStyles.toolbar)}>
+                    <div {...stylex.props(editorStyles.toolbar)}>
                       <Button
                         variant="destructive"
                         onClick={() =>
-                          action.mutate(() => {
+                          action.run(() => {
                             actions.remove(removing.id);
                             setRemoving(null);
                           })
@@ -162,23 +164,23 @@ export function CardTagManager({ deckId, onClose }: { deckId: string; onClose: (
             </Tabs.Panel>
           ))}
           <Tabs.Panel value="templates">
-            <div {...stylex.props(deckStyles.fields)}>
+            <div {...stylex.props(editorStyles.fields)}>
               <p {...stylex.props(tagStyles.caption)}>
                 Templates contain category names and colors. Applying one adds missing categories
                 and keeps existing tags and card assignments.
               </p>
               <Form
-                style={deckStyles.fields}
+                style={editorStyles.fields}
                 onSubmit={(event) => {
                   event.preventDefault();
-                  action.mutate(() => {
+                  action.run(() => {
                     actions.saveTemplate(templateName, categories);
                     setTemplateName("");
                     setNotice("Template saved.");
                   });
                 }}
               >
-                <label {...stylex.props(deckStyles.field)}>
+                <label {...stylex.props(editorStyles.field)}>
                   Template name
                   <Input
                     value={templateName}
@@ -187,10 +189,7 @@ export function CardTagManager({ deckId, onClose }: { deckId: string; onClose: (
                     maxLength={80}
                   />
                 </label>
-                <Button
-                  type="submit"
-                  disabled={!templateName.trim() || !local.length || action.isPending}
-                >
+                <Button type="submit" disabled={!templateName.trim() || !local.length}>
                   Save {local.length} deck categories as template
                 </Button>
                 {!local.length ? (
@@ -211,11 +210,11 @@ export function CardTagManager({ deckId, onClose }: { deckId: string; onClose: (
                         />
                       ))}
                     </div>
-                    <div {...stylex.props(deckStyles.toolbar)}>
+                    <div {...stylex.props(editorStyles.toolbar)}>
                       <Button
                         variant="secondary"
                         onClick={() =>
-                          action.mutate(() => {
+                          action.run(() => {
                             const count = actions.applyTemplate(deckId, template.id);
                             setNotice(
                               count
@@ -231,7 +230,7 @@ export function CardTagManager({ deckId, onClose }: { deckId: string; onClose: (
                         variant="ghost"
                         disabled={!local.length}
                         onClick={() =>
-                          action.mutate(() => {
+                          action.run(() => {
                             actions.saveTemplate(template.name, categories, template.id);
                             setNotice(`Updated ${template.name} from this deck’s categories.`);
                           })
@@ -243,7 +242,7 @@ export function CardTagManager({ deckId, onClose }: { deckId: string; onClose: (
                         variant="ghost"
                         aria-label={`Delete ${template.name} template`}
                         onClick={() =>
-                          action.mutate(() => {
+                          action.run(() => {
                             actions.removeTemplate(template.id);
                             setNotice("Template deleted. Deck categories are unchanged.");
                           })
@@ -261,8 +260,8 @@ export function CardTagManager({ deckId, onClose }: { deckId: string; onClose: (
             </div>
           </Tabs.Panel>
         </Tabs.Root>
-        {notice ? <DeckMessage>{notice}</DeckMessage> : null}
-        {action.error ? <DeckMessage error>{action.error.message}</DeckMessage> : null}
+        {notice ? <EditorMessage>{notice}</EditorMessage> : null}
+        {action.error ? <EditorMessage error>{action.error.message}</EditorMessage> : null}
         <Button variant="secondary" onClick={onClose}>
           Done
         </Button>
@@ -282,32 +281,30 @@ function TagDefinitionForm({
 }) {
   const [name, setName] = useState(tag?.name ?? "");
   const [color, setColor] = useState<TagStyle["color"]>(tag?.color ?? "sage");
-  const save = useMutation({
-    mutationFn: async () => {
-      onSave({ name, color });
-      setName("");
-    },
-  });
+  const save = useAction();
   return (
     <Form
-      style={deckStyles.fields}
+      style={editorStyles.fields}
       onSubmit={(event) => {
         event.preventDefault();
-        save.mutate();
+        save.run(() => {
+          onSave({ name, color });
+          setName("");
+        });
       }}
     >
-      <div {...stylex.props(deckStyles.toolbar)}>
-        <label {...stylex.props(deckStyles.field, styles.name)}>
+      <div {...stylex.props(editorStyles.toolbar)}>
+        <label {...stylex.props(editorStyles.field, styles.name)}>
           Tag name
           <Input value={name} onValueChange={setName} placeholder="e.g. Ramp" maxLength={80} />
         </label>
-        <DeckSelect
+        <EditorSelect
           label="Color"
           value={color}
           onChange={setColor}
           options={tagColors.map((value) => ({ value, label: tagColorStyles[value].label }))}
         />
-        <Button type="submit" disabled={!name.trim() || save.isPending}>
+        <Button type="submit" disabled={!name.trim()}>
           {tag ? "Save tag" : "Create tag"}
         </Button>
         {tag ? (
@@ -316,7 +313,7 @@ function TagDefinitionForm({
           </Button>
         ) : null}
       </div>
-      {save.error ? <DeckMessage error>{save.error.message}</DeckMessage> : null}
+      {save.error ? <EditorMessage error>{save.error.message}</EditorMessage> : null}
     </Form>
   );
 }

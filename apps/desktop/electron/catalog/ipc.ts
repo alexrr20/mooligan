@@ -1,10 +1,9 @@
 import { ipcMain, type IpcMainInvokeEvent } from "electron";
 import { Schema } from "effect";
 import { UuidSchema, type JsonValue } from "@mooligan/domain/schema";
-import type { Finish } from "@mooligan/domain/catalog";
 import { DeckCostRequestSchema } from "@mooligan/workspace/transport";
 import { CollectionPrintingValidationRequestSchema } from "@mooligan/domain/collection";
-import type { CatalogPrintingResult } from "@mooligan/domain/spoilers";
+import { assertPrintingCanUseFinish } from "@mooligan/domain/collection";
 import {
   CatalogColorPrintingIdsSchema,
   validateCatalogListRequest,
@@ -106,28 +105,6 @@ export function registerCatalogIpc(catalog: CatalogService, installer: CatalogIn
     } finally {
       catalogRequestControllers.delete(key);
     }
-  }
-}
-
-function assertPrintingCanUseFinish(
-  result: CatalogPrintingResult | null,
-  request: {
-    existingFinish?: Finish;
-    finish: Finish;
-  },
-) {
-  if (!result) {
-    if (request.existingFinish === request.finish) return;
-    throw new Error("This printing is not present in the installed catalog.");
-  }
-  if (result.status === "protected") {
-    throw new Error("Reveal this printing before adding it to the Collection.");
-  }
-  if (result.detail.selectedPrinting.isDigital) {
-    throw new Error("Digital printings cannot be added to the Collection.");
-  }
-  if (!result.detail.selectedPrinting.finishes?.includes(request.finish)) {
-    throw new Error("This finish is not available for the selected printing.");
   }
 }
 

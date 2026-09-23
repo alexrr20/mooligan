@@ -9,7 +9,7 @@ import { Button, Copy, Field, Panel, Row, Screen } from "@/components/ui";
 import { CardImage, CardRow } from "@/components/cards";
 import { useMobileAccount } from "@/account/account-provider";
 import { useCatalogQuery, useWorkspace } from "@/workspace/provider";
-import { CatalogSearch } from "./search";
+import { CatalogSearch } from "./search/catalog-search";
 
 export default function ProfileScreen() {
   const { auth, runtime } = useMobileAccount();

@@ -5,7 +5,7 @@ import { dirname } from "node:path";
 import { type JsonValue, StrictStruct } from "@mooligan/domain/schema";
 import { Either, Schema } from "effect";
 
-import type { AuthUser } from "../../shared/desktop-api.ts";
+import type { AuthUser } from "@mooligan/account/runtime";
 
 const MAX_ENCRYPTED_STATE_BYTES = 1024 * 1024;
 const MAX_PLAINTEXT_STATE_BYTES = 512 * 1024;
